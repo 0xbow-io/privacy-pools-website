@@ -9,6 +9,10 @@ const constants: Constants = {
       label: 'Support',
       href: 'https://docs.google.com/forms/d/e/1FAIpQLSe0UKiTrZ4kD0apx75bEW0PWqJxpd6bCYh_IUKBrCkJOBzkpQ/viewform',
     },
+    {
+      label: 'Github',
+      href: `https://github.com/0xbow-io/privacy-pools-website`,
+    },
   ],
   ASP_OPTIONS: ['0xBow ASP'],
   COOKIES: {
