@@ -6,7 +6,10 @@ import { styled } from '@mui/material';
 import { getConfig } from '~/config';
 
 export const Footer = () => {
-  const { FOOTER_LINKS } = getConfig().constants;
+  const {
+    constants: { FOOTER_LINKS },
+    env: { GITHUB_HASH },
+  } = getConfig();
 
   return (
     <FooterContainer>
@@ -15,7 +18,12 @@ export const Footer = () => {
           <Fragment key={item.label}>
             <LinkItem>
               <Link href={item.href} target='_blank'>
-                {item.label}
+                {item.label !== 'Github' && item.label}
+                {item.label === 'Github' && (
+                  <LinkHash>
+                    {item.label} {GITHUB_HASH && <span>{GITHUB_HASH}</span>}
+                  </LinkHash>
+                )}{' '}
               </Link>
             </LinkItem>
             {i < FOOTER_LINKS.length - 1 && <VBar>|</VBar>}
@@ -65,5 +73,17 @@ const LinkItem = styled('li')(({ theme }) => {
 const VBar = styled('span')(({ theme }) => {
   return {
     color: theme.palette.text.disabled,
+  };
+});
+
+const LinkHash = styled('span')(({ theme }) => {
+  return {
+    span: {
+      fontSize: '1rem',
+      color: theme.palette.text.primary,
+      padding: '0.2rem 0.8rem',
+      borderRadius: '1rem',
+      border: `1px solid ${theme.palette.text.primary}`,
+    },
   };
 });
