@@ -21,7 +21,7 @@ export const Disclaimer = () => {
   return (
     <Container>
       <Typography variant='caption'>
-        This app is in beta. Use at your own risk. Lost funds cannot be recovered.
+        Deposits are temporarily frozen pending a bugfix. Please see: https://x.com/0xprivacypools
       </Typography>
       <SIconButton size='small' onClick={closeDisclaimer}>
         <Close size={20} />
