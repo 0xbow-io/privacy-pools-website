@@ -13,7 +13,8 @@ export const ActionMenu = () => {
   const { hasSomeRelayerAvailable } = useChainContext();
 
   const isWithdrawDisabled = !address || !hasApprovedDeposit || !seed || !hasSomeRelayerAvailable;
-  const isDepositDisabled = !address || !seed;
+  // const isDepositDisabled = !address || !seed;
+  const isDepositDisabled = true; // Temporarily disabled
 
   const goToDeposit = () => {
     setModalOpen(ModalType.DEPOSIT);

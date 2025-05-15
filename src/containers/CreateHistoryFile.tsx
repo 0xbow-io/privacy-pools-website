@@ -68,7 +68,8 @@ export const CreateHistoryFile = () => {
           </Stack>
         </Stack>
         <Stack gap={2} flexDirection={['column', 'row']}>
-          <Button onClick={goToDeposit} data-testid='deposit-button'>
+          {/* Temporarily disabled */}
+          <Button onClick={goToDeposit} data-testid='deposit-button' disabled>
             Make a deposit
           </Button>
           <Button onClick={goToHome} data-testid='return-to-dashboard-button'>
