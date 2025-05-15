@@ -54,7 +54,7 @@ const mainnetChainData: ChainData = {
       scope: 4916574638117198869413701114161172350986437430914933850166949084132905299523n,
       deploymentBlock: 22153707n,
       entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
-      maxDeposit: parseEther('1'),
+      maxDeposit: parseEther('0'),
     },
   },
 };
