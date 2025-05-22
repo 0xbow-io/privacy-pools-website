@@ -54,7 +54,7 @@ const mainnetChainData: ChainData = {
       scope: 4916574638117198869413701114161172350986437430914933850166949084132905299523n,
       deploymentBlock: 22153707n,
       entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
-      maxDeposit: parseEther('0'),
+      maxDeposit: parseEther('10000'),
     },
   },
 };
@@ -80,7 +80,7 @@ const testnetChainData: ChainData = {
       scope: 841291896705749778591013763175255425092642324096338756899790031869355051990n,
       deploymentBlock: 7930633n,
       entryPointAddress: '0xE835EDFA2F78D2d9e7DA9058c30Fc7Ab7c22653e',
-      maxDeposit: parseEther('1'),
+      maxDeposit: parseEther('10000'),
     },
   },
 };
