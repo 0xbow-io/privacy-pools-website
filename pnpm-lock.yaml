@@ -15,8 +15,8 @@ importers:
   .:
     dependencies:
       '@0xbow/privacy-pools-core-sdk':
-        specifier: 0.1.18
-        version: 0.1.18(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+        specifier: 0.1.21
+        version: 0.1.21(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@carbon/icons-react':
         specifier: 11.52.0
         version: 11.52.0(react@19.0.0)
@@ -168,8 +168,8 @@ importers:
 
 packages:
 
-  '@0xbow/privacy-pools-core-sdk@0.1.18':
-    resolution: {integrity: sha512-eVVGnxIEEh30KuyGxABpmq9703vafMqq5G1lWCkXJV8fymVW0SQAiCHpkXE2zME9tguXTV/F+qt6xcyyKm4pbw==}
+  '@0xbow/privacy-pools-core-sdk@0.1.21':
+    resolution: {integrity: sha512-UTNPHSkdR1XdQoU2u7XLaGcRCh09WP9C9yIlXrUgF0SUkiaaE2ZnyUIrhtT/oW7/zreYNZArWv8v647uVSNCzw==}
 
   '@adraffy/ens-normalize@1.10.1':
     resolution: {integrity: sha512-96Z2IP3mYmF1Xg2cDm8f1gWGf/HUVedQ3FMifV4kG/PQ4yEP51xDtRAEfhVNt5f/uzpNkZHwWQuUcu6D6K+Ekw==}
@@ -5150,7 +5150,7 @@ packages:
 
 snapshots:
 
-  '@0xbow/privacy-pools-core-sdk@0.1.18(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
+  '@0xbow/privacy-pools-core-sdk@0.1.21(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
       '@types/snarkjs': 0.7.9
       '@zk-kit/lean-imt': 2.2.2
