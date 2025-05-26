@@ -16,7 +16,8 @@ jobs:
         with:
           title: Check private key and notify
           branch: dev
-          only_notify: true
+          notify_issue: false
+          notify_check: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
   format:
