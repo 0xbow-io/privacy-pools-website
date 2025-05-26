@@ -29,7 +29,7 @@
     "src/**/*.{js,jsx,ts,tsx,css,scss,md,html}": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "@0xbow/privacy-pools-core-sdk": "0.1.18",
+    "@0xbow/privacy-pools-core-sdk": "0.1.21",
     "@carbon/icons-react": "11.52.0",
     "@emotion/cache": "11.13.1",
     "@emotion/react": "11.14.0",

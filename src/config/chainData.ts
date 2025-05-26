@@ -18,6 +18,7 @@ export interface ChainData {
     decimals: number;
     image: string;
     explorerUrl: string;
+    sdkRpcUrl: string;
     rpcUrl: string;
     aspUrl: string;
     relayers: {
@@ -45,6 +46,7 @@ const mainnetChainData: ChainData = {
     image: mainnetIcon.src,
     explorerUrl: mainnet.blockExplorers.default.url,
     relayers: [{ name: 'Freedom Relay', url: 'https://www.freedomrelay.io' }],
+    sdkRpcUrl: 'https://eth.rpc.hypersync.xyz/',
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: ASP_ENDPOINT,
     poolInfo: {
@@ -67,6 +69,7 @@ const testnetChainData: ChainData = {
     decimals: sepolia.nativeCurrency.decimals,
     image: mainnetIcon.src,
     explorerUrl: sepolia.blockExplorers.default.url,
+    sdkRpcUrl: 'https://sepolia.rpc.hypersync.xyz/',
     rpcUrl: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: ASP_ENDPOINT,
     relayers: [
@@ -76,10 +79,10 @@ const testnetChainData: ChainData = {
     poolInfo: {
       chainId: sepolia.id,
       assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-      address: '0x01ef71F4d4b2b5E5738812fE28EC11B92Af4e79c',
-      scope: 841291896705749778591013763175255425092642324096338756899790031869355051990n,
-      deploymentBlock: 7930633n,
-      entryPointAddress: '0xE835EDFA2F78D2d9e7DA9058c30Fc7Ab7c22653e',
+      address: '0x4091b6aF3CB2460a04A58Ce775140221F8B6391B',
+      scope: 6276514527914124858593577781760940935800899619504017018988536900856718641423n,
+      deploymentBlock: 8042931n,
+      entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
       maxDeposit: parseEther('1'),
     },
   },

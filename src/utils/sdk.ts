@@ -55,7 +55,7 @@ const dataServiceConfig: ChainConfig[] = poolsByChain.map((pool) => {
     chainId: pool.chainId,
     privacyPoolAddress: pool.address,
     startBlock: pool.deploymentBlock,
-    rpcUrl: chainData[pool.chainId].rpcUrl,
+    rpcUrl: chainData[pool.chainId].sdkRpcUrl,
     apiKey: 'sdk', // It's not an api key https://viem.sh/docs/clients/public#key-optional
   };
 });
