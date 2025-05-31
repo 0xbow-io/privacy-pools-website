@@ -3,6 +3,7 @@
 import { Box, Divider, styled } from '@mui/material';
 import { BaseModal } from '~/components';
 import { ModalType } from '~/types';
+import { Transaction } from '../ActivityDetails/Transaction';
 import { DetailButtons } from './DetailsButtons';
 import { DetailsHeader } from './DetailsHeader';
 import { Resume } from './Resume';
@@ -22,6 +23,9 @@ export const PoolDetails = () => {
         <Divider />
 
         <WithdrawalsTable />
+        <Divider />
+
+        <Transaction />
       </ModalContainer>
     </BaseModal>
   );

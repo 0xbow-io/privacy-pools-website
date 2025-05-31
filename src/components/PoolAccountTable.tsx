@@ -38,6 +38,8 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('sm'));
 
+  const { setSelectedHistoryData } = usePoolAccountsContext();
+
   const handleToggle = (event: MouseEvent<HTMLElement>, index: number) => {
     const newAnchorEl = Array(poolAccounts.length).fill(null);
     newAnchorEl[index] = anchorEl[index] ? null : event.currentTarget;
@@ -71,6 +73,14 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
     const foundAccount = poolAccounts.find((pa) => pa.label === poolAccount.label);
     if (!foundAccount) return;
 
+    setSelectedHistoryData({
+      type: EventType.DEPOSIT,
+      amount: poolAccount.deposit.value,
+      txHash: poolAccount.deposit.txHash,
+      timestamp: poolAccount.deposit.timestamp ? parseInt(poolAccount.deposit.timestamp.toString()) : 0,
+      reviewStatus: poolAccount.reviewStatus,
+      label: poolAccount.label,
+    });
     setPoolAccount(foundAccount);
     setModalOpen(ModalType.PA_DETAILS);
     handleClose();
