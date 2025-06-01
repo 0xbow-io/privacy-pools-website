@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, MouseEvent } from 'react';
+import { useState, MouseEvent, useMemo } from 'react';
 import { OverflowMenuVertical } from '@carbon/icons-react';
 import {
   styled,
@@ -90,6 +90,13 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
     setAnchorEl(Array(poolAccounts.length).fill(null));
   };
 
+  const getRowReviewStatus = useMemo(
+    () => (row: PoolAccount) => {
+      return row.reviewStatus === ReviewStatus.APPROVED && row.balance === 0n ? ReviewStatus.SPENT : row.reviewStatus;
+    },
+    [],
+  );
+
   const getExitHandler = (row: PoolAccount) => {
     return row.balance !== 0n ? () => handleExit(row) : undefined;
   };
@@ -145,11 +152,11 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
 
                   <STableCell sx={{ paddingRight: mobile ? 0 : '1rem', textAlign: 'center' }}>
                     <Tooltip
-                      title={row.reviewStatus === ReviewStatus.PENDING ? statusMessage : ''}
+                      title={getRowReviewStatus(row) === ReviewStatus.PENDING ? statusMessage : ''}
                       placement='top'
                       disableInteractive
                     >
-                      <StatusChip status={row.reviewStatus} compact={mobile} />
+                      <StatusChip status={getRowReviewStatus(row)} compact={mobile} />
                     </Tooltip>
                   </STableCell>
 

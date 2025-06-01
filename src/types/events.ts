@@ -9,6 +9,7 @@ export enum ReviewStatus {
   APPROVED = 'approved',
   DECLINED = 'declined',
   EXITED = 'exited',
+  SPENT = 'spent',
 }
 
 export type Event = {
