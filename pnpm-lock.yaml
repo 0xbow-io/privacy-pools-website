@@ -85,7 +85,7 @@ importers:
         specifier: 29.7.0
         version: 29.7.0
       '@next/eslint-plugin-next':
-        specifier: ^15.3.2
+        specifier: 15.3.2
         version: 15.3.2
       '@types/jest':
         specifier: 29.5.12
@@ -136,7 +136,7 @@ importers:
         specifier: 5.2.1
         version: 5.2.1(eslint-config-prettier@9.1.0(eslint@9.11.1(jiti@2.1.2)))(eslint@9.11.1(jiti@2.1.2))(prettier@3.3.3)
       eslint-plugin-react-hooks:
-        specifier: ^5.2.0
+        specifier: 5.2.0
         version: 5.2.0(eslint@9.11.1(jiti@2.1.2))
       globals:
         specifier: 15.9.0
