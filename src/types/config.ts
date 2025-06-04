@@ -10,6 +10,7 @@ export interface Env {
   IS_TESTNET: boolean;
   GITHUB_HASH: string;
   HYPERSYNC_KEY: string;
+  SENTRY_DSN: string;
 }
 
 export interface Constants {
