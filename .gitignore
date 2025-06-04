@@ -35,3 +35,7 @@ cypress/downloads
 
 # SDK Private Package
 .npmrc
+
+# Sentry Config File
+.env.sentry-build-plugin
+src/app/sentry-example-page/
