@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { addBreadcrumb, captureException, withScope } from '@sentry/nextjs';
 import { getAddress, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
@@ -27,6 +28,35 @@ export const useExit = () => {
   const { data: walletClient } = useWalletClient({ chainId });
   const publicClient = usePublicClient({ chainId });
   const [isLoading, setIsLoading] = useState(false);
+
+  //eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const logErrorToSentry = (error: any, context: Record<string, any>) => {
+    withScope((scope) => {
+      scope.setUser({
+        address: address,
+      });
+
+      // Set additional context
+      scope.setContext('ragequit_context', {
+        chainId,
+        poolAddress: poolInfo?.address,
+        poolAccount: {
+          lastCommitment: poolAccount?.lastCommitment,
+        },
+        walletConnected: !!walletClient,
+        publicClientConnected: !!publicClient,
+        testMode: TEST_MODE,
+        ...context,
+      });
+
+      scope.setTag('operation', 'ragequit');
+      scope.setTag('chain_id', chainId?.toString());
+      scope.setTag('test_mode', TEST_MODE.toString());
+
+      // Log the error
+      captureException(error);
+    });
+  };
 
   const generateProof = async () => {
     if (!poolAccount?.lastCommitment) throw new Error('Pool account commitment not found');
@@ -76,8 +106,15 @@ export const useExit = () => {
             ],
           })
           .catch((err) => {
-            if (err?.metaMessages[0] == 'Error: OnlyOriginalDepositor()') {
-              throw new Error('Only original depositor can ragequit');
+            // Log simulation error to Sentry with context
+            logErrorToSentry(err, {
+              operation_step: 'contract_simulation',
+              contract_function: 'ragequit',
+              error_message: err?.metaMessages?.[0] || err?.message || '',
+            });
+
+            if (err?.metaMessages?.[0] === 'Error: OnlyOriginalDepositor()') {
+              throw new Error('Only the original depositor can ragequit from this commitment.');
             }
             throw err;
           });
@@ -112,6 +149,17 @@ export const useExit = () => {
             transactionHash: hash,
           },
         });
+
+        addBreadcrumb({
+          message: 'Ragequit successful',
+          category: 'transaction',
+          data: {
+            transactionHash: hash,
+            blockNumber: receipt.blockNumber.toString(),
+            value: _value.toString(),
+          },
+          level: 'info',
+        });
       } else {
         // Mock flow
         setTransactionHash(generatePrivateKey());
@@ -122,6 +170,18 @@ export const useExit = () => {
       setModalOpen(ModalType.SUCCESS);
     } catch (err) {
       const error = err as TransactionExecutionError;
+
+      // Log error to Sentry with full context
+      logErrorToSentry(error, {
+        operation_step: 'ragequit_execution',
+        error_type: error?.name || 'unknown',
+        short_message: error?.shortMessage,
+        has_proof: !!proof,
+        has_pool_account: !!poolAccount,
+        has_account_service: !!accountService,
+        has_seed: !!seed,
+      });
+
       const errorMessage = getDefaultErrorMessage(error?.shortMessage || error?.message);
       addNotification('error', errorMessage);
       console.error('Error calling exit', error);
