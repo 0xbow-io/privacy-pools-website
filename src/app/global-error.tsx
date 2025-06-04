@@ -1,10 +1,16 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Stack, Typography, styled, Button, CssBaseline, ThemeProvider as MuiThemeProvider } from '@mui/material';
+import * as Sentry from '@sentry/nextjs';
 import { PageWrapper } from '~/components';
 import { getConfig } from '~/config';
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    // eslint-disable-next-line
+    Sentry.captureException(error);
+  }, [error]);
   const muiTheme = getConfig().customThemes.getMui;
 
   return (
