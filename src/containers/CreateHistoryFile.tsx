@@ -22,11 +22,12 @@ export const CreateHistoryFile = () => {
 
   const [isHistoryFileCreated, setIsHistoryFileCreated] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
 
   const isDepositDisabled = !BigInt(maxDeposit);
 
   const handleCreateHistoryFile = () => {
-    if (!isConfirmed) return;
+    if (!isConfirmed || !isVerified) return;
 
     createAccount(seedPhrase);
     setIsHistoryFileCreated(true);
@@ -48,6 +49,10 @@ export const CreateHistoryFile = () => {
 
   const handleEnterKey = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter') handleCreateHistoryFile();
+  };
+
+  const handleVerificationComplete = (verified: boolean) => {
+    setIsVerified(verified);
   };
 
   useEffect(() => {
@@ -100,26 +105,33 @@ export const CreateHistoryFile = () => {
           seedPhrase={seedPhrase}
           setSeedPhrase={setSeedPhrase}
           onEnterKey={handleEnterKey}
+          onVerificationComplete={handleVerificationComplete}
         />
 
-        <SFormControlLabel
-          control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
-          label="I've saved my Recovery Phrase"
-          data-testid='save-recovery-phrase'
-          sx={{ fontSize: '1rem' }}
-        />
-        <Typography variant='caption' textAlign='center' maxWidth='32rem'>
-          By creating an account, you agree to our{' '}
-          <Link href={TOC_URL} target='_blank'>
-            Privacy Policy & Terms of Use
-          </Link>
-          .
-        </Typography>
+        {isVerified && (
+          <>
+            <SFormControlLabel
+              control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
+              label="I've saved my Recovery Phrase"
+              data-testid='save-recovery-phrase'
+              sx={{ fontSize: '1rem' }}
+            />
+            <Typography variant='caption' textAlign='center' maxWidth='32rem'>
+              By creating an account, you agree to our{' '}
+              <Link href={TOC_URL} target='_blank'>
+                Privacy Policy & Terms of Use
+              </Link>
+              .
+            </Typography>
+          </>
+        )}
       </Stack>
 
-      <Button onClick={handleCreateHistoryFile} disabled={!isConfirmed} data-testid='create-account-button' fullWidth>
-        Create
-      </Button>
+      {isVerified && (
+        <Button onClick={handleCreateHistoryFile} disabled={!isConfirmed} data-testid='create-account-button' fullWidth>
+          Create
+        </Button>
+      )}
     </CreateHistoryFileContainer>
   );
 };
