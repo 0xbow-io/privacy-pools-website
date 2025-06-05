@@ -7,6 +7,7 @@ import { BaseModal } from '~/components';
 import { useChainContext, usePoolAccountsContext } from '~/hooks';
 import { ModalType } from '~/types';
 import { ModalTitle } from '../Deposit';
+import { DataSection } from './DataSection';
 
 export const ProcessingwModal = () => {
   const {
@@ -24,6 +25,8 @@ export const ProcessingwModal = () => {
             <br />
             the {actionType}
           </ModalTitle>
+
+          <DataSection />
 
           <Typography variant='body2'>Wait a few seconds</Typography>
           {transactionHash && (
