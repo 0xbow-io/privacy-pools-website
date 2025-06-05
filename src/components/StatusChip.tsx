@@ -28,7 +28,14 @@ export const SStatusChip = styled(Box, {
     approved: theme.palette.success,
     pending: theme.palette.warning,
     declined: theme.palette.error,
-    exited: theme.palette.success,
+    exited: {
+      main: theme.palette.grey[500],
+      light: theme.palette.grey[100],
+    },
+    spent: {
+      main: theme.palette.grey[600],
+      light: theme.palette.grey[50],
+    },
   };
 
   return {
