@@ -35,12 +35,17 @@ const PRIVACY_POOL_ERRORS = {
   'Error: InvalidCommitment()':
     'The commitment you are trying to spend does not exist. Please check your transaction history.',
   'Error: InvalidProcessooor()': 'You are not authorized to perform this withdrawal operation.',
-  'Error: InvalidTreeDepth()': 'Invalid tree depth provided. Please contact support.',
+  'Error: InvalidTreeDepth()':
+    'Invalid tree depth provided. Please refresh and try again, contact support if error persists.',
   'Error: InvalidDepositValue()': 'The deposit amount is invalid. Maximum allowed value exceeded.',
-  'Error: ScopeMismatch()': 'Invalid scope provided for this privacy pool.',
-  'Error: ContextMismatch()': 'Invalid context provided for this pool and withdrawal.',
-  'Error: UnknownStateRoot()': 'The state root is unknown or outdated. Please refresh and try again.',
-  'Error: IncorrectASPRoot()': 'The ASP root is unknown or outdated. Please refresh and try again.',
+  'Error: ScopeMismatch()':
+    'Invalid scope provided for this privacy pool. Please refresh and try again, contact support if error persists.',
+  'Error: ContextMismatch()':
+    'Invalid context provided for this pool and withdrawal. Please refresh and try again, contact support if error persists.',
+  'Error: UnknownStateRoot()':
+    'The state root is unknown or outdated. Please refresh and try again, contact support if error persists.',
+  'Error: IncorrectASPRoot()':
+    'The ASP root is unknown or outdated. Please refresh and try again, contact support if error persists.',
   'Error: OnlyOriginalDepositor()': 'Only the original depositor can ragequit from this commitment.',
 } as const;
 
