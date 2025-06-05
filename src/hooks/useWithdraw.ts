@@ -148,7 +148,7 @@ export const useWithdraw = () => {
     )
       throw new Error('Missing some required data to generate proof');
 
-    let poolScope: Hash | undefined;
+    let poolScope: Hash | bigint | undefined;
     let stateMerkleProof: Awaited<ReturnType<typeof getMerkleProof>>;
     let aspMerkleProof: Awaited<ReturnType<typeof getMerkleProof>>;
     let merkleProofGenerated = false;
@@ -161,7 +161,7 @@ export const useWithdraw = () => {
         relayerData.fees,
       );
 
-      poolScope = getScope(publicClient, poolInfo.address) as unknown as Hash;
+      poolScope = await getScope(publicClient, poolInfo.address);
       stateMerkleProof = await getMerkleProof(stateLeaves?.map(BigInt) as bigint[], commitment.hash);
       aspMerkleProof = await getMerkleProof(aspLeaves?.map(BigInt), commitment.label);
       const context = await getContext(newWithdrawal, poolScope as Hash);
