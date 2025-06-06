@@ -35,3 +35,13 @@ cypress/downloads
 
 # SDK Private Package
 .npmrc
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/test/*.spec.ts-snapshots/
+
+# Synpress
+.cache-synpress

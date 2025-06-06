@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, styled, Typography } from '@mui/material';
 import { BaseModal } from '~/components';
 import { useExit, useModal, usePoolAccountsContext, useWithdraw } from '~/hooks';
@@ -14,6 +14,17 @@ export const GeneratingModal = () => {
   const { generateProof: generateRagequitProof } = useExit();
   const [isGenerating, setIsGenerating] = useState(false);
   const { actionType } = usePoolAccountsContext();
+  const isMountedRef = useRef(true);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (modalOpen !== ModalType.GENERATE_ZK_PROOF) return;
@@ -26,12 +37,26 @@ export const GeneratingModal = () => {
     if (actionType === EventType.WITHDRAWAL) {
       generateWithdrawalProof()
         .then(() => {
-          setTimeout(() => {
-            setModalOpen(ModalType.REVIEW);
+          timeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setModalOpen((currentModal) => {
+                if (currentModal === ModalType.GENERATE_ZK_PROOF) {
+                  return ModalType.REVIEW;
+                }
+                return currentModal;
+              });
+            }
           }, 1500);
         })
         .catch(() => {
-          setModalOpen(ModalType.WITHDRAW);
+          if (isMountedRef.current) {
+            setModalOpen((currentModal) => {
+              if (currentModal === ModalType.GENERATE_ZK_PROOF) {
+                return ModalType.WITHDRAW;
+              }
+              return currentModal;
+            });
+          }
         });
       setIsGenerating(false);
     }
@@ -39,12 +64,26 @@ export const GeneratingModal = () => {
     if (actionType === EventType.EXIT) {
       generateRagequitProof()
         .then(() => {
-          setTimeout(() => {
-            setModalOpen(ModalType.REVIEW);
+          timeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setModalOpen((currentModal) => {
+                if (currentModal === ModalType.GENERATE_ZK_PROOF) {
+                  return ModalType.REVIEW;
+                }
+                return currentModal;
+              });
+            }
           }, 1500);
         })
         .catch(() => {
-          setModalOpen(ModalType.NONE);
+          if (isMountedRef.current) {
+            setModalOpen((currentModal) => {
+              if (currentModal === ModalType.GENERATE_ZK_PROOF) {
+                return ModalType.NONE;
+              }
+              return currentModal;
+            });
+          }
         });
       setIsGenerating(false);
     }

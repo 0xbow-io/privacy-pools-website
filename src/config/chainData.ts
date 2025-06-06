@@ -1,4 +1,4 @@
-import { Address, parseEther } from 'viem';
+import { Address, parseEther, parseUnits } from 'viem';
 import { Chain, mainnet, sepolia } from 'viem/chains';
 import { getEnv } from '~/config/env';
 import mainnetIcon from '~/assets/icons/mainnet.svg';
@@ -10,6 +10,21 @@ const mainnetChains: readonly [Chain, ...Chain[]] = [mainnet];
 const testnetChains: readonly [Chain, ...Chain[]] = [sepolia];
 
 export const whitelistedChains = IS_TESTNET ? testnetChains : mainnetChains;
+
+export type ChainAssets = 'ETH' | 'USDC';
+
+export interface PoolInfo {
+  chainId: number;
+  address: Address;
+  scope: bigint;
+  deploymentBlock: bigint;
+  entryPointAddress: Address;
+  assetAddress: Address;
+  maxDeposit: bigint;
+  asset: ChainAssets;
+  assetDecimals?: number;
+  icon?: string;
+}
 
 export interface ChainData {
   [chainId: number]: {
@@ -25,15 +40,7 @@ export interface ChainData {
       name: string;
       url: string;
     }[];
-    poolInfo: {
-      chainId: number;
-      address: Address;
-      scope: bigint;
-      deploymentBlock: bigint;
-      entryPointAddress: Address;
-      assetAddress: Address;
-      maxDeposit: bigint;
-    };
+    poolInfo: PoolInfo[];
   };
 }
 
@@ -49,15 +56,20 @@ const mainnetChainData: ChainData = {
     sdkRpcUrl: `https://eth.rpc.hypersync.xyz/${HYPERSYNC_KEY}`,
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: ASP_ENDPOINT,
-    poolInfo: {
-      chainId: mainnet.id,
-      address: '0xF241d57C6DebAe225c0F2e6eA1529373C9A9C9fB',
-      assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-      scope: 4916574638117198869413701114161172350986437430914933850166949084132905299523n,
-      deploymentBlock: 22153707n,
-      entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
-      maxDeposit: parseEther('10000'),
-    },
+    poolInfo: [
+      {
+        chainId: mainnet.id,
+        address: '0xF241d57C6DebAe225c0F2e6eA1529373C9A9C9fB',
+        assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+        scope: 4916574638117198869413701114161172350986437430914933850166949084132905299523n,
+        deploymentBlock: 22153707n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseEther('10000'),
+        asset: 'ETH',
+        assetDecimals: 18,
+        icon: mainnetIcon.src,
+      },
+    ],
   },
 };
 
@@ -76,15 +88,31 @@ const testnetChainData: ChainData = {
       { name: 'Testnet Relay', url: 'https://testnet-relayer.privacypools.com' },
       { name: 'Freedom Relay', url: 'https://www.freedomrelay.io' },
     ],
-    poolInfo: {
-      chainId: sepolia.id,
-      assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-      address: '0x4091b6aF3CB2460a04A58Ce775140221F8B6391B',
-      scope: 6276514527914124858593577781760940935800899619504017018988536900856718641423n,
-      deploymentBlock: 8042931n,
-      entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
-      maxDeposit: parseEther('1'),
-    },
+    poolInfo: [
+      {
+        chainId: sepolia.id,
+        assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+        address: '0x4091b6aF3CB2460a04A58Ce775140221F8B6391B',
+        scope: 6276514527914124858593577781760940935800899619504017018988536900856718641423n,
+        deploymentBlock: 8042931n,
+        entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
+        maxDeposit: parseEther('1'),
+        asset: 'ETH',
+        assetDecimals: 18,
+        icon: mainnetIcon.src,
+      },
+      {
+        chainId: sepolia.id,
+        assetAddress: '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238',
+        address: '0x5a3be0927950b089463a08793ed33fc228f3f885',
+        scope: 13604834230510441355137990666952328592573726765577362680366393464214657610084n,
+        deploymentBlock: 8384614n,
+        entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
+        maxDeposit: parseUnits('100', 6),
+        asset: 'USDC',
+        assetDecimals: 6,
+      },
+    ],
   },
 };
 

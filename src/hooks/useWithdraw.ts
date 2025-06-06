@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getAddress, Hex, TransactionExecutionError } from 'viem';
+import { getAddress, Hex, parseUnits, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
 import { usePublicClient, useSwitchChain } from 'wagmi';
 import { getConfig } from '~/config';
@@ -46,10 +46,15 @@ export const useWithdraw = () => {
     newSecretKeys,
     setNewSecretKeys,
     setTransactionHash,
+    feeCommitment,
   } = usePoolAccountsContext();
+
   const {
-    chain: { poolInfo },
+    selectedPoolInfo,
     chainId,
+    selectedRelayer,
+    relayersData,
+    balanceBN: { decimals },
   } = useChainContext();
   const { accountService, addWithdrawal } = useAccountContext();
   const publicClient = usePublicClient({ chainId });
@@ -61,14 +66,17 @@ export const useWithdraw = () => {
   const generateProof = async () => {
     if (TEST_MODE) return;
 
+    const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
+
     if (
       !poolAccount ||
       !target ||
       !commitment ||
       !aspLeaves ||
       !stateLeaves ||
-      !relayerData.fees ||
-      !relayerData.relayerAddress ||
+      !relayerDetails ||
+      !relayerDetails.relayerAddress ||
+      relayerDetails.fees === undefined ||
       !accountService
     )
       throw new Error('Missing some required data to generate proof');
@@ -76,13 +84,15 @@ export const useWithdraw = () => {
     try {
       const newWithdrawal = prepareWithdrawRequest(
         getAddress(target),
-        getAddress(poolInfo.entryPointAddress),
-        getAddress(relayerData.relayerAddress),
-        relayerData.fees,
+        getAddress(selectedPoolInfo.entryPointAddress),
+        getAddress(relayerDetails.relayerAddress),
+        relayerDetails.fees,
       );
 
-      const poolScope = await getScope(publicClient, poolInfo.address);
+      const poolScope = await getScope(publicClient, selectedPoolInfo.address);
+
       const stateMerkleProof = await getMerkleProof(stateLeaves?.map(BigInt) as bigint[], commitment.hash);
+
       const aspMerkleProof = await getMerkleProof(aspLeaves?.map(BigInt), commitment.label);
       const context = await getContext(newWithdrawal, poolScope as Hash);
       const { secret, nullifier } = createWithdrawalSecrets(accountService, commitment);
@@ -91,7 +101,7 @@ export const useWithdraw = () => {
 
       const withdrawalProofInput = prepareWithdrawalProofInput(
         commitment,
-        amount,
+        parseUnits(amount, decimals),
         stateMerkleProof,
         aspMerkleProof,
         BigInt(context),
@@ -121,13 +131,16 @@ export const useWithdraw = () => {
 
   const withdraw = async () => {
     if (!TEST_MODE) {
+      const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
+
       if (
         !proof ||
         !withdrawal ||
         !commitment ||
         !target ||
-        !relayerData.fees ||
-        !relayerData.relayerAddress ||
+        !relayerDetails ||
+        !relayerDetails.relayerAddress ||
+        !feeCommitment ||
         !newSecretKeys ||
         !accountService
       )
@@ -135,17 +148,19 @@ export const useWithdraw = () => {
 
       await switchChainAsync({ chainId });
 
-      const poolScope = await getScope(publicClient, poolInfo.address);
+      const poolScope = await getScope(publicClient, selectedPoolInfo.address);
 
       try {
         setIsClosable(false);
         setIsLoading(true);
+
         const res = await relayerData.relay({
           withdrawal,
           proof: proof.proof as unknown as ProofRelayerPayload,
           publicSignals: proof.publicSignals as unknown as string[],
           scope: poolScope.toString(),
           chainId,
+          feeCommitment,
         });
         if (!res.success) throw new Error(res.error || 'Relay failed');
 

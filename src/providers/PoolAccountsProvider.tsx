@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useState } from 'react';
+import { createContext, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Address, createPublicClient, getAddress, Hex, http } from 'viem';
 import { whitelistedChains } from '~/config';
@@ -8,6 +8,7 @@ import { useChainContext } from '~/hooks';
 import {
   CommitmentProof,
   EventType,
+  FeeCommitment,
   HistoryData,
   PoolAccount,
   RagequitProof,
@@ -44,8 +45,12 @@ type ContextType = {
   setTransactionHash: (val: Hex) => void;
   actionType: EventType | undefined;
   setActionType: (val?: EventType) => void;
+  feeCommitment: FeeCommitment | null;
+  setFeeCommitment: (val: FeeCommitment | null) => void;
   resetTransactionState: () => void;
   isAssetConfigLoading: boolean;
+  feeBPSForWithdraw: bigint;
+  setFeeBPSForWithdraw: (val: bigint) => void;
 };
 
 interface Props {
@@ -57,7 +62,8 @@ export const PoolAccountsContext = createContext({} as ContextType);
 export const PoolAccountsProvider = ({ children }: Props) => {
   const {
     chainId,
-    chain: { poolInfo, rpcUrl },
+    chain: { rpcUrl },
+    selectedPoolInfo,
   } = useChainContext();
 
   const [actionType, setActionType] = useState<EventType>();
@@ -70,12 +76,15 @@ export const PoolAccountsProvider = ({ children }: Props) => {
   const [proof, setProof] = useState<ContextType['proof']>(null);
   const [withdrawal, setWithdrawal] = useState<Withdrawal | null>(null);
   const [newSecretKeys, setNewSecretKeys] = useState<{ secret: bigint; nullifier: bigint } | null>(null);
+  const [feeCommitment, setFeeCommitment] = useState<FeeCommitment | null>(null);
+  const [feeBPSForWithdraw, setFeeBPSForWithdraw] = useState<bigint>(BigInt(0));
 
   const [selectedHistoryData, setSelectedHistoryData] = useState<HistoryData[number]>();
 
   const resetInputs = () => {
     setAmount('');
     setTarget('');
+    setPoolAccount(undefined);
   };
 
   const resetTransactionState = () => {
@@ -84,11 +93,20 @@ export const PoolAccountsProvider = ({ children }: Props) => {
     setTransactionHash(undefined);
     setActionType(undefined);
     setPoolAccount(undefined);
+    setFeeCommitment(null);
+    setFeeBPSForWithdraw(BigInt(0));
   };
 
+  // Reset form inputs when asset/chain changes
+  useEffect(() => {
+    setAmount('');
+    setTarget('');
+    setPoolAccount(undefined);
+  }, [selectedPoolInfo.assetAddress, selectedPoolInfo.chainId]);
+
   const { data: assetConfigs, isLoading: isAssetConfigLoading } = useQuery({
-    queryKey: ['assetConfigs', chainId, poolInfo.scope.toString()],
-    enabled: !!poolInfo,
+    queryKey: ['assetConfigs', chainId, selectedPoolInfo.scope.toString()],
+    enabled: !!selectedPoolInfo,
     queryFn: async () => {
       const publicClient = createPublicClient({
         chain: whitelistedChains.find((chain) => chain.id === chainId),
@@ -96,10 +114,10 @@ export const PoolAccountsProvider = ({ children }: Props) => {
       });
 
       const config = await publicClient.readContract({
-        address: getAddress(poolInfo.entryPointAddress),
+        address: getAddress(selectedPoolInfo.entryPointAddress),
         abi: assetConfig,
         functionName: 'assetConfig',
-        args: [poolInfo.assetAddress],
+        args: [selectedPoolInfo.assetAddress],
       });
 
       if (!config) return;
@@ -134,10 +152,14 @@ export const PoolAccountsProvider = ({ children }: Props) => {
         setTransactionHash,
         actionType,
         setActionType,
+        feeCommitment,
+        setFeeCommitment,
         resetTransactionState,
         vettingFeeBPS: assetConfigs?.vettingFeeBPS ?? BigInt(0),
         minimumDepositAmount: assetConfigs?.minimumDepositAmount ?? BigInt(0),
         isAssetConfigLoading,
+        feeBPSForWithdraw,
+        setFeeBPSForWithdraw,
       }}
     >
       {children}

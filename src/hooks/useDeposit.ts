@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { getAddress, parseEther, TransactionExecutionError } from 'viem';
+import { Address, erc20Abi, getAddress, parseUnits, TransactionExecutionError, Hash as ViemHash } from 'viem';
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import { getConfig } from '~/config';
 import { useChainContext, useAccountContext, useNotifications, usePoolAccountsContext } from '~/hooks';
@@ -11,13 +11,15 @@ import { useModal } from './useModal';
 
 const {
   env: { TEST_MODE },
+  constants: { DEFAULT_ASSET },
 } = getConfig();
 
 export const useDeposit = () => {
   const { address } = useAccount();
   const {
     chainId,
-    chain: { poolInfo },
+    selectedPoolInfo,
+    balanceBN: { decimals },
   } = useChainContext();
   const { addNotification, getDefaultErrorMessage } = useNotifications();
   const { switchChainAsync } = useSwitchChain();
@@ -28,6 +30,16 @@ export const useDeposit = () => {
   const { data: walletClient } = useWalletClient({ chainId });
   const publicClient = usePublicClient({ chainId });
 
+  const allowance = async (tokenAddress: Address, owner: Address, spender: Address) => {
+    if (!publicClient) throw new Error('Public client not found');
+    return await publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: 'allowance',
+      args: [owner, spender],
+    });
+  };
+
   const deposit = async () => {
     try {
       setIsClosable(false);
@@ -35,35 +47,83 @@ export const useDeposit = () => {
       await switchChainAsync({ chainId });
 
       if (!accountService) throw new Error('AccountService not found');
+      if (!address) throw new Error('Address not found');
+
+      let assetAllowance = 0n;
+
+      if (selectedPoolInfo.asset !== DEFAULT_ASSET) {
+        assetAllowance = await allowance(selectedPoolInfo.assetAddress, address, selectedPoolInfo.entryPointAddress);
+      }
 
       const {
         nullifier,
         secret,
         precommitment: precommitmentHash,
-      } = createDepositSecrets(accountService, BigInt(poolInfo.scope) as Hash, BigInt(poolAccounts.length));
-      const value = parseEther(amount);
+      } = createDepositSecrets(accountService, BigInt(selectedPoolInfo.scope) as Hash, BigInt(poolAccounts.length));
+      const value = parseUnits(amount, decimals);
 
       if (!TEST_MODE) {
         if (!walletClient || !publicClient) throw new Error('Wallet or Public client not found');
-        if (!poolInfo.scope || !precommitmentHash || !value) throw new Error('Missing required data to deposit');
 
-        const { request } = await publicClient
-          .simulateContract({
+        if (!selectedPoolInfo.scope || !precommitmentHash || !value)
+          throw new Error('Missing required data to deposit');
+
+        // Allowance check
+        if (assetAllowance < value && selectedPoolInfo.asset !== DEFAULT_ASSET) {
+          addNotification('info', 'Allowance insufficient. Requesting approval...');
+          const approveHash = await walletClient.writeContract({
+            address: selectedPoolInfo.assetAddress,
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [selectedPoolInfo.entryPointAddress, value],
             account: address,
-            address: getAddress(poolInfo.entryPointAddress),
-            abi: entrypointAbi,
-            functionName: 'deposit',
-            args: [precommitmentHash],
-            value,
-          })
-          .catch((err) => {
-            if (err?.metaMessages[0] == 'Error: PrecommitmentAlreadyUsed()') {
-              throw new Error('Precommitment already used');
-            }
-            throw err;
           });
 
-        const hash = await walletClient.writeContract(request);
+          const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          if (!approvalReceipt) throw new Error('Approval receipt not found');
+        }
+
+        let hash: ViemHash;
+
+        if (selectedPoolInfo.asset === DEFAULT_ASSET) {
+          const { request } = await publicClient
+            .simulateContract({
+              account: address,
+              address: getAddress(selectedPoolInfo.entryPointAddress),
+              abi: entrypointAbi,
+              functionName: 'deposit',
+              args: [precommitmentHash],
+              value,
+            })
+            .catch((err) => {
+              if (err?.metaMessages[0] == 'Error: PrecommitmentAlreadyUsed()') {
+                throw new Error('Precommitment already used');
+              }
+              throw err;
+            });
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { account: _account, ...restRequest } = request;
+          hash = await walletClient.writeContract(restRequest);
+        } else {
+          if (!selectedPoolInfo.assetAddress) throw new Error('Asset address missing for token deposit');
+          const { request } = await publicClient
+            .simulateContract({
+              account: address,
+              address: getAddress(selectedPoolInfo.entryPointAddress),
+              abi: entrypointAbi,
+              functionName: 'deposit',
+              args: [selectedPoolInfo.assetAddress, value, precommitmentHash],
+            })
+            .catch((err) => {
+              if (err?.metaMessages[0] == 'Error: PrecommitmentAlreadyUsed()') {
+                throw new Error('Precommitment already used');
+              }
+              throw err;
+            });
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { account: _account, ...restRequest } = request;
+          hash = await walletClient.writeContract(restRequest);
+        }
 
         setTransactionHash(hash);
         setModalOpen(ModalType.PROCESSING);
@@ -86,7 +146,7 @@ export const useDeposit = () => {
         if (!_commitment || !_label) throw new Error('Commitment or label not found');
 
         addPoolAccount(accountService, {
-          scope: poolInfo.scope,
+          scope: selectedPoolInfo.scope,
           value: _value,
           nullifier: nullifier as Secret,
           secret: secret as Secret,

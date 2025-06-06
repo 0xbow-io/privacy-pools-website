@@ -1,7 +1,7 @@
 'use client';
 
 import { Table, TableBody, TableHead, TableRow, TableCell, styled, Typography, Stack } from '@mui/material';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import {
   ExtendedTooltip as Tooltip,
   HTableCell,
@@ -32,7 +32,8 @@ export const ActivityTable = ({
 }) => {
   const { setModalOpen } = useModal();
   const {
-    chain: { decimals, symbol },
+    balanceBN: { decimals, symbol },
+    selectedPoolInfo: { assetDecimals },
   } = useChainContext();
   const { poolAccounts } = useAccountContext();
   const { setSelectedHistoryData } = usePoolAccountsContext();
@@ -48,7 +49,7 @@ export const ActivityTable = ({
   };
 
   const formatAmount = (row: ActivityRecords[number]) => {
-    return `${formatDataNumber(BigInt(getAmount(row) || 0), decimals, 3, false, true, false)} ${symbol}`;
+    return `${formatDataNumber(BigInt(getAmount(row) || 0), assetDecimals || decimals, 3, false, true, false)} ${symbol}`;
   };
 
   const formatTime = (row: ActivityRecords[number]) => {
@@ -108,7 +109,10 @@ export const ActivityTable = ({
                   {/* Value */}
                   <STableCell>
                     <Tooltip
-                      title={formatEther(getAmount(row as ActivityRecords[number]) as bigint)}
+                      title={formatUnits(
+                        getAmount(row as ActivityRecords[number]) as bigint,
+                        assetDecimals || decimals,
+                      )}
                       placement='top'
                       disableInteractive
                     >

@@ -8,7 +8,7 @@ import { aspClient } from '~/utils';
 const { ITEMS_PER_PAGE } = getConstants();
 const { ASP_ENDPOINT } = getEnv();
 const chainId = whitelistedChains[0].id;
-const scope = chainData[chainId].poolInfo.scope.toString();
+const scope = chainData[chainId].poolInfo[0].scope.toString();
 
 global.fetch = jest.fn() as unknown as typeof fetch;
 

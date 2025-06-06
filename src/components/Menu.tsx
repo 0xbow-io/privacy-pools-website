@@ -12,25 +12,24 @@ import {
   IconButton,
   useTheme,
 } from '@mui/material';
-import { formatEther } from 'viem';
-import { useAccount, useBalance } from 'wagmi';
+import { formatUnits } from 'viem';
+import { useAccount } from 'wagmi';
 import { useGoTo, useChainContext, useAuthContext } from '~/hooks';
 import { formatDataNumber, getUsdBalance, ROUTER, truncateAddress, zIndex } from '~/utils';
 
 export const Menu = () => {
   const { address } = useAccount();
-  const { price, chain, chainId } = useChainContext();
-  const { data } = useBalance({
-    address,
-    chainId,
-  });
+  const {
+    price,
+    balanceBN: { value, symbol, decimals },
+  } = useChainContext();
   const { logout } = useAuthContext();
   const [copied, setCopied] = useState(false);
   const theme = useTheme();
 
-  const ethBalanceBN = data?.value.toString() ?? '0';
-  const balance = formatDataNumber(ethBalanceBN, 18, 2, false, false, false);
-  const usdBalance = getUsdBalance(price, formatEther(data?.value ?? 0n), 18);
+  const ethBalanceBN = value.toString() ?? '0';
+  const balance = formatDataNumber(ethBalanceBN, decimals, 2, false, false, false);
+  const usdBalance = getUsdBalance(price, formatUnits(value, decimals), decimals);
 
   const goTo = useGoTo();
 
@@ -85,7 +84,7 @@ export const Menu = () => {
         <Stack direction='column' alignItems='start'>
           <EthText variant='h6'>
             {balance}
-            <span>{chain.symbol}</span>
+            <span>{symbol}</span>
           </EthText>
           <BalanceUsd variant='body2'>{`~ ${usdBalance}`}</BalanceUsd>
         </Stack>

@@ -1,44 +1,46 @@
 'use client';
 import { Stack, styled, Typography } from '@mui/material';
-import { formatEther, formatUnits, parseEther, parseUnits } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { ExtendedTooltip as Tooltip } from '~/components';
 import { useExternalServices, usePoolAccountsContext, useChainContext } from '~/hooks';
 import { EventType } from '~/types';
-import { formatDataNumber, getUsdBalance, truncateAddress } from '~/utils';
+import { getUsdBalance, truncateAddress } from '~/utils';
 
 export const DataSection = () => {
   const { address } = useAccount();
   const {
-    chain: { symbol, decimals, poolInfo },
+    balanceBN: { symbol, decimals },
     price,
-    selectedRelayer,
+    selectedPoolInfo,
   } = useChainContext();
-  const { relayerData } = useExternalServices();
-  const { amount, target, actionType, poolAccount, vettingFeeBPS } = usePoolAccountsContext();
+  const { currentSelectedRelayerData } = useExternalServices();
+  const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw } = usePoolAccountsContext();
   const isDeposit = actionType === EventType.DEPOSIT;
   const aspDataFees = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
   const aspOrRelayer = {
     label: isDeposit ? 'ASP' : 'Relayer',
-    value: isDeposit ? '0xBow ASP' : selectedRelayer.name,
+    value: isDeposit ? '0xBow ASP' : currentSelectedRelayerData?.name,
   };
 
   const fromAddress = isDeposit ? address : '';
   const toAddress = isDeposit ? '' : target;
 
-  const relayerFees = (BigInt(relayerData.fees ?? 0n) * parseUnits(amount, decimals)) / 100n / 100n;
+  const relayerFees = (BigInt(feeBPSForWithdraw ?? 0n) * parseUnits(amount, decimals)) / 100n / 100n;
 
   const fees = isDeposit ? aspDataFees : relayerFees;
-  const feeFormatted = formatDataNumber(fees, decimals);
-  const feeUSD = getUsdBalance(price, formatUnits(BigInt(fees ?? 0), decimals), decimals);
+  const feeFormatted = formatUnits(fees, decimals);
+  const feeUSD = getUsdBalance(price, feeFormatted, decimals);
   const feeText = `${feeFormatted} ${symbol} (~ ${feeUSD} USD)`;
 
-  const feesCollectorAddress = isDeposit ? poolInfo.entryPointAddress : relayerData.relayerAddress;
+  const feesCollectorAddress = isDeposit
+    ? selectedPoolInfo.entryPointAddress
+    : currentSelectedRelayerData?.relayerAddress;
   const feesCollector = `OxBow (${truncateAddress(feesCollectorAddress)})`;
 
   const amountUSD = getUsdBalance(price, amount, decimals);
-  const amountWithFeeBN = parseEther(amount) - fees;
-  const amountWithFee = formatEther(amountWithFeeBN);
+  const amountWithFeeBN = parseUnits(amount, decimals) - fees;
+  const amountWithFee = formatUnits(amountWithFeeBN, decimals);
   const amountWithFeeUSD = getUsdBalance(price, amountWithFee, decimals);
 
   const valueText = `${amountWithFee} ${symbol} (~ ${amountWithFeeUSD} USD)`;

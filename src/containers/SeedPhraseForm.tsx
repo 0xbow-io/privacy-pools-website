@@ -54,16 +54,21 @@ export const SeedPhraseForm = ({
 
   const pasteFromClipboard = useCallback(() => {
     navigator.clipboard.readText().then((text) => {
-      if (text === seedPhrase) return;
+      const cleanedText = text.trim().replace(/\s+/g, ' ');
+
+      if (cleanedText === seedPhrase) return;
+
       setSplitSeedPhrase([]); // reset this state to avoid infinite loop
-      setSeedPhrase(text);
+      setSeedPhrase(cleanedText);
       setIsHidden(true);
     });
   }, [seedPhrase, setSeedPhrase]);
 
   const changeSeedPhraseWord = (text: string, index: number) => {
+    text = text.trim().replace(/\s+/g, ' ');
+
     // Check if the text contains multiple words (was pasted)
-    const words = text.trim().split(/\s+/);
+    const words = text.split(/\s+/).filter((word) => word.length > 0);
 
     if (words.length > 1) {
       // If it's exactly 12 words, fill all inputs
@@ -81,6 +86,12 @@ export const SeedPhraseForm = ({
 
       return newSplitSeedPhrase;
     });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === ' ') {
+      e.preventDefault();
+    }
   };
 
   const generateVerificationWords = useCallback(() => {
@@ -249,6 +260,7 @@ export const SeedPhraseForm = ({
                     type={isHidden ? 'password' : 'text'}
                     value={splitSeedPhrase[index] ?? ''}
                     onChange={(e) => changeSeedPhraseWord(e.target.value, index)}
+                    onKeyDown={handleKeyDown}
                     startAdornment={<InputAdornment position='start'>{index + 1}.</InputAdornment>}
                   />
                 </FormControl>

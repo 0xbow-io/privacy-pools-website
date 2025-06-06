@@ -12,14 +12,17 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import { StatusChip } from '~/components';
 import { usePoolAccountsContext, useChainContext, useAccountContext } from '~/hooks';
 import { EventType, ReviewStatus } from '~/types';
 import { getTimeAgo, truncateAddress } from '~/utils';
 
 export const WithdrawalsTable = () => {
-  const { chain } = useChainContext();
+  const {
+    chain,
+    balanceBN: { decimals },
+  } = useChainContext();
   const explorerUrl = chain.explorerUrl;
   const { poolAccount } = usePoolAccountsContext();
   const { historyData } = useAccountContext();
@@ -58,7 +61,7 @@ export const WithdrawalsTable = () => {
                   </STableCell>
 
                   {/* Value */}
-                  <STableCell>{formatEther(row.amount as bigint)}</STableCell>
+                  <STableCell>{formatUnits(row.amount as bigint, decimals)}</STableCell>
 
                   {/* To */}
                   {/* Temporarily disabled */}

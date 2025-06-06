@@ -1,3 +1,4 @@
+import { ChainAssets } from '~/config';
 import { Cookies, CustomThemes } from '~/types';
 
 export interface Env {
@@ -19,6 +20,7 @@ export interface Constants {
   ITEMS_PER_PAGE: number;
   TOC_URL: string;
   PENDING_STATUS_MESSAGE: string;
+  DEFAULT_ASSET: ChainAssets;
 }
 
 export interface Config {

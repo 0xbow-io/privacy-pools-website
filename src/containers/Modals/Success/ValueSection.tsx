@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Stack, styled, Typography } from '@mui/material';
-import { formatEther, formatUnits, parseEther } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import { usePoolAccountsContext, useChainContext, useAccountContext } from '~/hooks';
 import { EventType } from '~/types';
 
@@ -8,7 +8,7 @@ export const ValueSection = () => {
   const { amount, poolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const {
-    chain: { symbol, decimals },
+    balanceBN: { symbol, decimals },
   } = useChainContext();
 
   const paText = actionType === EventType.DEPOSIT ? 'To pool account' : 'From pool account';
@@ -17,10 +17,10 @@ export const ValueSection = () => {
 
   const isDeposit = actionType === EventType.DEPOSIT;
 
-  const fee = (vettingFeeBPS * parseEther(amount)) / 100n / 100n;
+  const fee = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
 
-  const totalAmountBN = isDeposit ? parseEther(amount) - fee : parseEther(amount);
-  const formattedTotalAmount = formatEther(totalAmountBN);
+  const totalAmountBN = isDeposit ? parseUnits(amount, decimals) - fee : parseUnits(amount, decimals);
+  const formattedTotalAmount = formatUnits(totalAmountBN, decimals);
 
   const remainingBalance = useMemo(() => {
     const pa = poolAccounts.find((pa) => pa.label === poolAccount?.label);

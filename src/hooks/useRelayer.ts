@@ -1,43 +1,47 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useChainContext } from '~/hooks';
-import { FeesResponse, RelayRequestBody, RelayerResponse } from '~/types';
+import { QuoteRequestBody, QuoteResponse, RelayRequestBody, RelayerResponse } from '~/types';
 import { relayerClient } from '~/utils';
 
-export const useRelayer = (
-  relayerUrl: string,
-  chainId: number,
-): {
-  isError?: boolean;
-  isLoading?: boolean;
-  fees: FeesResponse['feeBPS'] | undefined;
-  relayerAddress: FeesResponse['feeReceiverAddress'] | undefined;
+export type UseRelayerReturn = {
+  getQuote: (input: QuoteRequestBody) => Promise<QuoteResponse>;
+  quoteData: QuoteResponse | undefined;
+  isQuoteLoading: boolean;
+  quoteError: Error | null;
   relay: (input: RelayRequestBody) => Promise<RelayerResponse>;
-} => {
-  const {
-    chain: { poolInfo },
-  } = useChainContext();
+};
 
-  const feesQuery = useQuery({
-    queryKey: ['relayerFees', relayerUrl, chainId],
-    queryFn: () => relayerClient.fetchFees(relayerUrl, chainId, poolInfo.assetAddress),
+export const useRelayer = (): UseRelayerReturn => {
+  const { selectedRelayer } = useChainContext();
+  const relayerUrl = selectedRelayer?.url;
+
+  const quoteMutation = useMutation<QuoteResponse, Error, QuoteRequestBody>({
+    mutationFn: async (input: QuoteRequestBody) => {
+      if (!relayerUrl) {
+        throw new Error('No relayer URL selected for getQuote');
+      }
+      return relayerClient.fetchQuote(relayerUrl, input);
+    },
   });
 
-  const relay = useCallback((input: RelayRequestBody) => relayerClient.relay(relayerUrl, input), [relayerUrl]);
-
-  const isError = feesQuery.isError;
-  const isLoading = feesQuery.isLoading;
-
-  return useMemo(
-    () => ({
-      isError,
-      isLoading,
-      fees: feesQuery.data?.feeBPS,
-      relayerAddress: feesQuery.data?.feeReceiverAddress,
-      relay,
-    }),
-    [isError, isLoading, feesQuery.data?.feeBPS, feesQuery.data?.feeReceiverAddress, relay],
+  const relay = useCallback(
+    async (input: RelayRequestBody) => {
+      if (!relayerUrl) {
+        throw new Error('No relayer URL selected for relay');
+      }
+      return relayerClient.relay(relayerUrl, input);
+    },
+    [relayerUrl],
   );
+
+  return {
+    getQuote: quoteMutation.mutateAsync,
+    quoteData: quoteMutation.data,
+    isQuoteLoading: quoteMutation.isPending,
+    quoteError: quoteMutation.error,
+    relay,
+  };
 };

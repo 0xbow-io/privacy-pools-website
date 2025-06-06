@@ -1,30 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
+import Image from 'next/image';
 import { FormControl, MenuItem, Select, styled, SelectChangeEvent } from '@mui/material';
-import { EtherIcon } from '~/assets/coins/ether';
+import { ChainAssets } from '~/config';
+import { useChainContext } from '~/hooks/context/useChainContext';
 
 export interface Option {
-  value: string;
+  value: ChainAssets;
   label: string;
-  icon?: React.ReactNode;
 }
 
-// TODO: Replace with global state management
-// This component will use global state to manage the selected asset across the application
-// The global state should provide:
-// 1. The currently selected asset
-// 2. A function to change the selected asset
-// 3. Available asset options
-
-// Testing purposes - these will be moved to the global state later
-const DEFAULT_TOKEN_OPTIONS = [
-  { value: 'ETH', label: 'ETH', icon: <EtherIcon /> },
+const ALL_TOKEN_OPTIONS: Option[] = [
+  { value: 'ETH', label: 'ETH' },
   { value: 'USDC', label: 'USDC' },
-  { value: 'DAI', label: 'DAI' },
 ];
-
-const DEFAULT_ASSET = 'ETH';
 
 const MENU_STYLING = {
   MenuListProps: {
@@ -36,35 +26,44 @@ const MENU_STYLING = {
   },
 };
 
-export interface AssetSelectProps {
-  value?: string;
-  options?: Option[];
-}
+export const AssetSelect: React.FC = () => {
+  const { selectedAsset, setSelectedAsset, chain } = useChainContext();
 
-export const AssetSelect: React.FC<AssetSelectProps> = ({ value = DEFAULT_ASSET, options = DEFAULT_TOKEN_OPTIONS }) => {
-  // Local state - will be replaced with global state
-  const [selectedAsset, setSelectedAsset] = useState(value);
+  const supportedAssets = useMemo(() => {
+    return [...new Set(chain.poolInfo.map((pool) => pool.asset))];
+  }, [chain.poolInfo]);
 
-  // This will be replaced with a hook to access global state
-  // const { selectedAsset, setSelectedAsset, availableAssets } = useAssetContext();
+  const filteredTokenOptions = useMemo(() => {
+    return ALL_TOKEN_OPTIONS.filter((option) => supportedAssets.includes(option.value));
+  }, [supportedAssets]);
+
+  const getAssetIcon = (asset: ChainAssets) => {
+    const poolWithAsset = chain.poolInfo.find((pool) => pool.asset === asset);
+    return poolWithAsset?.icon ? (
+      <Image src={poolWithAsset.icon} alt={asset} width={20} height={20} style={{ width: '100%', height: '100%' }} />
+    ) : null;
+  };
+
+  const tokenOptions = filteredTokenOptions;
 
   const handleChange = (event: SelectChangeEvent<unknown>) => {
-    setSelectedAsset(event.target.value as string);
-    // When global state is implemented, this will update the global state
-    // setSelectedAsset(event.target.value as string);
+    setSelectedAsset(event.target.value as ChainAssets);
   };
 
   return (
     <FormControl fullWidth>
       <StyledSelect value={selectedAsset} onChange={handleChange} variant='outlined' MenuProps={MENU_STYLING}>
-        {options?.map((option) => (
-          <MenuItem key={option.value} value={option.value}>
-            <MenuItemContent>
-              {option.icon && <IconWrapper>{option.icon}</IconWrapper>}
-              <span>{option.label}</span>
-            </MenuItemContent>
-          </MenuItem>
-        ))}
+        {tokenOptions?.map((option) => {
+          const icon = getAssetIcon(option.value);
+          return (
+            <MenuItem key={option.value} value={option.value}>
+              <MenuItemContent>
+                {icon && <IconWrapper>{icon}</IconWrapper>}
+                <span>{option.label}</span>
+              </MenuItemContent>
+            </MenuItem>
+          );
+        })}
       </StyledSelect>
     </FormControl>
   );

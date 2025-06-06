@@ -1,14 +1,17 @@
 import { Exit, PiggyBank, WatsonHealthRotate_360 } from '@carbon/icons-react';
 import { Button, Stack, styled } from '@mui/material';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
-import { useModal, usePoolAccountsContext } from '~/hooks';
+import { useModal, usePoolAccountsContext, useChainContext } from '~/hooks';
 import { EventType, ModalType, ReviewStatus } from '~/types';
 
 export const DetailButtons = () => {
   const { address } = useAccount();
   const { setModalOpen } = useModal();
   const { poolAccount, setTarget, setAmount, setActionType } = usePoolAccountsContext();
+  const {
+    balanceBN: { decimals },
+  } = useChainContext();
   const isWithdrawDisabled = poolAccount?.balance === 0n || poolAccount?.reviewStatus !== ReviewStatus.APPROVED;
   const isExitDisabled = poolAccount?.balance === 0n;
 
@@ -24,7 +27,7 @@ export const DetailButtons = () => {
     if (!poolAccount) throw new Error('Pool account not found');
 
     setTarget(address!);
-    setAmount(formatEther(poolAccount.balance));
+    setAmount(formatUnits(poolAccount.balance, decimals));
     setActionType(EventType.EXIT);
     setModalOpen(ModalType.GENERATE_ZK_PROOF);
   };

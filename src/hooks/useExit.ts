@@ -18,10 +18,7 @@ export const useExit = () => {
   const { addNotification, getDefaultErrorMessage } = useNotifications();
   const { switchChainAsync } = useSwitchChain();
   const { setModalOpen, setIsClosable } = useModal();
-  const {
-    chain: { poolInfo },
-    chainId,
-  } = useChainContext();
+  const { chainId, selectedPoolInfo } = useChainContext();
   const { poolAccount, setTransactionHash, proof, setProof } = usePoolAccountsContext();
   const { seed, accountService, addRagequit } = useAccountContext();
   const { data: walletClient } = useWalletClient({ chainId });
@@ -63,7 +60,7 @@ export const useExit = () => {
         const { request } = await publicClient
           .simulateContract({
             account: address,
-            address: getAddress(poolInfo.address),
+            address: getAddress(selectedPoolInfo.address),
             abi: privacyPoolAbi,
             functionName: 'ragequit',
             args: [
