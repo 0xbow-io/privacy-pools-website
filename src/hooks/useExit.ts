@@ -36,7 +36,7 @@ export const useExit = () => {
       // Set additional context
       scope.setContext('ragequit_context', {
         chainId,
-        poolAddress: poolInfo?.address,
+        poolAddress: selectedPoolInfo.address,
         poolAccount: {
           lastCommitment: poolAccount?.lastCommitment,
         },

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { addBreadcrumb, captureException, withScope } from '@sentry/nextjs';
-import { getAddress, Hex, TransactionExecutionError } from 'viem';
+import { getAddress, Hex, parseUnits, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
 import { useAccount, usePublicClient, useSwitchChain } from 'wagmi';
 import { getConfig } from '~/config';
@@ -94,16 +94,16 @@ export const useWithdraw = () => {
       // Set additional context
       scope.setContext('withdrawal_context', {
         chainId,
-        poolAddress: poolInfo?.address,
-        entryPointAddress: poolInfo?.entryPointAddress,
+        poolAddress: selectedPoolInfo?.address,
+        entryPointAddress: selectedPoolInfo?.entryPointAddress,
         amount: amount?.toString(),
         target,
         hasPoolAccount: !!poolAccount,
         hasCommitment: !!commitment,
         hasAspLeaves: !!aspLeaves,
         hasStateLeaves: !!stateLeaves,
-        hasRelayerData: !!relayerData?.relayerAddress,
-        hasRelayerFees: !!relayerData?.fees,
+        hasSelectedRelayer: !!selectedRelayer?.url,
+        selectedRelayer,
         testMode: TEST_MODE,
         ...context,
       });
@@ -169,7 +169,7 @@ export const useWithdraw = () => {
         relayerDetails.fees,
       );
 
-      poolScope = await getScope(publicClient, poolInfo.address);
+      poolScope = await getScope(publicClient, selectedPoolInfo?.address);
       stateMerkleProof = await getMerkleProof(stateLeaves?.map(BigInt) as bigint[], commitment.hash);
       aspMerkleProof = await getMerkleProof(aspLeaves?.map(BigInt), commitment.label);
       const context = await getContext(newWithdrawal, poolScope as Hash);
