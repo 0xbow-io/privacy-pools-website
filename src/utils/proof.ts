@@ -1,4 +1,4 @@
-import { Address, encodeAbiParameters, Hex, isAddress, parseAbiParameters, parseEther } from 'viem';
+import { Address, encodeAbiParameters, Hex, isAddress, parseAbiParameters } from 'viem';
 import { Secret, AccountCommitment, Withdrawal, WithdrawalProofInput, Hash } from '~/types';
 import { getMerkleProof } from '~/utils';
 
@@ -34,7 +34,7 @@ function padArray(arr: bigint[], length: number): bigint[] {
 
 export const prepareWithdrawalProofInput = (
   commitment: AccountCommitment,
-  amount: string,
+  amount: bigint,
   stateMerkleProof: Awaited<ReturnType<typeof getMerkleProof>>,
   aspMerkleProof: Awaited<ReturnType<typeof getMerkleProof>>,
   context: bigint,
@@ -42,7 +42,7 @@ export const prepareWithdrawalProofInput = (
   nullifier: Secret,
 ): WithdrawalProofInput => {
   return {
-    withdrawalAmount: parseEther(amount),
+    withdrawalAmount: amount,
     stateMerkleProof: {
       root: stateMerkleProof.root as Hash,
       leaf: commitment.hash,

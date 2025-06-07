@@ -46,7 +46,7 @@ export const useASP = (
   });
 
   const isError = poolInfoQuery.isError || mtRootQuery.isError;
-  const isLoading = poolInfoQuery.isLoading || mtRootQuery.isLoading;
+  const isLoading = poolInfoQuery.isLoading || mtRootQuery.isLoading || mtLeavesQuery.isLoading;
 
   return useMemo(
     () => ({

@@ -30,13 +30,13 @@ if (typeof window !== 'undefined') {
   baseUrl = window.location.origin;
 }
 
-const chainDataByWhitelistedChains = Object.values(chainData).filter((chain) =>
-  whitelistedChains.some((c) => c.id === chain.poolInfo.chainId),
+const chainDataByWhitelistedChains = Object.values(chainData).filter(
+  (chain) => chain.poolInfo.length > 0 && whitelistedChains.some((c) => c.id === chain.poolInfo[0].chainId),
 );
 
-const poolsByChain = chainDataByWhitelistedChains.map(
+const poolsByChain = chainDataByWhitelistedChains.flatMap(
   (chain) => chain.poolInfo,
-) as ChainData[keyof ChainData]['poolInfo'][];
+) as ChainData[keyof ChainData]['poolInfo'];
 
 const circuits = new Circuits({ baseUrl });
 const sdk = new PrivacyPoolSDK(circuits);
@@ -221,7 +221,9 @@ export const getPoolAccountsFromAccount = async (account: PrivacyPoolAccount, ch
       const lastCommitment =
         poolAccount.children.length > 0 ? poolAccount.children[poolAccount.children.length - 1] : poolAccount.deposit;
 
-      const _chainId = Object.keys(chainData).find((key) => chainData[Number(key)].poolInfo.scope === _scope);
+      const _chainId = Object.keys(chainData).find((key) =>
+        chainData[Number(key)].poolInfo.some((pool) => pool.scope === _scope),
+      );
 
       const updatedPoolAccount = {
         ...(poolAccount as PoolAccount),

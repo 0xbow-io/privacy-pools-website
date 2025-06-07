@@ -5,7 +5,7 @@ import { formatTimestamp } from '~/utils';
 
 export const Resume = () => {
   const {
-    chain: { symbol, decimals },
+    balanceBN: { symbol, decimals },
   } = useChainContext();
   const { poolAccount } = usePoolAccountsContext();
 

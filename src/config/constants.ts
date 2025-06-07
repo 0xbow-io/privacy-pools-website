@@ -23,6 +23,7 @@ const constants: Constants = {
   TOC_URL: 'https://docs.privacypools.com/toc',
   PENDING_STATUS_MESSAGE:
     'The ASP is validating that the funds are coming from a good actor. Estimated period: Up to 7 days.',
+  DEFAULT_ASSET: 'ETH',
 };
 
 export const getConstants = (): Constants => {

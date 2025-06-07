@@ -95,3 +95,10 @@ export const getUniqueConnectors = (connectors: readonly Connector<CreateConnect
     return true;
   });
 };
+
+export const calculateRemainingTime = (expiration: number | undefined): number => {
+  if (expiration === undefined || expiration === null) return 0;
+  const now = Date.now();
+  const remaining = expiration - now;
+  return Math.max(0, Math.floor(remaining / 1000));
+};

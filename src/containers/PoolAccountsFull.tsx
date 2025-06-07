@@ -9,9 +9,10 @@ import { ViewAllText, ViewAllButton } from './PoolAccountsPreview';
 
 export const PoolAccountsFull = () => {
   const {
-    chain: { symbol, decimals },
+    balanceBN: { symbol, decimals },
   } = useChainContext();
-  const { poolAccounts, allPools, allEth, pendingEth, hideEmptyPools, toggleHideEmptyPools } = useAccountContext();
+  const { poolAccounts, allPools, amountPoolAsset, pendingAmountPoolAsset, hideEmptyPools, toggleHideEmptyPools } =
+    useAccountContext();
   const { ITEMS_PER_PAGE, fullPoolAccounts } = useAdvancedView();
   const { isLogged } = useAuthContext();
 
@@ -36,7 +37,7 @@ export const PoolAccountsFull = () => {
               <Stack width='50%' gap={1}>
                 <Subtitle variant='caption'>Available:</Subtitle>
                 <EthText variant='subtitle1' fontWeight='bold'>
-                  {formatUnits(allEth, decimals)}
+                  {formatUnits(amountPoolAsset, decimals)}
                   <span>{symbol}</span>
                 </EthText>
               </Stack>
@@ -44,7 +45,7 @@ export const PoolAccountsFull = () => {
               <Stack width='50%' gap={1}>
                 <Subtitle variant='caption'>Being validated:</Subtitle>
                 <EthText variant='subtitle1' fontWeight='bold'>
-                  {formatUnits(pendingEth, decimals)}
+                  {formatUnits(pendingAmountPoolAsset, decimals)}
                   <span>{symbol}</span>
                 </EthText>
               </Stack>

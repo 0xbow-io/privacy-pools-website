@@ -1,21 +1,22 @@
 import { styled, Stack, Typography } from '@mui/material';
-import { formatEther, parseEther } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import { useAccountContext, usePoolAccountsContext, useChainContext } from '~/hooks';
 import { EventType } from '~/types';
 
 export const PoolAccountSection = () => {
   const {
-    chain: { symbol },
+    selectedPoolInfo: { asset },
+    balanceBN: { decimals },
   } = useChainContext();
   const { amount, poolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const isDeposit = actionType === EventType.DEPOSIT;
 
   const poolAccountName = isDeposit ? `PA-${poolAccounts.length + 1}` : `PA-${poolAccount?.name}`;
-  const fee = (vettingFeeBPS * parseEther(amount)) / 100n / 100n;
+  const fee = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
 
-  const totalAmountBN = isDeposit ? parseEther(amount) - fee : parseEther(amount);
-  const formattedTotalAmount = formatEther(totalAmountBN);
+  const totalAmountBN = isDeposit ? parseUnits(amount, decimals) - fee : parseUnits(amount, decimals);
+  const formattedTotalAmount = formatUnits(totalAmountBN, decimals);
 
   return (
     <Container>
@@ -24,7 +25,7 @@ export const PoolAccountSection = () => {
         <Value variant='body2'>{poolAccountName}</Value>
       </Row>
       <TotalValue variant='body2'>
-        {formattedTotalAmount} {symbol}
+        {formattedTotalAmount} {asset}
       </TotalValue>
     </Container>
   );

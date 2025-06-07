@@ -7,6 +7,7 @@ jobs:
   check:
     name: Check for crypto
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'defi-wonderland'
 
     steps:
       - uses: actions/checkout@v3

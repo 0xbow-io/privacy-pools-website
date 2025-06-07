@@ -11,6 +11,7 @@ interface AuthContextType {
   isConnected: boolean;
   login: (_seed?: string) => void;
   logout: () => void;
+  isAuthorized: boolean;
 }
 
 export const AuthContext = createContext({} as AuthContextType);
@@ -51,6 +52,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         isConnected: !!address,
         login,
         logout,
+        isAuthorized: isLogged && !!address,
       }}
     >
       {children}

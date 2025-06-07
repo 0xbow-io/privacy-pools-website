@@ -10,6 +10,7 @@ const env: Env = {
   IS_TESTNET: process.env.NEXT_PUBLIC_IS_TESTNET === 'true',
   GITHUB_HASH: process.env.NEXT_PUBLIC_GITHUB_HASH as string,
   HYPERSYNC_KEY: process.env.NEXT_PUBLIC_HYPERSYNC_KEY as string,
+  SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN as string,
 };
 
 export const getServerEnv = () => {

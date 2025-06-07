@@ -25,4 +25,5 @@ export type HistoryData = {
   timestamp: number;
   reviewStatus: ReviewStatus;
   label: bigint;
+  scope: Hash;
 }[];

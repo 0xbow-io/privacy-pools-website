@@ -1,19 +1,22 @@
 'use client';
 
 import { Box, Stack, styled, Typography } from '@mui/material';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { useExternalServices, useChainContext } from '~/hooks';
 
 export const GlobalPool = () => {
   const {
-    chain: { symbol },
+    balanceBN: { symbol, decimals: balanceDecimals },
+    selectedPoolInfo: { assetDecimals },
   } = useChainContext();
   const {
     aspData: { poolsData },
   } = useExternalServices();
 
-  const poolBalance = Number(formatEther(BigInt(poolsData?.totalInPoolValue || 0))).toFixed(2);
+  const decimals = assetDecimals ?? balanceDecimals ?? 18;
+
+  const poolBalance = Number(formatUnits(BigInt(poolsData?.totalInPoolValue || 0), decimals)).toFixed(2);
 
   return (
     <HomeSection>
