@@ -92,10 +92,10 @@ const testnetChainData: ChainData = {
       {
         chainId: sepolia.id,
         assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-        address: '0x4091b6aF3CB2460a04A58Ce775140221F8B6391B',
-        scope: 6276514527914124858593577781760940935800899619504017018988536900856718641423n,
+        address: '0x644d5A2554d36e27509254F32ccfeBe8cd58861f',
+        scope: 13541713702858359530363969798588891965037210808099002426745892519913535247342n,
         deploymentBlock: 8042931n,
-        entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
+        entryPointAddress: '0x34A2068192b1297f2a7f85D7D8CdE66F8F0921cB',
         maxDeposit: parseEther('1'),
         asset: 'ETH',
         assetDecimals: 18,
