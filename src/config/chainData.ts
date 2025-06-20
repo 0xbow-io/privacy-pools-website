@@ -11,7 +11,7 @@ const testnetChains: readonly [Chain, ...Chain[]] = [sepolia];
 
 export const whitelistedChains = IS_TESTNET ? testnetChains : mainnetChains;
 
-export type ChainAssets = 'ETH' | 'USDC';
+export type ChainAssets = 'ETH' | 'USDC' | 'USDT';
 
 export interface PoolInfo {
   chainId: number;
@@ -92,9 +92,9 @@ const testnetChainData: ChainData = {
       {
         chainId: sepolia.id,
         assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-        address: '0x4091b6aF3CB2460a04A58Ce775140221F8B6391B',
-        scope: 6276514527914124858593577781760940935800899619504017018988536900856718641423n,
-        deploymentBlock: 8042931n,
+        address: '0x644d5A2554d36e27509254F32ccfeBe8cd58861f',
+        scope: 13541713702858359530363969798588891965037210808099002426745892519913535247342n,
+        deploymentBlock: 8587019n,
         entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
         maxDeposit: parseEther('1'),
         asset: 'ETH',
@@ -103,10 +103,21 @@ const testnetChainData: ChainData = {
       },
       {
         chainId: sepolia.id,
+        assetAddress: '0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0',
+        address: '0x6709277E170DEe3E54101cDb73a450E392ADfF54',
+        scope: 9423591183392302543658559874370404687995075471172962430042059179876435583731n,
+        deploymentBlock: 8587019n,
+        entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
+        maxDeposit: parseUnits('100', 6),
+        asset: 'USDT',
+        assetDecimals: 6,
+      },
+      {
+        chainId: sepolia.id,
         assetAddress: '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238',
-        address: '0x5a3be0927950b089463a08793ed33fc228f3f885',
-        scope: 13604834230510441355137990666952328592573726765577362680366393464214657610084n,
-        deploymentBlock: 8384614n,
+        address: '0x34A2068192b1297f2a7f85D7D8CdE66F8F0921cB',
+        scope: 18021368285297593722986850677939473668942851500120722179451099768921996600282n,
+        deploymentBlock: 8587019n,
         entryPointAddress: '0x5fffC32b925E2E2f5931905EE785568D98B641d1',
         maxDeposit: parseUnits('100', 6),
         asset: 'USDC',

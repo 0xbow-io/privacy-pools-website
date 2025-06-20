@@ -14,6 +14,7 @@ export interface Option {
 const ALL_TOKEN_OPTIONS: Option[] = [
   { value: 'ETH', label: 'ETH' },
   { value: 'USDC', label: 'USDC' },
+  { value: 'USDT', label: 'USDT' },
 ];
 
 const MENU_STYLING = {
