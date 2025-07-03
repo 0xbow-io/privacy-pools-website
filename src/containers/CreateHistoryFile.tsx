@@ -23,8 +23,6 @@ export const CreateHistoryFile = () => {
   const [isHistoryFileCreated, setIsHistoryFileCreated] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  const isDepositDisabled = !BigInt(maxDeposit);
-
   const handleCreateHistoryFile = () => {
     if (!isConfirmed) return;
 
