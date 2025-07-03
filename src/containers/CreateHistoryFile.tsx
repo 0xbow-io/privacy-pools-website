@@ -26,6 +26,8 @@ export const CreateHistoryFile = () => {
 
   const isDepositDisabled = !BigInt(maxDeposit);
 
+  const isDepositDisabled = !BigInt(maxDeposit);
+
   const handleCreateHistoryFile = () => {
     if (!isConfirmed || !isVerified) return;
 
