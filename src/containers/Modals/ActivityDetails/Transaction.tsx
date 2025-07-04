@@ -12,11 +12,23 @@ export const Transaction = () => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    setCopied(true);
-    navigator.clipboard.writeText(selectedHistoryData?.txHash ?? '');
-    setTimeout(() => {
-      setCopied(false);
-    }, 1000);
+    navigator.clipboard
+      .writeText(selectedHistoryData?.txHash ?? '')
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => {
+          setCopied(false);
+        }, 1000);
+      })
+      .catch((error) => {
+        // Don't report clipboard permission denials to Sentry - this is expected user behavior
+        if (error.name === 'NotAllowedError') {
+          console.warn('Clipboard permission denied by user');
+          return;
+        }
+        // Report other clipboard errors
+        throw error;
+      });
   };
 
   const handleLink = () => {
