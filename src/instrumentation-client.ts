@@ -30,6 +30,36 @@ Sentry.init({
 
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
+
+  beforeSend(event, hint) {
+    const error = hint.originalException;
+
+    // Filter out expected user behavior errors that aren't bugs
+    if (error && typeof error === 'object' && 'message' in error) {
+      const message = (error as Error).message;
+
+      // Filter out wallet provider errors - these happen when users don't have wallets installed
+      // or deny wallet connections, which is expected behavior
+      if (message.includes('this.provider.disconnect is not a function')) {
+        console.warn('Filtered wallet provider error (likely no wallet installed):', message);
+        return null;
+      }
+    }
+
+    // Filter out errors from WalletConnect modules when users don't have proper wallet setup
+    if (
+      event.exception?.values?.[0]?.stacktrace?.frames?.some(
+        (frame) =>
+          frame.filename?.includes('@walletconnect') &&
+          event.exception?.values?.[0]?.value?.includes('disconnect is not a function'),
+      )
+    ) {
+      console.warn('Filtered WalletConnect provider error (likely no wallet installed)');
+      return null;
+    }
+
+    return event;
+  },
 });
 
 // eslint-disable-next-line
