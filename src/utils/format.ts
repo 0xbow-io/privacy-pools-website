@@ -1,3 +1,4 @@
+import { captureException, withScope } from '@sentry/nextjs';
 import { decodeEventLog, parseAbiItem, TransactionReceipt } from 'viem';
 
 export const truncateAddress = (address?: string) => {
@@ -82,7 +83,22 @@ export const decodeEventsFromReceipt = (receipt: TransactionReceipt, eventAbi: s
           args: decodedLog.args,
         };
       } catch (error) {
-        console.warn('Failed to decode log:', error);
+        // Log decode errors to Sentry for debugging
+        withScope((scope) => {
+          scope.setTag('function', 'decodeEventsFromReceipt');
+          scope.setTag('event_abi', parsedAbiItem.name);
+          scope.setContext('log_data', {
+            topics: log.topics,
+            data: log.data,
+            address: log.address,
+          });
+          scope.setContext('transaction', {
+            hash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
+            status: receipt.status,
+          });
+          captureException(error);
+        });
         return null;
       }
     })
