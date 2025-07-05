@@ -304,6 +304,7 @@ export const useWithdraw = () => {
 
         const receipt = await publicClient?.waitForTransactionReceipt({
           hash: res.txHash as Hex,
+          timeout: 300_000, // 5 minutes timeout for withdrawal transactions
         });
 
         if (!receipt) throw new Error('Receipt not found');

@@ -107,7 +107,9 @@ Sentry.init({
         message.includes('Connection timeout') ||
         message.includes('Request timeout') ||
         message.includes('Network request failed') ||
-        message.includes('Network error')
+        message.includes('Network error') ||
+        message.includes('WaitForTransactionReceiptTimeoutError') ||
+        errorName === 'WaitForTransactionReceiptTimeoutError'
       ) {
         console.warn('Filtered network/connection error:', message);
         return null;

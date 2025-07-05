@@ -153,6 +153,7 @@ export const useExit = () => {
 
         const receipt = await publicClient?.waitForTransactionReceipt({
           hash,
+          timeout: 300_000, // 5 minutes timeout for exit transactions
         });
 
         if (!receipt) throw new Error('Receipt not found');

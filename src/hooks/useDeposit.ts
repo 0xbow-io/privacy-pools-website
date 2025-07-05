@@ -79,7 +79,10 @@ export const useDeposit = () => {
             account: address,
           });
 
-          const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          const approvalReceipt = await publicClient.waitForTransactionReceipt({
+            hash: approveHash,
+            timeout: 180_000, // 3 minutes timeout for approval transactions
+          });
           if (!approvalReceipt) throw new Error('Approval receipt not found');
         }
 
@@ -130,6 +133,7 @@ export const useDeposit = () => {
 
         const receipt = await publicClient?.waitForTransactionReceipt({
           hash,
+          timeout: 300_000, // 5 minutes timeout for deposit transactions
         });
 
         if (!receipt) throw new Error('Receipt not found');
