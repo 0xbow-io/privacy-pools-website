@@ -159,7 +159,16 @@ export const useDeposit = () => {
           txHash: hash,
         });
 
+        // Show success modal first
         setModalOpen(ModalType.SUCCESS);
+
+        // After a brief delay, check if the deposit might not be visible to users who refresh
+        setTimeout(() => {
+          addNotification(
+            'info',
+            `✅ Deposit confirmed! Transaction: ${hash}\n\nNote: If you refresh the page and your deposit doesn't appear immediately, don't worry! Our indexers may need a few minutes to sync. Your funds are safe on-chain.`,
+          );
+        }, 2000);
       } else {
         // Mock flow
         setModalOpen(ModalType.PROCESSING);
