@@ -44,24 +44,46 @@ export const SeedPhraseForm = ({
   const mobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(seedPhrase);
-    setIsCopied(true);
-
-    setTimeout(() => {
-      setIsCopied(false);
-    }, 3000);
+    navigator.clipboard
+      .writeText(seedPhrase)
+      .then(() => {
+        setIsCopied(true);
+        setTimeout(() => {
+          setIsCopied(false);
+        }, 3000);
+      })
+      .catch((error) => {
+        // Don't report clipboard permission denials to Sentry - this is expected user behavior
+        if (error.name === 'NotAllowedError') {
+          console.warn('Clipboard permission denied by user');
+          return;
+        }
+        // Report other clipboard errors
+        throw error;
+      });
   };
 
   const pasteFromClipboard = useCallback(() => {
-    navigator.clipboard.readText().then((text) => {
-      const cleanedText = text.trim().replace(/\s+/g, ' ');
+    navigator.clipboard
+      .readText()
+      .then((text) => {
+        const cleanedText = text.trim().replace(/\s+/g, ' ');
 
-      if (cleanedText === seedPhrase) return;
+        if (cleanedText === seedPhrase) return;
 
-      setSplitSeedPhrase([]); // reset this state to avoid infinite loop
-      setSeedPhrase(cleanedText);
-      setIsHidden(true);
-    });
+        setSplitSeedPhrase([]); // reset this state to avoid infinite loop
+        setSeedPhrase(cleanedText);
+        setIsHidden(true);
+      })
+      .catch((error) => {
+        // Don't report clipboard permission denials to Sentry - this is expected user behavior
+        if (error.name === 'NotAllowedError') {
+          console.warn('Clipboard permission denied by user');
+          return;
+        }
+        // Report other clipboard errors
+        throw error;
+      });
   }, [seedPhrase, setSeedPhrase]);
 
   const changeSeedPhraseWord = (text: string, index: number) => {

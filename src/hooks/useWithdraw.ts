@@ -86,6 +86,36 @@ export const useWithdraw = () => {
 
   //eslint-disable-next-line @typescript-eslint/no-explicit-any
   const logErrorToSentry = (error: any, context: Record<string, any>) => {
+    // Filter out expected user behavior errors
+    if (error && typeof error === 'object') {
+      const message = error.message || '';
+      const errorName = error.name || '';
+      const errorCode = error.code;
+
+      // Don't log wallet rejections and user behavior errors
+      if (
+        errorCode === 4001 ||
+        errorCode === 4100 ||
+        errorCode === 4200 ||
+        errorCode === -32002 ||
+        errorCode === -32003 ||
+        message.includes('User rejected the request') ||
+        message.includes('User denied') ||
+        message.includes('User cancelled') ||
+        message.includes('Pop up window failed to open') ||
+        message.includes('provider is not defined') ||
+        message.includes('No Ethereum provider found') ||
+        message.includes('Connection timeout') ||
+        message.includes('Request timeout') ||
+        message.includes('Transaction cancelled') ||
+        message.includes('Chain switching failed') ||
+        errorName === 'UserRejectedRequestError'
+      ) {
+        console.warn('Filtered wallet user behavior error (not logging to Sentry)');
+        return;
+      }
+    }
+
     withScope((scope) => {
       scope.setUser({
         address: address,
@@ -274,6 +304,7 @@ export const useWithdraw = () => {
 
         const receipt = await publicClient?.waitForTransactionReceipt({
           hash: res.txHash as Hex,
+          timeout: 300_000, // 5 minutes timeout for withdrawal transactions
         });
 
         if (!receipt) throw new Error('Receipt not found');

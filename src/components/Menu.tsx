@@ -59,12 +59,23 @@ export const Menu = () => {
   };
 
   const handleCopyAddress = () => {
-    navigator.clipboard.writeText(address!);
-    setCopied(true);
-
-    setTimeout(() => {
-      setCopied(false);
-    }, 1400);
+    navigator.clipboard
+      .writeText(address!)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => {
+          setCopied(false);
+        }, 1400);
+      })
+      .catch((error) => {
+        // Don't report clipboard permission denials to Sentry - this is expected user behavior
+        if (error.name === 'NotAllowedError') {
+          console.warn('Clipboard permission denied by user');
+          return;
+        }
+        // Report other clipboard errors
+        throw error;
+      });
   };
 
   return (
