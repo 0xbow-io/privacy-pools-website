@@ -44,6 +44,16 @@ Sentry.init({
         console.warn('Filtered wallet provider error (likely no wallet installed):', message);
         return null;
       }
+
+      // Filter out user transaction rejections - this is expected user behavior
+      if (
+        message.includes('User rejected the request') ||
+        ('name' in error && error.name === 'UserRejectedRequestError') ||
+        ('code' in error && error.code === 4001)
+      ) {
+        console.warn('Filtered user transaction rejection:', message);
+        return null;
+      }
     }
 
     // Filter out errors from WalletConnect modules when users don't have proper wallet setup

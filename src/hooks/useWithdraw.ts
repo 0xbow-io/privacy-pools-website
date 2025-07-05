@@ -86,6 +86,21 @@ export const useWithdraw = () => {
 
   //eslint-disable-next-line @typescript-eslint/no-explicit-any
   const logErrorToSentry = (error: any, context: Record<string, any>) => {
+    // Filter out expected user behavior errors
+    if (error && typeof error === 'object') {
+      const message = error.message || '';
+
+      // Don't log wallet rejections - these are expected user behavior
+      if (
+        message.includes('User rejected the request') ||
+        error.name === 'UserRejectedRequestError' ||
+        error.code === 4001
+      ) {
+        console.warn('User rejected wallet transaction (not logging to Sentry)');
+        return;
+      }
+    }
+
     withScope((scope) => {
       scope.setUser({
         address: address,
