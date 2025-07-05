@@ -151,6 +151,16 @@ Sentry.init({
       return null;
     }
 
+    // Filter out performance-related alerts - these are optimization issues, not bugs
+    if (
+      event.message?.includes('Large Render Blocking Asset') ||
+      event.message?.includes('render blocking') ||
+      event.tags?.alert_type === 'performance'
+    ) {
+      console.warn('Filtered performance alert (not an application bug)');
+      return null;
+    }
+
     return event;
   },
 });

@@ -24,12 +24,6 @@ import { transports } from '~/config/wagmiConfig';
 import { PoolAccount, ReviewStatus } from '~/types';
 import { getTimestampFromBlockNumber } from '~/utils';
 
-let baseUrl = '';
-
-if (typeof window !== 'undefined') {
-  baseUrl = window.location.origin;
-}
-
 const chainDataByWhitelistedChains = Object.values(chainData).filter(
   (chain) => chain.poolInfo.length > 0 && whitelistedChains.some((c) => c.id === chain.poolInfo[0].chainId),
 );
@@ -38,8 +32,22 @@ const poolsByChain = chainDataByWhitelistedChains.flatMap(
   (chain) => chain.poolInfo,
 ) as ChainData[keyof ChainData]['poolInfo'];
 
-const circuits = new Circuits({ baseUrl });
-const sdk = new PrivacyPoolSDK(circuits);
+// Lazy load circuits only when needed
+let circuits: Circuits | null = null;
+let sdk: PrivacyPoolSDK | null = null;
+
+const initializeSDK = () => {
+  if (!circuits) {
+    // Ensure we have a valid baseUrl (client-side only)
+    const currentBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    if (!currentBaseUrl) {
+      throw new Error('SDK can only be initialized on client-side');
+    }
+    circuits = new Circuits({ baseUrl: currentBaseUrl });
+    sdk = new PrivacyPoolSDK(circuits);
+  }
+  return sdk!;
+};
 
 const pools: PoolInfo[] = poolsByChain.map((pool) => {
   return {
@@ -72,7 +80,8 @@ const dataService = new DataService(dataServiceConfig);
  * @throws {ProofError} If proof generation fails
  */
 export const generateRagequitProof = async (commitment: AccountCommitment): Promise<CommitmentProof> => {
-  return await sdk.proveCommitment(commitment.value, commitment.label, commitment.nullifier, commitment.secret);
+  const sdkInstance = initializeSDK();
+  return await sdkInstance.proveCommitment(commitment.value, commitment.label, commitment.nullifier, commitment.secret);
 };
 
 /**
@@ -84,7 +93,8 @@ export const generateRagequitProof = async (commitment: AccountCommitment): Prom
  * @throws {ProofError} If verification fails
  */
 export const verifyRagequitProof = async ({ proof, publicSignals }: CommitmentProof) => {
-  return await sdk.verifyCommitment({ proof, publicSignals });
+  const sdkInstance = initializeSDK();
+  return await sdkInstance.verifyCommitment({ proof, publicSignals });
 };
 
 /**
@@ -97,7 +107,8 @@ export const verifyRagequitProof = async ({ proof, publicSignals }: CommitmentPr
  * @throws {ProofError} If proof generation fails
  */
 export const generateWithdrawalProof = async (commitment: AccountCommitment, input: WithdrawalProofInput) => {
-  return await sdk.proveWithdrawal(
+  const sdkInstance = initializeSDK();
+  return await sdkInstance.proveWithdrawal(
     {
       preimage: {
         label: commitment.label,
@@ -124,7 +135,8 @@ export const getMerkleProof = async (leaves: bigint[], leaf: bigint) => {
 };
 
 export const verifyWithdrawalProof = async (proof: WithdrawalProof) => {
-  return await sdk.verifyWithdrawal(proof);
+  const sdkInstance = initializeSDK();
+  return await sdkInstance.verifyWithdrawal(proof);
 };
 
 export const createAccount = (seed: string) => {
