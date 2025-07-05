@@ -36,28 +36,103 @@ Sentry.init({
 
     // Filter out expected user behavior errors that aren't bugs
     if (error && typeof error === 'object' && 'message' in error) {
-      const message = (error as Error).message;
+      const message = (error as Error).message || '';
+      const errorName = (error as Error).name || '';
+      const errorCode = 'code' in error ? (error as { code: number }).code : undefined;
 
-      // Filter out wallet provider errors - these happen when users don't have wallets installed
-      // or deny wallet connections, which is expected behavior
-      if (message.includes('this.provider.disconnect is not a function')) {
-        console.warn('Filtered wallet provider error (likely no wallet installed):', message);
-        return null;
-      }
-
-      // Filter out user transaction rejections - this is expected user behavior
+      // Filter out user rejection errors (multiple error codes and patterns)
       if (
+        errorCode === 4001 ||
+        errorCode === 4100 ||
+        errorCode === 4200 ||
         message.includes('User rejected the request') ||
-        ('name' in error && error.name === 'UserRejectedRequestError') ||
-        ('code' in error && error.code === 4001)
+        message.includes('User denied') ||
+        message.includes('User cancelled') ||
+        errorName === 'UserRejectedRequestError'
       ) {
-        console.warn('Filtered user transaction rejection:', message);
+        console.warn('Filtered user rejection error:', message);
         return null;
       }
 
-      // Filter out wallet popup failures - these happen due to popup blockers or user closing popups
-      if (message.includes('Pop up window failed to open')) {
-        console.warn('Filtered wallet popup failure (likely popup blocker):', message);
+      // Filter out JSON-RPC errors that represent user behavior
+      if (
+        errorCode === -32002 || // Resource unavailable
+        errorCode === -32003 || // Transaction rejected
+        (errorCode === -32603 && message.toLowerCase().includes('user')) // Internal error from user action
+      ) {
+        console.warn('Filtered JSON-RPC user behavior error:', message);
+        return null;
+      }
+
+      // Filter out wallet connection/provider errors
+      if (
+        message.includes('this.provider.disconnect is not a function') ||
+        message.includes('Pop up window failed to open') ||
+        message.includes('provider is not defined') ||
+        message.includes('No Ethereum provider found') ||
+        message.includes('window.ethereum is undefined') ||
+        message.includes('Injected provider not found') ||
+        message.includes('wallet_requestPermissions is not a function')
+      ) {
+        console.warn('Filtered wallet provider error:', message);
+        return null;
+      }
+
+      // Filter out chain switching rejections
+      if (
+        message.includes('User rejected the request to switch chains') ||
+        message.includes('Chain switching failed') ||
+        message.includes('Unrecognized chain ID') ||
+        message.includes('Chain not supported')
+      ) {
+        console.warn('Filtered chain switching rejection:', message);
+        return null;
+      }
+
+      // Filter out WalletConnect user behavior errors
+      if (
+        message.includes('WalletConnect session expired') ||
+        message.includes('WalletConnect proposal expired') ||
+        message.includes('QR Code modal closed') ||
+        message.includes('Session request expired') ||
+        message.includes('Connection request timeout') ||
+        message.includes('Pairing expired')
+      ) {
+        console.warn('Filtered WalletConnect user behavior:', message);
+        return null;
+      }
+
+      // Filter out network timeouts and connection issues (user environment)
+      if (
+        message.includes('Connection timeout') ||
+        message.includes('Request timeout') ||
+        message.includes('Network request failed') ||
+        message.includes('Network error')
+      ) {
+        console.warn('Filtered network/connection error:', message);
+        return null;
+      }
+
+      // Filter out mobile and browser specific errors
+      if (
+        message.includes('Deep link failed') ||
+        message.includes('App not installed') ||
+        message.includes('Universal link failed') ||
+        message.includes('Extension not enabled') ||
+        message.includes('Extension locked') ||
+        message.includes('Extension not responding')
+      ) {
+        console.warn('Filtered browser/mobile wallet error:', message);
+        return null;
+      }
+
+      // Filter out transaction cancellation by user
+      if (
+        message.includes('Transaction cancelled') ||
+        message.includes('User cancelled transaction') ||
+        message.includes('Transaction rejected by user')
+      ) {
+        console.warn('Filtered transaction cancellation:', message);
         return null;
       }
     }

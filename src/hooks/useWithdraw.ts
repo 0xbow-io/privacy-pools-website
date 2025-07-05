@@ -89,20 +89,29 @@ export const useWithdraw = () => {
     // Filter out expected user behavior errors
     if (error && typeof error === 'object') {
       const message = error.message || '';
+      const errorName = error.name || '';
+      const errorCode = error.code;
 
-      // Don't log wallet rejections - these are expected user behavior
+      // Don't log wallet rejections and user behavior errors
       if (
+        errorCode === 4001 ||
+        errorCode === 4100 ||
+        errorCode === 4200 ||
+        errorCode === -32002 ||
+        errorCode === -32003 ||
         message.includes('User rejected the request') ||
-        error.name === 'UserRejectedRequestError' ||
-        error.code === 4001
+        message.includes('User denied') ||
+        message.includes('User cancelled') ||
+        message.includes('Pop up window failed to open') ||
+        message.includes('provider is not defined') ||
+        message.includes('No Ethereum provider found') ||
+        message.includes('Connection timeout') ||
+        message.includes('Request timeout') ||
+        message.includes('Transaction cancelled') ||
+        message.includes('Chain switching failed') ||
+        errorName === 'UserRejectedRequestError'
       ) {
-        console.warn('User rejected wallet transaction (not logging to Sentry)');
-        return;
-      }
-
-      // Don't log wallet popup failures - these are expected user behavior
-      if (message.includes('Pop up window failed to open')) {
-        console.warn('Wallet popup failed to open (not logging to Sentry)');
+        console.warn('Filtered wallet user behavior error (not logging to Sentry)');
         return;
       }
     }
