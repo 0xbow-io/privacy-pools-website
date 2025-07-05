@@ -86,7 +86,7 @@ export const decodeEventsFromReceipt = (receipt: TransactionReceipt, eventAbi: s
         // Log decode errors to Sentry for debugging
         withScope((scope) => {
           scope.setTag('function', 'decodeEventsFromReceipt');
-          scope.setTag('event_abi', parsedAbiItem.name);
+          scope.setTag('event_abi', parsedAbiItem.type === 'event' ? parsedAbiItem.name : 'unknown');
           scope.setContext('log_data', {
             topics: log.topics,
             data: log.data,
