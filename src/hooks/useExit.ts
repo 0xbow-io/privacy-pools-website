@@ -41,6 +41,12 @@ export const useExit = () => {
         console.warn('User rejected wallet transaction (not logging to Sentry)');
         return;
       }
+
+      // Don't log wallet popup failures - these are expected user behavior
+      if (message.includes('Pop up window failed to open')) {
+        console.warn('Wallet popup failed to open (not logging to Sentry)');
+        return;
+      }
     }
 
     withScope((scope) => {

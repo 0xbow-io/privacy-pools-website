@@ -54,6 +54,12 @@ Sentry.init({
         console.warn('Filtered user transaction rejection:', message);
         return null;
       }
+
+      // Filter out wallet popup failures - these happen due to popup blockers or user closing popups
+      if (message.includes('Pop up window failed to open')) {
+        console.warn('Filtered wallet popup failure (likely popup blocker):', message);
+        return null;
+      }
     }
 
     // Filter out errors from WalletConnect modules when users don't have proper wallet setup
