@@ -11,3 +11,4 @@ export * from './relayerClient';
 export * from './sdk';
 export * from './withdraw';
 export * from './seedPhrase';
+export * from './clipboard';

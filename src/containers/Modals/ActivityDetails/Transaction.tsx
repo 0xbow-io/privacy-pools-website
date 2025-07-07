@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { Checkmark, Copy, Link as LinkIcon } from '@carbon/icons-react';
 import { IconButton, styled, Link, Stack } from '@mui/material';
 import { useChainContext, usePoolAccountsContext } from '~/hooks';
+import { useClipboard } from '~/utils';
 import { Label } from './DataSection';
 
 export const Transaction = () => {
@@ -9,26 +9,12 @@ export const Transaction = () => {
   const {
     chain: { explorerUrl },
   } = useChainContext();
-  const [copied, setCopied] = useState(false);
+  const { copied, copyToClipboard } = useClipboard({ timeout: 1000 });
 
   const handleCopy = () => {
-    navigator.clipboard
-      .writeText(selectedHistoryData?.txHash ?? '')
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => {
-          setCopied(false);
-        }, 1000);
-      })
-      .catch((error) => {
-        // Don't report clipboard permission denials to Sentry - this is expected user behavior
-        if (error.name === 'NotAllowedError') {
-          console.warn('Clipboard permission denied by user');
-          return;
-        }
-        // Report other clipboard errors
-        throw error;
-      });
+    if (selectedHistoryData?.txHash) {
+      copyToClipboard(selectedHistoryData.txHash);
+    }
   };
 
   const handleLink = () => {

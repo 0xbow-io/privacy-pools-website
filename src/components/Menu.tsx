@@ -15,7 +15,7 @@ import {
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { useGoTo, useChainContext, useAuthContext } from '~/hooks';
-import { formatDataNumber, getUsdBalance, ROUTER, truncateAddress, zIndex } from '~/utils';
+import { formatDataNumber, getUsdBalance, ROUTER, truncateAddress, zIndex, useClipboard } from '~/utils';
 
 export const Menu = () => {
   const { address } = useAccount();
@@ -24,7 +24,7 @@ export const Menu = () => {
     balanceBN: { value, symbol, decimals },
   } = useChainContext();
   const { logout } = useAuthContext();
-  const [copied, setCopied] = useState(false);
+  const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
   const theme = useTheme();
 
   const ethBalanceBN = value.toString() ?? '0';
@@ -59,23 +59,9 @@ export const Menu = () => {
   };
 
   const handleCopyAddress = () => {
-    navigator.clipboard
-      .writeText(address!)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => {
-          setCopied(false);
-        }, 1400);
-      })
-      .catch((error) => {
-        // Don't report clipboard permission denials to Sentry - this is expected user behavior
-        if (error.name === 'NotAllowedError') {
-          console.warn('Clipboard permission denied by user');
-          return;
-        }
-        // Report other clipboard errors
-        throw error;
-      });
+    if (address) {
+      copyToClipboard(address);
+    }
   };
 
   return (
