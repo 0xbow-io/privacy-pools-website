@@ -30,10 +30,33 @@ async function generateJWT(payload: object, secret: string) {
   return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
 }
 
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Credentials': 'false',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders(),
+  });
+}
+
 export async function GET() {
   const secret = process.env.ASP_JWT_SECRET;
   if (!secret) {
-    return NextResponse.json({ error: 'Missing JWT secret' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Missing JWT secret' },
+      {
+        status: 500,
+        headers: corsHeaders(),
+      },
+    );
   }
 
   const expiresIn = 3600; // 1 hour in seconds
@@ -53,6 +76,7 @@ export async function GET() {
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': `private, max-age=${maxAge}`,
+      ...corsHeaders(),
     },
   });
 }
