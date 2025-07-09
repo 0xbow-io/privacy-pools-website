@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, styled, Typography, LinearProgress } from '@mui/material';
 import { BaseModal } from '~/components';
 import { useExit, useModal, usePoolAccountsContext, useWithdraw } from '~/hooks';
@@ -19,9 +19,22 @@ export const GeneratingModal = () => {
   const { generateProof: generateRagequitProof } = useExit();
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<ZKProofProgress>({ phase: 'loading_circuits', progress: 0 });
-  const { actionType, poolAccount } = usePoolAccountsContext();
+
+  const updateProgress = useCallback((newProgress: ZKProofProgress) => {
+    setProgress((current) => {
+      // Only update if the new progress is higher than current progress
+      if (newProgress.progress > current.progress) {
+        return newProgress;
+      }
+      // Keep current progress if new progress is lower
+      return current;
+    });
+  }, []);
+
+  const { actionType } = usePoolAccountsContext();
   const isMountedRef = useRef(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasStartedRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -33,18 +46,22 @@ export const GeneratingModal = () => {
   }, []);
 
   useEffect(() => {
-    if (modalOpen !== ModalType.GENERATE_ZK_PROOF) return;
+    if (modalOpen !== ModalType.GENERATE_ZK_PROOF) {
+      hasStartedRef.current = false;
+      return;
+    }
     if (isGenerating) return;
+    if (hasStartedRef.current) return; // Prevent multiple starts
 
+    hasStartedRef.current = true;
     setIsGenerating(true);
     setProgress({ phase: 'loading_circuits', progress: 0 });
 
     if (!actionType) throw new Error('Action type not found');
 
     if (actionType === EventType.WITHDRAWAL) {
-      generateWithdrawalProof()
+      generateWithdrawalProof(updateProgress)
         .then(() => {
-          setProgress({ phase: 'generating_proof', progress: 100 });
           timeoutRef.current = setTimeout(() => {
             if (isMountedRef.current) {
               setModalOpen((currentModal) => {
@@ -68,13 +85,13 @@ export const GeneratingModal = () => {
         })
         .finally(() => {
           setIsGenerating(false);
+          hasStartedRef.current = false;
         });
     }
 
     if (actionType === EventType.EXIT) {
-      generateRagequitProof()
+      generateRagequitProof(updateProgress)
         .then(() => {
-          setProgress({ phase: 'generating_proof', progress: 100 });
           timeoutRef.current = setTimeout(() => {
             if (isMountedRef.current) {
               setModalOpen((currentModal) => {
@@ -99,9 +116,19 @@ export const GeneratingModal = () => {
         })
         .finally(() => {
           setIsGenerating(false);
+          hasStartedRef.current = false;
         });
     }
-  }, [modalOpen, setModalOpen, generateWithdrawalProof, generateRagequitProof, isGenerating, actionType, poolAccount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    modalOpen,
+    actionType,
+    generateWithdrawalProof,
+    generateRagequitProof,
+    setModalOpen,
+    updateProgress,
+    // Note: isGenerating is intentionally excluded to prevent duplicate proof generation
+  ]);
 
   const getProgressText = () => {
     switch (progress.phase) {

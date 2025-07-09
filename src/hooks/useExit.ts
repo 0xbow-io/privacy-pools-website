@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { addBreadcrumb, captureException, withScope } from '@sentry/nextjs';
 import { getAddress, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
@@ -85,13 +85,67 @@ export const useExit = () => {
     });
   };
 
-  const generateProof = async () => {
-    if (!poolAccount?.lastCommitment) throw new Error('Pool account commitment not found');
+  const generateProof = useCallback(
+    async (
+      onProgress?: (progress: {
+        phase: 'loading_circuits' | 'generating_proof' | 'verifying_proof';
+        progress: number;
+      }) => void,
+    ) => {
+      if (!poolAccount?.lastCommitment) throw new Error('Pool account commitment not found');
 
-    const proof = await generateRagequitProof(poolAccount.lastCommitment);
-    setProof(proof);
-    return proof;
-  };
+      // Use worker for progress updates, but still call actual SDK for proof generation
+      const workerPromise = new Promise((resolve, reject) => {
+        const worker = new Worker(new URL('../workers/zkProofWorker.ts', import.meta.url));
+        const requestId = Math.random().toString(36).substring(2, 15);
+
+        worker.onmessage = (event) => {
+          const { type, payload, id } = event.data;
+
+          if (id !== requestId) return;
+
+          switch (type) {
+            case 'success':
+              worker.terminate();
+              resolve(payload);
+              break;
+            case 'error':
+              worker.terminate();
+              reject(new Error(payload.message));
+              break;
+            case 'progress':
+              if (onProgress) {
+                onProgress(payload);
+              }
+              break;
+          }
+        };
+
+        worker.onerror = (error) => {
+          worker.terminate();
+          reject(error);
+        };
+
+        worker.postMessage({
+          type: 'generateRagequitProof',
+          payload: poolAccount.lastCommitment,
+          id: requestId,
+        });
+      });
+
+      // Run both worker (for progress) and actual SDK call in parallel
+      const [, proof] = await Promise.all([workerPromise, generateRagequitProof(poolAccount.lastCommitment)]);
+
+      setProof(proof);
+
+      if (onProgress) {
+        onProgress({ phase: 'verifying_proof', progress: 1.0 });
+      }
+
+      return proof;
+    },
+    [poolAccount?.lastCommitment, setProof],
+  );
 
   const exit = async () => {
     if (!proof) throw new Error('Ragequit proof not found');

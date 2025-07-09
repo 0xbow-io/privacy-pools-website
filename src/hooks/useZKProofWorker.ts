@@ -24,10 +24,16 @@ interface ZKProofWorkerHook {
 
 export const useZKProofWorker = (): ZKProofWorkerHook => {
   const workerRef = useRef<Worker | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pendingRequests = useRef<Map<string, { resolve: (value: any) => void; reject: (error: Error) => void }>>(
-    new Map(),
-  );
+  const pendingRequests = useRef<
+    Map<
+      string,
+      {
+        resolve: (value: unknown) => void;
+        reject: (error: Error) => void;
+        onProgress?: (progress: ZKProofProgress) => void;
+      }
+    >
+  >(new Map());
 
   const getWorker = useCallback(() => {
     if (!workerRef.current) {
@@ -50,6 +56,9 @@ export const useZKProofWorker = (): ZKProofWorkerHook => {
             break;
           case 'progress':
             // Progress updates are handled by the onProgress callback
+            if (request.onProgress) {
+              request.onProgress(payload);
+            }
             break;
         }
       };
@@ -59,23 +68,15 @@ export const useZKProofWorker = (): ZKProofWorkerHook => {
 
   const executeWorkerTask = useCallback(
     <T>(type: string, payload: unknown, onProgress?: (progress: ZKProofProgress) => void): Promise<T> => {
-      return new Promise((resolve, reject) => {
+      return new Promise<T>((resolve, reject) => {
         const worker = getWorker();
         const id = Math.random().toString(36).substring(2, 15);
 
-        pendingRequests.current.set(id, { resolve, reject });
-
-        if (onProgress) {
-          const originalOnMessage = worker.onmessage;
-          worker.onmessage = (event) => {
-            if (event.data.id === id && event.data.type === 'progress') {
-              onProgress(event.data.payload);
-            }
-            if (originalOnMessage) {
-              originalOnMessage.call(worker, event);
-            }
-          };
-        }
+        pendingRequests.current.set(id, {
+          resolve: resolve as (value: unknown) => void,
+          reject,
+          onProgress,
+        });
 
         worker.postMessage({ type, payload, id });
       });
