@@ -3,7 +3,13 @@ import { Stack, styled, Typography } from '@mui/material';
 import { formatUnits, parseUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { ExtendedTooltip as Tooltip } from '~/components';
-import { useExternalServices, usePoolAccountsContext, useChainContext } from '~/hooks';
+import {
+  useExternalServices,
+  usePoolAccountsContext,
+  useChainContext,
+  useRequestQuote,
+  useNotifications,
+} from '~/hooks';
 import { EventType } from '~/types';
 import { getUsdBalance, truncateAddress } from '~/utils';
 
@@ -13,10 +19,29 @@ export const DataSection = () => {
     balanceBN: { symbol, decimals },
     price,
     selectedPoolInfo,
+    chainId,
   } = useChainContext();
-  const { currentSelectedRelayerData } = useExternalServices();
+  const { currentSelectedRelayerData, relayerData } = useExternalServices();
   const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw } = usePoolAccountsContext();
+  const { addNotification } = useNotifications();
   const isDeposit = actionType === EventType.DEPOSIT;
+
+  // Add quote timer for withdrawals
+  const amountBN = parseUnits(amount, decimals);
+  const { getQuote, isQuoteLoading, quoteError } = relayerData || {};
+  const { countdown, isQuoteValid } = useRequestQuote({
+    getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
+    isQuoteLoading: isQuoteLoading || false,
+    quoteError: quoteError || null,
+    chainId,
+    amountBN,
+    assetAddress: selectedPoolInfo?.assetAddress,
+    recipient: target,
+    isValidAmount: amountBN > 0n,
+    isRecipientAddressValid: !!target,
+    isRelayerSelected: !!currentSelectedRelayerData?.relayerAddress,
+    addNotification,
+  });
   const aspDataFees = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
   const aspOrRelayer = {
     label: isDeposit ? 'ASP' : 'Relayer',
@@ -93,6 +118,12 @@ export const DataSection = () => {
             <Label variant='body2'>Fees:</Label>
             <Value variant='body2'>{feeText}</Value>
           </Row>
+          {actionType === EventType.WITHDRAWAL && isQuoteValid && countdown > 0 && (
+            <Row>
+              <Label variant='body2'>Quote expires:</Label>
+              <QuoteTimer variant='body2'>in {countdown}s</QuoteTimer>
+            </Row>
+          )}
           <Row>
             <Label variant='body2'>Value:</Label>
             <Value variant='body2'>{valueText}</Value>
@@ -152,4 +183,9 @@ const TotalValueLabel = styled(Label)(({ theme }) => ({
 
 const TotalValue = styled(Value)(({ theme }) => ({
   color: theme.palette.grey[900],
+}));
+
+const QuoteTimer = styled(Value)(({ theme }) => ({
+  fontWeight: 500,
+  color: theme.palette.warning.main,
 }));
