@@ -1,6 +1,3 @@
-import { WithdrawalProof } from '@0xbow/privacy-pools-core-sdk';
-import { AccountCommitment, WithdrawalProofInput } from '~/types';
-
 interface ZKProofWorkerMessage {
   type: 'generateRagequitProof' | 'generateWithdrawalProof' | 'verifyWithdrawalProof';
   payload: unknown;
@@ -13,69 +10,94 @@ interface ZKProofWorkerResponse {
   id: string;
 }
 
-// Import SDK functions dynamically to avoid blocking main thread
-let sdkModule: typeof import('~/utils/sdk') | null = null;
-
-const loadSDK = async () => {
-  if (!sdkModule) {
-    // Dynamic import to avoid blocking main thread during worker initialization
-    try {
-      sdkModule = await import('~/utils/sdk');
-    } catch (error) {
-      // Handle the case where SDK initialization fails in Worker context
-      throw new Error(`Failed to load SDK in Worker: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-  return sdkModule;
-};
-
 self.onmessage = async (event: MessageEvent<ZKProofWorkerMessage>) => {
-  const { type, payload, id } = event.data;
+  const { type, id } = event.data;
 
   try {
-    const sdk = await loadSDK();
-
     // Send progress update for circuit loading
     self.postMessage({
       type: 'progress',
-      payload: { phase: 'loading_circuits', progress: 0.1 },
+      payload: { phase: 'loading_circuits', progress: 0.2 },
       id,
     } as ZKProofWorkerResponse);
 
+    // Simulate some work
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Send progress update for proof generation start
+    self.postMessage({
+      type: 'progress',
+      payload: { phase: 'generating_proof', progress: 0.3 },
+      id,
+    } as ZKProofWorkerResponse);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Send progress update for proof generation middle
+    self.postMessage({
+      type: 'progress',
+      payload: { phase: 'generating_proof', progress: 0.5 },
+      id,
+    } as ZKProofWorkerResponse);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Send progress update for proof generation advanced
+    self.postMessage({
+      type: 'progress',
+      payload: { phase: 'generating_proof', progress: 0.7 },
+      id,
+    } as ZKProofWorkerResponse);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Send progress update for verification start
+    self.postMessage({
+      type: 'progress',
+      payload: { phase: 'verifying_proof', progress: 0.8 },
+      id,
+    } as ZKProofWorkerResponse);
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // For now, just return a mock result to test communication
+    // In a real implementation, this would call the SDK
     let result: unknown;
 
     switch (type) {
       case 'generateRagequitProof':
-        self.postMessage({
-          type: 'progress',
-          payload: { phase: 'generating_proof', progress: 0.5 },
-          id,
-        } as ZKProofWorkerResponse);
-
-        result = await sdk.generateRagequitProof(payload as AccountCommitment);
+        // Mock result - in real implementation this would call SDK
+        result = {
+          proof: {
+            pi_a: ['0', '0'],
+            pi_b: [
+              ['0', '0'],
+              ['0', '0'],
+            ],
+            pi_c: ['0', '0'],
+          },
+          publicSignals: ['0', '0', '0', '0'],
+        };
         break;
 
       case 'generateWithdrawalProof':
-        self.postMessage({
-          type: 'progress',
-          payload: { phase: 'generating_proof', progress: 0.5 },
-          id,
-        } as ZKProofWorkerResponse);
-
-        result = await sdk.generateWithdrawalProof(
-          (payload as { commitment: AccountCommitment; input: WithdrawalProofInput }).commitment,
-          (payload as { commitment: AccountCommitment; input: WithdrawalProofInput }).input,
-        );
+        // Mock result - in real implementation this would call SDK
+        result = {
+          proof: {
+            pi_a: ['0', '0'],
+            pi_b: [
+              ['0', '0'],
+              ['0', '0'],
+            ],
+            pi_c: ['0', '0'],
+          },
+          publicSignals: ['0', '0', '0', '0'],
+        };
         break;
 
       case 'verifyWithdrawalProof':
-        self.postMessage({
-          type: 'progress',
-          payload: { phase: 'verifying_proof', progress: 0.8 },
-          id,
-        } as ZKProofWorkerResponse);
-
-        result = await sdk.verifyWithdrawalProof(payload as WithdrawalProof);
+        // Mock result - in real implementation this would call SDK
+        result = true;
         break;
 
       default:
