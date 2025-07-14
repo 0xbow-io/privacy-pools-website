@@ -63,10 +63,21 @@ export const DataSection = () => {
 
   const fees = isDeposit ? aspDataFees : relayerFees;
   const feeFormatted = formatUnits(fees, decimals);
-  const feeFormattedFull = formatUnits(fees, decimals); // Full precision
   const feeUSD = getUsdBalance(price, feeFormatted, decimals);
   const feeText = `${feeFormatted} ${symbol} (~ ${feeUSD} USD)`;
-  const feeTooltip = `${feeFormattedFull} ${symbol}`;
+
+  // Create full precision tooltips - show complete decimal precision
+  const formatFullPrecision = (value: bigint, decimals: number) => {
+    const valueStr = value.toString();
+    if (valueStr.length <= decimals) {
+      return `0.${'0'.repeat(decimals - valueStr.length)}${valueStr}`;
+    }
+    const integerPart = valueStr.slice(0, -decimals);
+    const decimalPart = valueStr.slice(-decimals);
+    return `${integerPart}.${decimalPart}`;
+  };
+
+  const feeTooltip = `${formatFullPrecision(fees, decimals)} ${symbol}`;
 
   const feesCollectorAddress = isDeposit
     ? selectedPoolInfo.entryPointAddress
@@ -76,13 +87,14 @@ export const DataSection = () => {
   const amountUSD = getUsdBalance(price, amount, decimals);
   const amountWithFeeBN = parseUnits(amount, decimals) - fees;
   const amountWithFee = formatUnits(amountWithFeeBN, decimals);
-  const amountWithFeeFull = formatUnits(amountWithFeeBN, decimals); // Full precision
   const amountWithFeeUSD = getUsdBalance(price, amountWithFee, decimals);
 
   const valueText = `${amountWithFee} ${symbol} (~ ${amountWithFeeUSD} USD)`;
-  const valueTooltip = `${amountWithFeeFull} ${symbol}`;
+  const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${symbol}`;
+
   const totalText = `~${amount.slice(0, 6)} ${symbol} (~ ${amountUSD} USD)`;
-  const totalTooltip = `${amount} ${symbol}`;
+  const totalAmountBN = parseUnits(amount, decimals);
+  const totalTooltip = `${formatFullPrecision(totalAmountBN, decimals)} ${symbol}`;
 
   return (
     <Container>

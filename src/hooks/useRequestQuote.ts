@@ -72,9 +72,7 @@ export const useRequestQuote = ({
       const newQuoteData = await getQuote(quoteInput);
 
       const remainingTime = calculateRemainingTime(newQuoteData.feeCommitment.expiration);
-      // Cap timer at 60 seconds to match ASP updated timer
-      const cappedTime = Math.min(remainingTime, 60);
-      setQuoteData(newQuoteData.feeCommitment, Number(newQuoteData.feeBPS), cappedTime);
+      setQuoteData(newQuoteData.feeCommitment, Number(newQuoteData.feeBPS), remainingTime);
     } catch (err) {
       const errorMessage = `Failed to get quote: ${err instanceof Error ? err.message : 'Unknown error'}`;
       console.error('executeFetchAndSetQuote error:', err);
