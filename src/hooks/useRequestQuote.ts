@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useRef } from 'react';
 import { Address } from 'viem';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { QuoteRequestBody, QuoteResponse, FeeCommitment } from '~/types';
@@ -48,6 +48,7 @@ export const useRequestQuote = ({
   addNotification,
 }: UseRequestQuoteParams): UseRequestQuoteReturn => {
   const { quoteState, setQuoteData, updateCountdown, resetQuote, markAsExpired } = useQuoteContext();
+  const isFetchingRef = useRef(false);
 
   const canRequestQuote = useMemo(() => {
     return (
@@ -62,22 +63,35 @@ export const useRequestQuote = ({
   }, [isValidAmount, recipient, isRecipientAddressValid, isRelayerSelected, assetAddress, chainId, amountBN]);
 
   const executeFetchAndSetQuote = useCallback(async () => {
-    if (!canRequestQuote || !chainId || !assetAddress || !recipient) {
-      resetQuote();
+    if (!canRequestQuote || !chainId || !assetAddress || !recipient || isFetchingRef.current) {
       return;
     }
 
+    isFetchingRef.current = true;
     try {
       const quoteInput = { chainId, amount: amountBN.toString(), asset: assetAddress, recipient };
       const newQuoteData = await getQuote(quoteInput);
 
+      console.log('🔍 Quote response debug:', {
+        expiration: newQuoteData.feeCommitment.expiration,
+        currentTime: Date.now(),
+        expirationDate: new Date(newQuoteData.feeCommitment.expiration),
+        currentDate: new Date(),
+        timeDiff: newQuoteData.feeCommitment.expiration - Date.now(),
+        fullQuoteData: newQuoteData,
+      });
+
       const remainingTime = calculateRemainingTime(newQuoteData.feeCommitment.expiration);
+      console.log('⏰ Calculated remaining time:', remainingTime, 'seconds');
+
       setQuoteData(newQuoteData.feeCommitment, Number(newQuoteData.feeBPS), remainingTime);
     } catch (err) {
       const errorMessage = `Failed to get quote: ${err instanceof Error ? err.message : 'Unknown error'}`;
       console.error('executeFetchAndSetQuote error:', err);
       addNotification('error', errorMessage);
       resetQuote();
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [
     canRequestQuote,
@@ -93,9 +107,18 @@ export const useRequestQuote = ({
 
   // Effect to fetch quote initially or when relevant inputs change
   useEffect(() => {
+    console.log('useRequestQuote effect triggered:', {
+      canRequestQuote,
+      hasQuoteCommitment: !!quoteState.quoteCommitment,
+      isExpired: quoteState.isExpired,
+      isFetching: isFetchingRef.current,
+    });
+
     if (canRequestQuote && !quoteState.quoteCommitment && !quoteState.isExpired) {
+      console.log('Executing quote fetch...');
       executeFetchAndSetQuote();
     } else if (!canRequestQuote) {
+      console.log('Resetting quote due to invalid request conditions...');
       resetQuote();
     }
   }, [canRequestQuote, executeFetchAndSetQuote, resetQuote, quoteState.quoteCommitment, quoteState.isExpired]);
@@ -136,6 +159,7 @@ export const useRequestQuote = ({
 
   // Manual function to request a new quote (for use after expiry)
   const requestNewQuote = useCallback(async () => {
+    isFetchingRef.current = false; // Reset the flag
     resetQuote();
     if (canRequestQuote) {
       await executeFetchAndSetQuote();

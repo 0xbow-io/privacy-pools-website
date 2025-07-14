@@ -264,14 +264,34 @@ export const WithdrawForm = () => {
   }, [poolAccount, setAmount, decimals]);
 
   const handleWithdraw = useCallback(() => {
+    console.log('🚀 handleWithdraw called with:', {
+      quoteCommitment,
+      countdown,
+      feeBPS,
+      isQuoteValid,
+      hasCommitment: !!quoteCommitment,
+      countdownValid: countdown > 0,
+    });
+
     if (quoteCommitment && countdown > 0) {
+      console.log('✅ Proceeding with withdrawal - quote is valid');
       setFeeCommitment(quoteCommitment);
       setFeeBPSForWithdraw(feeBPS ? BigInt(feeBPS) : BigInt(0));
       setModalOpen(ModalType.GENERATE_ZK_PROOF);
     } else {
+      console.log('❌ Cannot proceed - quote invalid or expired');
       addNotification('error', 'Cannot proceed: relayer quote is invalid or expired.');
     }
-  }, [quoteCommitment, countdown, setFeeCommitment, setModalOpen, addNotification, feeBPS, setFeeBPSForWithdraw]);
+  }, [
+    quoteCommitment,
+    countdown,
+    setFeeCommitment,
+    setModalOpen,
+    addNotification,
+    feeBPS,
+    setFeeBPSForWithdraw,
+    isQuoteValid,
+  ]);
 
   const assetIcon = useMemo(() => {
     if (selectedPoolInfo?.asset === 'ETH') {
