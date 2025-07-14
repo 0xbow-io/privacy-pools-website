@@ -52,7 +52,7 @@ const mainnetChainData: ChainData = {
     decimals: mainnet.nativeCurrency.decimals,
     image: mainnetIcon.src,
     explorerUrl: mainnet.blockExplorers.default.url,
-    relayers: [{ name: 'Fast Relay', url: 'https://www.fastrelay.xyz' }],
+    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: ASP_ENDPOINT,
@@ -86,7 +86,7 @@ const testnetChainData: ChainData = {
     aspUrl: ASP_ENDPOINT,
     relayers: [
       { name: 'Testnet Relay', url: 'https://testnet-relayer.privacypools.com' },
-      { name: 'Freedom Relay', url: 'https://www.freedomrelay.io' },
+      { name: 'Freedom Relay', url: 'https://fastrelay.xyz' },
     ],
     poolInfo: [
       {
