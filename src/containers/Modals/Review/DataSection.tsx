@@ -29,7 +29,13 @@ export const DataSection = () => {
   // Add quote timer for withdrawals
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading, quoteError } = relayerData || {};
-  const { countdown, isQuoteValid, isExpired, requestNewQuote } = useRequestQuote({
+  const {
+    countdown,
+    isQuoteValid,
+    isExpired,
+    requestNewQuote,
+    feeBPS: quoteFeesBPS,
+  } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
     quoteError: quoteError || null,
@@ -51,12 +57,16 @@ export const DataSection = () => {
   const fromAddress = isDeposit ? address : '';
   const toAddress = isDeposit ? '' : target;
 
-  const relayerFees = (BigInt(feeBPSForWithdraw ?? 0n) * parseUnits(amount, decimals)) / 100n / 100n;
+  // Use fresh quote fees for withdrawals, fallback to context fees if no quote
+  const effectiveFeeBPS = isDeposit ? feeBPSForWithdraw : (quoteFeesBPS ?? feeBPSForWithdraw ?? 0);
+  const relayerFees = (BigInt(effectiveFeeBPS) * parseUnits(amount, decimals)) / 100n / 100n;
 
   const fees = isDeposit ? aspDataFees : relayerFees;
   const feeFormatted = formatUnits(fees, decimals);
+  const feeFormattedFull = formatUnits(fees, decimals); // Full precision
   const feeUSD = getUsdBalance(price, feeFormatted, decimals);
   const feeText = `${feeFormatted} ${symbol} (~ ${feeUSD} USD)`;
+  const feeTooltip = `${feeFormattedFull} ${symbol}`;
 
   const feesCollectorAddress = isDeposit
     ? selectedPoolInfo.entryPointAddress
@@ -66,10 +76,13 @@ export const DataSection = () => {
   const amountUSD = getUsdBalance(price, amount, decimals);
   const amountWithFeeBN = parseUnits(amount, decimals) - fees;
   const amountWithFee = formatUnits(amountWithFeeBN, decimals);
+  const amountWithFeeFull = formatUnits(amountWithFeeBN, decimals); // Full precision
   const amountWithFeeUSD = getUsdBalance(price, amountWithFee, decimals);
 
   const valueText = `${amountWithFee} ${symbol} (~ ${amountWithFeeUSD} USD)`;
+  const valueTooltip = `${amountWithFeeFull} ${symbol}`;
   const totalText = `~${amount.slice(0, 6)} ${symbol} (~ ${amountUSD} USD)`;
+  const totalTooltip = `${amount} ${symbol}`;
 
   return (
     <Container>
@@ -116,7 +129,9 @@ export const DataSection = () => {
           </Row>
           <Row>
             <Label variant='body2'>Fees:</Label>
-            <Value variant='body2'>{feeText}</Value>
+            <Tooltip title={feeTooltip} placement='top'>
+              <Value variant='body2'>{feeText}</Value>
+            </Tooltip>
           </Row>
           {actionType === EventType.WITHDRAWAL && (
             <>
@@ -141,14 +156,18 @@ export const DataSection = () => {
           )}
           <Row>
             <Label variant='body2'>Value:</Label>
-            <Value variant='body2'>{valueText}</Value>
+            <Tooltip title={valueTooltip} placement='top'>
+              <Value variant='body2'>{valueText}</Value>
+            </Tooltip>
           </Row>
         </Stack>
       )}
 
       <Row>
         <TotalValueLabel variant='body2'>{actionType !== EventType.EXIT ? 'Total:' : 'Value:'}</TotalValueLabel>
-        <TotalValue variant='body2'>{totalText}</TotalValue>
+        <Tooltip title={totalTooltip} placement='top'>
+          <TotalValue variant='body2'>{totalText}</TotalValue>
+        </Tooltip>
       </Row>
     </Container>
   );
