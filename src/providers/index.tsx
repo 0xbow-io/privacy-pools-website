@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { QuoteProvider } from '~/contexts/QuoteContext';
 import { AccountProvider } from './AccountProvider';
 import { AuthProvider } from './AuthProvider';
 import { ChainProvider } from './ChainProvider';
@@ -23,7 +24,9 @@ export const Providers = ({ children }: Props) => {
               <PoolAccountsProvider>
                 <AccountProvider>
                   <AuthProvider>
-                    <ModalProvider>{children}</ModalProvider>
+                    <QuoteProvider>
+                      <ModalProvider>{children}</ModalProvider>
+                    </QuoteProvider>
                   </AuthProvider>
                 </AccountProvider>
               </PoolAccountsProvider>

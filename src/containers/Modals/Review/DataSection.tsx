@@ -29,7 +29,7 @@ export const DataSection = () => {
   // Add quote timer for withdrawals
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading, quoteError } = relayerData || {};
-  const { countdown, isQuoteValid } = useRequestQuote({
+  const { countdown, isQuoteValid, isExpired, requestNewQuote } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
     quoteError: quoteError || null,
@@ -118,11 +118,26 @@ export const DataSection = () => {
             <Label variant='body2'>Fees:</Label>
             <Value variant='body2'>{feeText}</Value>
           </Row>
-          {actionType === EventType.WITHDRAWAL && isQuoteValid && countdown > 0 && (
-            <Row>
-              <Label variant='body2'>Quote expires:</Label>
-              <QuoteTimer variant='body2'>in {countdown}s</QuoteTimer>
-            </Row>
+          {actionType === EventType.WITHDRAWAL && (
+            <>
+              {isQuoteValid && countdown > 0 && (
+                <Row>
+                  <Label variant='body2'>Quote expires:</Label>
+                  <QuoteTimer variant='body2'>in {countdown}s</QuoteTimer>
+                </Row>
+              )}
+              {isExpired && (
+                <Row>
+                  <Label variant='body2'>Quote status:</Label>
+                  <ExpiredQuote variant='body2'>
+                    Expired -
+                    <RefreshButton onClick={requestNewQuote} disabled={isQuoteLoading}>
+                      {isQuoteLoading ? 'Getting new quote...' : 'Request new quote'}
+                    </RefreshButton>
+                  </ExpiredQuote>
+                </Row>
+              )}
+            </>
           )}
           <Row>
             <Label variant='body2'>Value:</Label>
@@ -188,4 +203,33 @@ const TotalValue = styled(Value)(({ theme }) => ({
 const QuoteTimer = styled(Value)(({ theme }) => ({
   fontWeight: 500,
   color: theme.palette.warning.main,
+}));
+
+const ExpiredQuote = styled(Value)(({ theme }) => ({
+  fontWeight: 500,
+  color: theme.palette.error.main,
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+}));
+
+const RefreshButton = styled('button')(({ theme }) => ({
+  background: 'none',
+  border: `1px solid ${theme.palette.primary.main}`,
+  color: theme.palette.primary.main,
+  padding: theme.spacing(0.5, 1),
+  borderRadius: theme.spacing(0.5),
+  fontSize: '1.2rem',
+  cursor: 'pointer',
+  marginLeft: theme.spacing(1),
+
+  '&:hover': {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+  },
+
+  '&:disabled': {
+    opacity: 0.6,
+    cursor: 'not-allowed',
+  },
 }));
