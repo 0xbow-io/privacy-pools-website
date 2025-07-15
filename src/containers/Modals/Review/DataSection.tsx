@@ -1,4 +1,5 @@
 'use client';
+import { useEffect } from 'react';
 import { Stack, styled, Typography } from '@mui/material';
 import { formatUnits, parseUnits } from 'viem';
 import { useAccount } from 'wagmi';
@@ -22,7 +23,17 @@ export const DataSection = () => {
     chainId,
   } = useChainContext();
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
-  const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw } = usePoolAccountsContext();
+  const {
+    amount,
+    target,
+    actionType,
+    poolAccount,
+    vettingFeeBPS,
+    feeBPSForWithdraw,
+    setFeeCommitment,
+    setFeeBPSForWithdraw,
+    setProof,
+  } = usePoolAccountsContext();
   const { addNotification } = useNotifications();
   const isDeposit = actionType === EventType.DEPOSIT;
 
@@ -35,6 +46,7 @@ export const DataSection = () => {
     isExpired,
     requestNewQuote,
     feeBPS: quoteFeesBPS,
+    quoteCommitment,
   } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
@@ -48,6 +60,22 @@ export const DataSection = () => {
     isRelayerSelected: !!currentSelectedRelayerData?.relayerAddress,
     addNotification,
   });
+
+  // Update PoolAccountsContext when a new quote is received (for withdrawals)
+  useEffect(() => {
+    if (actionType === EventType.WITHDRAWAL && quoteCommitment && quoteFeesBPS !== null) {
+      console.log('📋 DataSection: Updating PoolAccountsContext with new quote:', {
+        quoteCommitment,
+        quoteFeesBPS,
+      });
+      setFeeCommitment(quoteCommitment);
+      setFeeBPSForWithdraw(BigInt(quoteFeesBPS));
+
+      // Clear existing proof since fee parameters changed - new proof needed
+      console.log('🔄 DataSection: Clearing existing proof - new quote requires new proof generation');
+      setProof(null);
+    }
+  }, [actionType, quoteCommitment, quoteFeesBPS, setFeeCommitment, setFeeBPSForWithdraw, setProof]);
   const aspDataFees = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
   const aspOrRelayer = {
     label: isDeposit ? 'ASP' : 'Relayer',
