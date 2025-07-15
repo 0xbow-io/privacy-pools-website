@@ -72,15 +72,6 @@ export const useRequestQuote = ({
       const quoteInput = { chainId, amount: amountBN.toString(), asset: assetAddress, recipient };
       const newQuoteData = await getQuote(quoteInput);
 
-      console.log('🔍 Quote response debug:', {
-        expiration: newQuoteData.feeCommitment.expiration,
-        currentTime: Date.now(),
-        expirationDate: new Date(newQuoteData.feeCommitment.expiration),
-        currentDate: new Date(),
-        timeDiff: newQuoteData.feeCommitment.expiration - Date.now(),
-        fullQuoteData: newQuoteData,
-      });
-
       const remainingTime = calculateRemainingTime(newQuoteData.feeCommitment.expiration);
       console.log('⏰ Calculated remaining time:', remainingTime, 'seconds');
 
@@ -107,18 +98,9 @@ export const useRequestQuote = ({
 
   // Effect to fetch quote initially or when relevant inputs change
   useEffect(() => {
-    console.log('useRequestQuote effect triggered:', {
-      canRequestQuote,
-      hasQuoteCommitment: !!quoteState.quoteCommitment,
-      isExpired: quoteState.isExpired,
-      isFetching: isFetchingRef.current,
-    });
-
     if (canRequestQuote && !quoteState.quoteCommitment && !quoteState.isExpired) {
-      console.log('Executing quote fetch...');
       executeFetchAndSetQuote();
     } else if (!canRequestQuote) {
-      console.log('Resetting quote due to invalid request conditions...');
       resetQuote();
     }
   }, [canRequestQuote, executeFetchAndSetQuote, resetQuote, quoteState.quoteCommitment, quoteState.isExpired]);

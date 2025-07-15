@@ -199,36 +199,14 @@ export const useWithdraw = () => {
         progress: number;
       }) => void,
     ) => {
-      console.log('🔧 generateProof called');
-      console.log('🔧 feeCommitment:', feeCommitment);
-      console.log('🔧 feeBPSForWithdraw:', feeBPSForWithdraw);
-
       // Check for valid quote data immediately
       if (!feeBPSForWithdraw || feeBPSForWithdraw === 0n || !feeCommitment) {
-        console.error('❌ Cannot generate proof: No valid quote available');
         throw new Error('No valid quote available. Please ensure you have a valid quote before withdrawing.');
       }
-
-      console.log(`✅ Quote state ready: feeBPSForWithdraw=${feeBPSForWithdraw}, feeCommitment=${!!feeCommitment}`);
 
       if (TEST_MODE) return;
 
       const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
-
-      console.log('🔧 Validation check:', {
-        poolAccount: !!poolAccount,
-        target: !!target,
-        commitment: !!commitment,
-        aspLeaves: !!aspLeaves,
-        stateLeaves: !!stateLeaves,
-        relayerDetails: !!relayerDetails,
-        relayerAddress: !!relayerDetails?.relayerAddress,
-        feeBPSForWithdraw: feeBPSForWithdraw,
-        feeBPSType: typeof feeBPSForWithdraw,
-        feeBPSNull: feeBPSForWithdraw === null,
-        feeBPSUndefined: feeBPSForWithdraw === undefined,
-        accountService: !!accountService,
-      });
 
       const missingFields = [];
       if (!poolAccount) missingFields.push('poolAccount');
@@ -393,9 +371,6 @@ export const useWithdraw = () => {
   );
 
   const withdraw = async () => {
-    console.log('🚀 withdraw() function called');
-    console.log('🚀 feeCommitment:', feeCommitment);
-
     if (!TEST_MODE) {
       const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
 
