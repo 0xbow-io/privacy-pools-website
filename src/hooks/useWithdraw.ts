@@ -81,14 +81,6 @@ export const useWithdraw = () => {
     feeBPSForWithdraw,
   } = usePoolAccountsContext();
 
-  console.log('🔍 useWithdraw debug:', {
-    feeCommitment,
-    feeBPSForWithdraw: feeBPSForWithdraw || 'undefined',
-    feeBPSType: typeof feeBPSForWithdraw,
-    target,
-    poolAccount: !!poolAccount,
-  });
-
   const commitment = poolAccount?.lastCommitment;
   const aspLeaves = aspData.mtLeavesData?.aspLeaves;
   const stateLeaves = aspData.mtLeavesData?.stateTreeLeaves;
