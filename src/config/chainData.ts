@@ -1,7 +1,8 @@
 import { Address, parseEther, parseUnits } from 'viem';
 import { Chain, mainnet, sepolia } from 'viem/chains';
 import { getEnv } from '~/config/env';
-import mainnetIcon from '~/assets/icons/mainnet.svg';
+import mainnetIcon from '~/assets/icons/mainnet_color.svg';
+import usdsIcon from '~/assets/icons/usds.svg';
 
 const { ALCHEMY_KEY, IS_TESTNET, ASP_ENDPOINT } = getEnv();
 
@@ -11,7 +12,7 @@ const testnetChains: readonly [Chain, ...Chain[]] = [sepolia];
 
 export const whitelistedChains = IS_TESTNET ? testnetChains : mainnetChains;
 
-export type ChainAssets = 'ETH' | 'USDC' | 'USDT';
+export type ChainAssets = 'ETH' | 'USDS' | 'USDC' | 'USDT';
 
 export interface PoolInfo {
   chainId: number;
@@ -68,6 +69,18 @@ const mainnetChainData: ChainData = {
         asset: 'ETH',
         assetDecimals: 18,
         icon: mainnetIcon.src,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0x05e4DBD71B56861eeD2Aaa12d00A797F04B5D3c0',
+        assetAddress: '0xdC035D45d973E3EC169d2276DDab16f1e407384F',
+        scope: 10083421949316970946867916491567109470259179563818386567305777802830033294482n,
+        deploymentBlock: 22917987n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 6),
+        asset: 'USDS',
+        assetDecimals: 6,
+        icon: usdsIcon.src,
       },
     ],
   },
