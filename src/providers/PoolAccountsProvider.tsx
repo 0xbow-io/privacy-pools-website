@@ -36,7 +36,7 @@ type ContextType = {
 
   // Transaction
   proof: WithdrawalProof | RagequitProof | CommitmentProof | null;
-  setProof: (val: WithdrawalProof | RagequitProof | CommitmentProof | null) => void;
+  setProof: (val: WithdrawalProof | RagequitProof | CommitmentProof) => void;
   withdrawal: Withdrawal | null;
   setWithdrawal: (val: Withdrawal) => void;
   newSecretKeys: { secret: bigint; nullifier: bigint } | null;

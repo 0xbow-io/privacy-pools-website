@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { Box, Button, CircularProgress, Divider, Stack, styled } from '@mui/material';
 import { BaseModal } from '~/components';
 import { useDeposit, useExit, useModal, usePoolAccountsContext, useWithdraw } from '~/hooks';
@@ -12,21 +11,13 @@ import { ExitMessage } from './ExitMessage';
 import { PoolAccountSection } from './PoolAccountSection';
 
 export const ReviewModal = () => {
-  const { isClosable, setModalOpen } = useModal();
+  const { isClosable } = useModal();
   const { deposit, isLoading: isDepositLoading } = useDeposit();
   const { withdraw, isLoading: isWithdrawLoading } = useWithdraw();
   const { exit, isLoading: isExitLoading } = useExit();
-  const { actionType, proof } = usePoolAccountsContext();
+  const { actionType } = usePoolAccountsContext();
 
   const isLoading = isDepositLoading || isExitLoading || isWithdrawLoading;
-
-  // Redirect to proof generation if proof is cleared (due to new quote)
-  useEffect(() => {
-    if (actionType === EventType.WITHDRAWAL && !proof) {
-      console.log('🔄 Review: Proof was cleared, redirecting to proof generation');
-      setModalOpen(ModalType.GENERATE_ZK_PROOF);
-    }
-  }, [actionType, proof, setModalOpen]);
 
   const handleConfirm = () => {
     if (actionType === EventType.DEPOSIT) {
