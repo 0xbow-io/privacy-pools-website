@@ -1,4 +1,3 @@
-export * from './useAccountType';
 export * from './useASP';
 export * from './useCustomConnect';
 export * from './useExternalServices';
@@ -12,8 +11,6 @@ export * from './useWithdraw';
 export * from './useAdvancedView';
 export * from './useAccountManager';
 export * from './useRequestQuote';
-export * from './useSafeApp';
-export * from './useSafeTransactions';
 export * from '../contexts/QuoteContext';
 export * from './useCircuitPreloader';
 export * from './useZKProofWorker';
@@ -22,4 +19,3 @@ export * from './context/usePoolAccountsContext';
 export * from './context/useAccountContext';
 export * from './context/useAuthContext';
 export * from './context/useNotificationsContext';
-export * from './useFeatureFlag';

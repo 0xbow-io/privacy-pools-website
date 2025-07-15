@@ -40,12 +40,6 @@ Sentry.init({
       const errorName = (error as Error).name || '';
       const errorCode = 'code' in error ? (error as { code: number }).code : undefined;
 
-      // ALWAYS send "unsupported transaction type" errors to Sentry - these indicate network/wallet configuration issues
-      if (message.includes('unsupported transaction type') || errorName === 'UNSUPPORTED_OPERATION') {
-        console.log('Sending UNSUPPORTED_OPERATION error to Sentry:', message);
-        return event;
-      }
-
       // Filter out user rejection errors (multiple error codes and patterns)
       if (
         errorCode === 4001 ||

@@ -19,7 +19,7 @@ export const StatusChip = ({
   if (typeof status === 'object' && status !== null) {
     // Use shared getStatus function to extract the actual status value
     statusValue = getStatus({ reviewStatus: status });
-    displayValue = statusValue === ReviewStatus.POI_REQUIRED ? 'POA Needed' : statusValue;
+    displayValue = statusValue;
 
     // Note: Object status format detected, extracting status value
     console.debug('StatusChip received object format:', {
@@ -29,7 +29,7 @@ export const StatusChip = ({
     });
   } else if (typeof status === 'string') {
     statusValue = status as ReviewStatus;
-    displayValue = status === ReviewStatus.POI_REQUIRED ? 'POA Needed' : status;
+    displayValue = status;
   } else {
     statusValue = ReviewStatus.PENDING;
     displayValue = ReviewStatus.PENDING;
@@ -58,10 +58,6 @@ export const SStatusChip = styled(Box, {
       main: theme.palette.grey[600],
       light: theme.palette.grey[50],
     },
-    poi_required: {
-      main: '#D32F2F', // Deep red for high visibility
-      light: '#FFEBEE', // Light red background
-    },
   };
 
   // Defensive programming: fallback to pending style if status not found
@@ -76,12 +72,9 @@ export const SStatusChip = styled(Box, {
 
   const finalStatusStyle = statusStyle || statusColorMap.pending;
 
-  // POI_REQUIRED gets special styling to fit text on one line (only in non-compact mode)
-  const isPOIRequired = status === 'poi_required';
-
   return {
     display: 'inline-block',
-    textTransform: 'capitalize' as const,
+    textTransform: 'capitalize',
     padding: '4px 12px',
     borderRadius: '1.2rem',
     fontSize: '1rem',
@@ -90,24 +83,13 @@ export const SStatusChip = styled(Box, {
     border: '1px solid',
     borderColor: finalStatusStyle.main,
     background: finalStatusStyle.light,
-    cursor: 'inherit' as const,
-
-    // Only add special POA styling in non-compact mode
-    ...(isPOIRequired && {
-      whiteSpace: 'nowrap' as const,
-      minWidth: '85px',
-      textAlign: 'center' as const,
-    }),
+    cursor: 'inherit',
 
     '&.compact': {
       padding: 0,
       borderRadius: '50%',
       width: '1rem',
       height: '1rem',
-      // Remove special POA styling in compact mode
-      minWidth: '1rem',
-      whiteSpace: 'normal' as const,
-      textAlign: 'left' as const,
     },
   };
 });

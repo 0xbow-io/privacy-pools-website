@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Relayer quotation logic
 
+## [1.1.0] - 2025-07-16
+
+### Added
+
+- USDS pool support
+
+### Changed
+
+- Relayer quotation logic
+
 ## [1.0.0] - 2025-07-03
 
 ### Added

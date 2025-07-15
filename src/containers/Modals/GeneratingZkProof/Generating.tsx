@@ -15,24 +15,18 @@ interface ZKProofProgress {
 
 export const GeneratingModal = () => {
   const { setModalOpen, modalOpen } = useModal();
-  const { generateProofAndWithdraw } = useWithdraw();
-  const { generateProofAndExit } = useExit();
+  const { generateProof: generateWithdrawalProof } = useWithdraw();
+  const { generateProof: generateRagequitProof } = useExit();
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<ZKProofProgress>({ phase: 'loading_circuits', progress: 0 });
 
   const updateProgress = useCallback((newProgress: ZKProofProgress) => {
     setProgress((current) => {
-      // Always allow progress to reach 100% (completion)
-      if (newProgress.progress === 1.0) {
-        return newProgress;
-      }
-
       // Only update if the new progress is higher than current progress
       if (newProgress.progress > current.progress) {
         return newProgress;
       }
-
-      // Ignore if new progress is lower than current progress
+      // Keep current progress if new progress is lower
       return current;
     });
   }, []);
@@ -43,11 +37,10 @@ export const GeneratingModal = () => {
   const hasStartedRef = useRef(false);
 
   useEffect(() => {
-    const currentTimeout = timeoutRef.current;
     return () => {
       isMountedRef.current = false;
-      if (currentTimeout) {
-        clearTimeout(currentTimeout);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, []);
@@ -55,15 +48,10 @@ export const GeneratingModal = () => {
   useEffect(() => {
     if (modalOpen !== ModalType.GENERATE_ZK_PROOF) {
       hasStartedRef.current = false;
-      setIsGenerating(false);
       return;
     }
-    if (isGenerating) {
-      return;
-    }
-    if (hasStartedRef.current) {
-      return; // Prevent multiple starts
-    }
+    if (isGenerating) return;
+    if (hasStartedRef.current) return; // Prevent multiple starts
 
     hasStartedRef.current = true;
     setIsGenerating(true);
@@ -72,10 +60,18 @@ export const GeneratingModal = () => {
     if (!actionType) throw new Error('Action type not found');
 
     if (actionType === EventType.WITHDRAWAL) {
-      generateProofAndWithdraw(updateProgress)
+      generateWithdrawalProof(updateProgress)
         .then(() => {
-          // generateProofAndWithdraw handles the full flow including transaction processing
-          // Modal transitions are handled by the withdrawal hook
+          timeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setModalOpen((currentModal) => {
+                if (currentModal === ModalType.GENERATE_ZK_PROOF) {
+                  return ModalType.REVIEW;
+                }
+                return currentModal;
+              });
+            }
+          }, 1500);
         })
         .catch(() => {
           if (isMountedRef.current) {
@@ -89,16 +85,23 @@ export const GeneratingModal = () => {
         })
         .finally(() => {
           setIsGenerating(false);
-          // Don't reset hasStarted immediately - let the modal transition handle it
-          // hasStartedRef.current = false;
+          hasStartedRef.current = false;
         });
     }
 
     if (actionType === EventType.EXIT) {
-      generateProofAndExit(updateProgress)
+      generateRagequitProof(updateProgress)
         .then(() => {
-          // generateProofAndExit handles the full flow including transaction processing
-          // Modal transitions are handled by the exit hook
+          timeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setModalOpen((currentModal) => {
+                if (currentModal === ModalType.GENERATE_ZK_PROOF) {
+                  return ModalType.REVIEW;
+                }
+                return currentModal;
+              });
+            }
+          }, 1500);
         })
         .catch((error) => {
           console.error('Exit proof generation failed:', error);
@@ -113,16 +116,15 @@ export const GeneratingModal = () => {
         })
         .finally(() => {
           setIsGenerating(false);
-          // Don't reset hasStarted immediately - let the modal transition handle it
-          // hasStartedRef.current = false;
+          hasStartedRef.current = false;
         });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     modalOpen,
     actionType,
-    generateProofAndWithdraw,
-    generateProofAndExit,
+    generateWithdrawalProof,
+    generateRagequitProof,
     setModalOpen,
     updateProgress,
     // Note: isGenerating is intentionally excluded to prevent duplicate proof generation

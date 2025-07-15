@@ -1,11 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import { Stack, styled, Typography, IconButton, Collapse, Avatar, Alert } from '@mui/material';
-import { formatUnits, parseUnits, isAddress } from 'viem';
-import { useAccount, useEnsName, useEnsAvatar, usePublicClient } from 'wagmi';
+import { Stack, styled, Typography } from '@mui/material';
+import { formatUnits, parseUnits } from 'viem';
+import { useAccount } from 'wagmi';
 import { ExtendedTooltip as Tooltip } from '~/components';
-import { useQuoteContext } from '~/contexts/QuoteContext';
 import {
   useExternalServices,
   usePoolAccountsContext,
@@ -15,23 +12,9 @@ import {
 } from '~/hooks';
 import { EventType } from '~/types';
 import { getUsdBalance, truncateAddress } from '~/utils';
-import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
-import { FeeBreakdown, formatFeeDisplay } from './FeeBreakdown';
-
-const getMaxDisplayPrecision = (isStableAsset: boolean): number => {
-  // Stable assets (stablecoins and yield-bearing stablecoins) should have max 3 decimal places
-  if (isStableAsset) {
-    return 3;
-  }
-  // ETH and other tokens can show full precision (use high number)
-  return 18;
-};
 
 export const DataSection = () => {
   const { address } = useAccount();
-  const [isFeeBreakdownOpen, setIsFeeBreakdownOpen] = useState(false);
-  const { quoteState } = useQuoteContext();
-  const publicClient = usePublicClient();
   const {
     balanceBN: { symbol, decimals },
     price,
@@ -39,40 +22,9 @@ export const DataSection = () => {
     chainId,
   } = useChainContext();
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
-  const {
-    amount,
-    target,
-    actionType,
-    poolAccount,
-    vettingFeeBPS,
-    feeBPSForWithdraw,
-    setFeeCommitment,
-    setFeeBPSForWithdraw,
-    selectedAlternativeToken,
-  } = usePoolAccountsContext();
+  const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw } = usePoolAccountsContext();
   const { addNotification } = useNotifications();
   const isDeposit = actionType === EventType.DEPOSIT;
-  const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
-
-  // Calculate sUSDS amount if using alternative token
-  const [sUSDSPreview, setSUSDSPreview] = useState<bigint | null>(null);
-
-  useEffect(() => {
-    const fetchPreview = async () => {
-      if (selectedAlternativeToken && publicClient && amount) {
-        try {
-          const amountBN = parseUnits(amount, decimals);
-          const preview = await getStakedTokenPreview(selectedAlternativeToken, amountBN, publicClient);
-          setSUSDSPreview(preview);
-        } catch (error) {
-          console.error('Error fetching sUSDS preview:', error);
-        }
-      } else {
-        setSUSDSPreview(null);
-      }
-    };
-    fetchPreview();
-  }, [selectedAlternativeToken, amount, decimals, publicClient]);
 
   // Add quote timer for withdrawals
   const amountBN = parseUnits(amount, decimals);
@@ -81,10 +33,8 @@ export const DataSection = () => {
     countdown,
     isQuoteValid,
     isExpired,
+    requestNewQuote,
     feeBPS: quoteFeesBPS,
-    baseFeeBPS: quoteBaseFeeBPS,
-    extraGasAmountETH: quoteExtraGasAmountETH,
-    quoteCommitment,
   } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
@@ -98,14 +48,6 @@ export const DataSection = () => {
     isRelayerSelected: !!currentSelectedRelayerData?.relayerAddress,
     addNotification,
   });
-
-  // Set fee commitment when valid quote is available for withdrawals
-  useEffect(() => {
-    if (actionType === EventType.WITHDRAWAL && isQuoteValid && quoteCommitment && quoteFeesBPS) {
-      setFeeCommitment(quoteCommitment);
-      setFeeBPSForWithdraw(BigInt(quoteFeesBPS));
-    }
-  }, [actionType, isQuoteValid, quoteCommitment, quoteFeesBPS, setFeeCommitment, setFeeBPSForWithdraw]);
   const aspDataFees = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
   const aspOrRelayer = {
     label: isDeposit ? 'ASP' : 'Relayer',
@@ -115,22 +57,14 @@ export const DataSection = () => {
   const fromAddress = isDeposit ? address : '';
   const toAddress = isDeposit ? '' : target;
 
-  // ENS hooks for the target address
-  const { data: ensName } = useEnsName({
-    address: isAddress(toAddress) ? (toAddress as `0x${string}`) : undefined,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  const { data: ensAvatar } = useEnsAvatar({
-    name: ensName || undefined,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
   // Use fresh quote fees for withdrawals, fallback to context fees if no quote
   const effectiveFeeBPS = isDeposit ? feeBPSForWithdraw : (quoteFeesBPS ?? feeBPSForWithdraw ?? 0);
   const relayerFees = (BigInt(effectiveFeeBPS) * parseUnits(amount, decimals)) / 100n / 100n;
 
   const fees = isDeposit ? aspDataFees : relayerFees;
+  const feeFormatted = formatUnits(fees, decimals);
+  const feeUSD = getUsdBalance(price, feeFormatted, decimals);
+  const feeText = `${feeFormatted} ${symbol} (~ ${feeUSD} USD)`;
 
   // Create full precision tooltips - show complete decimal precision
   const formatFullPrecision = (value: bigint, decimals: number) => {
@@ -140,85 +74,30 @@ export const DataSection = () => {
     }
     const integerPart = valueStr.slice(0, -decimals);
     const decimalPart = valueStr.slice(-decimals);
-    const result = `${integerPart}.${decimalPart}`;
-
-    // Remove trailing zeros, but keep at least 2 decimal places
-    const trimmed = result.replace(/\.?0+$/, '');
-    if (!trimmed.includes('.')) {
-      return `${trimmed}.00`;
-    }
-    const decimalIndex = trimmed.indexOf('.');
-    const currentDecimals = trimmed.length - decimalIndex - 1;
-    if (currentDecimals < 2) {
-      return trimmed + '0'.repeat(2 - currentDecimals);
-    }
-
-    return trimmed;
+    return `${integerPart}.${decimalPart}`;
   };
+
+  const feeTooltip = `${formatFullPrecision(fees, decimals)} ${symbol}`;
 
   const feesCollectorAddress = isDeposit
     ? selectedPoolInfo.entryPointAddress
     : currentSelectedRelayerData?.relayerAddress;
   const feesCollector = `OxBow (${truncateAddress(feesCollectorAddress)})`;
 
-  // Use alternative token symbol if selected
-  const displaySymbol = selectedAlternativeToken && isDeposit ? selectedAlternativeToken.tokenSymbol : symbol;
-
   const amountUSD = getUsdBalance(price, amount, decimals);
-
-  // Value is now the actual amount being withdrawn (amount minus fees)
   const amountWithFeeBN = parseUnits(amount, decimals) - fees;
   const amountWithFee = formatUnits(amountWithFeeBN, decimals);
   const amountWithFeeUSD = getUsdBalance(price, amountWithFee, decimals);
-  const valueText = `${parseFloat(amountWithFee).toString()} ${displaySymbol} (~$${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)} USD)`;
-  const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${displaySymbol}`;
 
-  // Net Fee calculation (includes extra gas amount if enabled)
-  let netFeeAmount = fees;
-  if (quoteState.extraGas && quoteExtraGasAmountETH) {
-    // Convert extraGasAmountETH from wei to token amount
-    const extraGasETH = parseFloat(formatUnits(BigInt(quoteExtraGasAmountETH), 18));
-    const extraGasInToken = (extraGasETH * price) / parseFloat(formatUnits(parseUnits('1', decimals), decimals));
+  const valueText = `${amountWithFee} ${symbol} (~ ${amountWithFeeUSD} USD)`;
+  const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${symbol}`;
 
-    // Convert to fixed decimal string to avoid scientific notation
-    const extraGasAmountBN = parseUnits(extraGasInToken.toFixed(decimals), decimals);
-    netFeeAmount = fees + extraGasAmountBN;
-  }
-  const netFeeFormatted = formatUnits(netFeeAmount, decimals);
-  const netFeeUSD = getUsdBalance(price, netFeeFormatted, decimals);
-
-  // Net fee uses the same precision logic as fee breakdown
-  const netFeePrecision = getMaxDisplayPrecision(isStableAsset);
-  const netFeeNumeric = parseFloat(netFeeFormatted);
-  const netFeeDisplayValue = parseFloat(netFeeNumeric.toFixed(netFeePrecision)).toString();
-
-  const netFeeText = `${netFeeDisplayValue} ${displaySymbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`;
-  const netFeeTooltip = `${formatFullPrecision(netFeeAmount, decimals)} ${displaySymbol}`;
-
+  const totalText = `~${amount.slice(0, 6)} ${symbol} (~ ${amountUSD} USD)`;
   const totalAmountBN = parseUnits(amount, decimals);
-  const totalTooltip = `${formatFullPrecision(totalAmountBN, decimals)} ${displaySymbol}`;
+  const totalTooltip = `${formatFullPrecision(totalAmountBN, decimals)} ${symbol}`;
 
   return (
     <Container>
-      {selectedAlternativeToken && isDeposit && (
-        <Alert severity='info' sx={{ mb: 2, fontSize: '1.4rem' }}>
-          <Stack gap={1}>
-            <Typography variant='body2'>
-              <strong>Staking Flow:</strong> Your {selectedAlternativeToken.tokenSymbol} will be staked to{' '}
-              {selectedPoolInfo?.asset}
-            </Typography>
-            {sUSDSPreview && (
-              <Typography variant='body2'>
-                <strong>You will receive:</strong> {formatUnits(sUSDSPreview, decimals)} {selectedPoolInfo?.asset}
-              </Typography>
-            )}
-            <Typography variant='caption' color='text.secondary'>
-              This will be done in a single batched transaction
-            </Typography>
-          </Stack>
-        </Alert>
-      )}
-
       <Stack>
         {actionType !== EventType.EXIT && (
           <Row>
@@ -241,17 +120,17 @@ export const DataSection = () => {
 
         <Row>
           <Label variant='body2'>To:</Label>
-          <Value variant='body2' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {ensAvatar && <Avatar src={ensAvatar} sx={{ width: 20, height: 20 }} />}
+          <Value variant='body2'>
             <Tooltip title={toAddress} placement='top'>
               <span>
-                {toAddress && (ensName || truncateAddress(toAddress))}
+                {toAddress && truncateAddress(toAddress)}
                 {!toAddress && 'New Pool Account'}
               </span>
             </Tooltip>
           </Value>
         </Row>
       </Stack>
+
       {actionType !== EventType.EXIT && (
         <Stack>
           <Row>
@@ -260,84 +139,48 @@ export const DataSection = () => {
               <Value variant='body2'>{feesCollector}</Value>
             </Tooltip>
           </Row>
-          {actionType === EventType.WITHDRAWAL && (isQuoteValid || isExpired) && (
-            <Row>
-              <Label variant='body2'>Quote expires:</Label>
-              {countdown > 0 ? (
-                <QuoteTimer variant='body2'>in {countdown}s</QuoteTimer>
-              ) : (
-                <FlashingExpiredTimer variant='body2'>Expired</FlashingExpiredTimer>
-              )}
-            </Row>
-          )}
-          {actionType !== EventType.WITHDRAWAL && (isQuoteValid || isExpired) && (
-            <Row>
-              <Label variant='body2'>Value:</Label>
-              <Tooltip title={valueTooltip} placement='top'>
-                <Value variant='body2'>{valueText}</Value>
-              </Tooltip>
-            </Row>
-          )}
-          {/* Net Fee row with dropdown for withdrawals */}
-          {actionType === EventType.WITHDRAWAL && isQuoteValid && quoteFeesBPS !== null && quoteBaseFeeBPS !== null && (
+          <Row>
+            <Label variant='body2'>Fees:</Label>
+            <Tooltip title={feeTooltip} placement='top'>
+              <Value variant='body2'>{feeText}</Value>
+            </Tooltip>
+          </Row>
+          {actionType === EventType.WITHDRAWAL && (
             <>
-              <Row>
-                <Label variant='body2'>Net Fee:</Label>
-                <FeeRow>
-                  <Tooltip title={netFeeTooltip} placement='top'>
-                    <NetFeeValue isExtraGasEnabled={quoteState.extraGas} variant='body2'>
-                      {netFeeText}
-                    </NetFeeValue>
-                  </Tooltip>
-                  <ExpandIconButton
-                    onClick={() => setIsFeeBreakdownOpen(!isFeeBreakdownOpen)}
-                    expanded={isFeeBreakdownOpen}
-                  >
-                    <ExpandMoreIcon />
-                  </ExpandIconButton>
-                </FeeRow>
-              </Row>
-
-              {/* Collapsible Fee Breakdown */}
-              <Collapse in={isFeeBreakdownOpen}>
-                <FeeBreakdownContainer>
-                  <FeeBreakdown
-                    feeBPS={quoteFeesBPS}
-                    baseFeeBPS={quoteBaseFeeBPS}
-                    extraGasAmountETH={quoteState.extraGas ? quoteExtraGasAmountETH : null}
-                    amount={amount}
-                  />
-                </FeeBreakdownContainer>
-              </Collapse>
+              {isQuoteValid && countdown > 0 && (
+                <Row>
+                  <Label variant='body2'>Quote expires:</Label>
+                  <QuoteTimer variant='body2'>in {countdown}s</QuoteTimer>
+                </Row>
+              )}
+              {isExpired && (
+                <Row>
+                  <Label variant='body2'>Quote status:</Label>
+                  <ExpiredQuote variant='body2'>
+                    Expired -
+                    <RefreshButton onClick={requestNewQuote} disabled={isQuoteLoading}>
+                      {isQuoteLoading ? 'Getting new quote...' : 'Request new quote'}
+                    </RefreshButton>
+                  </ExpiredQuote>
+                </Row>
+              )}
             </>
           )}
+          <Row>
+            <Label variant='body2'>Value:</Label>
+            <Tooltip title={valueTooltip} placement='top'>
+              <Value variant='body2'>{valueText}</Value>
+            </Tooltip>
+          </Row>
         </Stack>
       )}
 
-      {/* Totals Section for Withdrawals */}
-      {actionType === EventType.WITHDRAWAL && (
-        <TotalsContainer>
-          <TotalBox>
-            <TotalLabel>Total Withdrawn</TotalLabel>
-            <Tooltip title={totalTooltip} placement='top'>
-              <TotalAmount>
-                {formatFeeDisplay(totalAmountBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
-              </TotalAmount>
-            </Tooltip>
-            <TotalUSD>${parseFloat(amountUSD.replace('$', '')).toFixed(2)}</TotalUSD>
-          </TotalBox>
-
-          <TotalBox>
-            <TotalLabel>Total Received</TotalLabel>
-            <Tooltip title={valueTooltip} placement='top'>
-              <TotalAmount>
-                {formatFeeDisplay(amountWithFeeBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
-              </TotalAmount>
-            </Tooltip>
-            <TotalUSD>${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)}</TotalUSD>
-          </TotalBox>
-        </TotalsContainer>
-      )}
+      <Row>
+        <TotalValueLabel variant='body2'>{actionType !== EventType.EXIT ? 'Total:' : 'Value:'}</TotalValueLabel>
+        <Tooltip title={totalTooltip} placement='top'>
+          <TotalValue variant='body2'>{totalText}</TotalValue>
+        </Tooltip>
+      </Row>
     </Container>
   );
 };
@@ -380,112 +223,44 @@ const Value = styled(Label)(() => ({
   fontWeight: 400,
 }));
 
+const TotalValueLabel = styled(Label)(({ theme }) => ({
+  color: theme.palette.grey[900],
+}));
+
+const TotalValue = styled(Value)(({ theme }) => ({
+  color: theme.palette.grey[900],
+}));
+
 const QuoteTimer = styled(Value)(({ theme }) => ({
   fontWeight: 500,
   color: theme.palette.warning.main,
 }));
 
-const FlashingExpiredTimer = styled(Value)(({ theme }) => ({
+const ExpiredQuote = styled(Value)(({ theme }) => ({
   fontWeight: 500,
   color: theme.palette.error.main,
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(1),
-  animation: 'flash 2s 3',
+}));
 
-  '@keyframes flash': {
-    '0%, 50%': {
-      opacity: 1,
-    },
-    '25%, 75%': {
-      opacity: 0.3,
-    },
+const RefreshButton = styled('button')(({ theme }) => ({
+  background: 'none',
+  border: `1px solid ${theme.palette.primary.main}`,
+  color: theme.palette.primary.main,
+  padding: theme.spacing(0.5, 1),
+  borderRadius: theme.spacing(0.5),
+  fontSize: '1.2rem',
+  cursor: 'pointer',
+  marginLeft: theme.spacing(1),
+
+  '&:hover': {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
   },
-}));
 
-const FeeRow = styled('div')({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '4px',
-});
-
-const NetFeeValue = styled(Value, {
-  shouldForwardProp: (prop) => prop !== 'isExtraGasEnabled',
-})<{ isExtraGasEnabled?: boolean }>(({ theme, isExtraGasEnabled }) => ({
-  color: isExtraGasEnabled ? theme.palette.success.main : theme.palette.text.primary,
-  fontWeight: isExtraGasEnabled ? 600 : 400,
-}));
-
-const ExpandIconButton = styled(IconButton, {
-  shouldForwardProp: (prop) => prop !== 'expanded',
-})<{ expanded?: boolean }>(({ theme, expanded }) => ({
-  padding: '2px',
-  minWidth: '24px',
-  minHeight: '24px',
-  transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-  transition: theme.transitions.create('transform', {
-    duration: theme.transitions.duration.shortest,
-  }),
-  '& .MuiSvgIcon-root': {
-    fontSize: '18px',
+  '&:disabled': {
+    opacity: 0.6,
+    cursor: 'not-allowed',
   },
-}));
-
-const FeeBreakdownContainer = styled('div')({
-  marginTop: '8px',
-  marginLeft: '16px',
-});
-
-const TotalsContainer = styled('div')(({ theme }) => ({
-  display: 'flex',
-  marginTop: '24px',
-  justifyContent: 'space-between',
-  position: 'relative',
-  '&::after': {
-    content: '""',
-    position: 'absolute',
-    left: '50%',
-    top: '0',
-    bottom: '0',
-    width: '1px',
-    backgroundColor: theme.palette.divider,
-    transform: 'translateX(-50%)',
-  },
-}));
-
-const TotalBox = styled('div')(() => ({
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  padding: '0 0 16px',
-  gap: '4px',
-  backgroundColor: 'transparent',
-  minWidth: '208px',
-  height: '86px',
-}));
-
-const TotalLabel = styled(Typography)(({ theme }) => ({
-  fontSize: '14px',
-  fontWeight: 400,
-  lineHeight: '18px',
-  color: theme.palette.text.secondary,
-  textAlign: 'center',
-}));
-
-const TotalAmount = styled(Typography)(({ theme }) => ({
-  fontSize: '20px',
-  fontWeight: 700,
-  lineHeight: '26px',
-  color: theme.palette.text.primary,
-  textAlign: 'center',
-  cursor: 'help',
-}));
-
-const TotalUSD = styled(Typography)(({ theme }) => ({
-  fontSize: '14px',
-  fontWeight: 400,
-  lineHeight: '18px',
-  color: theme.palette.text.secondary,
-  textAlign: 'center',
 }));
