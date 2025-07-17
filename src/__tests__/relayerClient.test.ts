@@ -45,7 +45,14 @@ describe('relayerClient', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         `${relayerUrl}/relayer/details?chainId=${chainId}&assetAddress=${assetAddress}`,
       );
-      expect(result).toEqual({ feeBPS: MOCK_RELAYER.feeBPS, feeReceiverAddress: MOCK_RELAYER.feeReceiverAddress });
+      expect(result).toEqual({
+        feeBPS: MOCK_RELAYER.feeBPS,
+        feeReceiverAddress: MOCK_RELAYER.feeReceiverAddress,
+        chainId: chainId,
+        assetAddress: assetAddress,
+        minWithdrawAmount: '1000000000000000000',
+        maxGasPrice: '20000000000',
+      });
     });
 
     it('should throw an error when fetching fees fails', async () => {
