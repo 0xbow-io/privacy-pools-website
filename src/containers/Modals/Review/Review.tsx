@@ -53,7 +53,7 @@ export const ReviewModal = () => {
 
   // Helper function to determine if current asset is a stablecoin
   const isStablecoin = (assetSymbol: string): boolean => {
-    return ['USDT', 'USDC', 'USDS'].includes(assetSymbol);
+    return ['USDT', 'USDC', 'USDS', 'sUSDS'].includes(assetSymbol);
   };
 
   const amountBN = parseUnits(amount, decimals);
