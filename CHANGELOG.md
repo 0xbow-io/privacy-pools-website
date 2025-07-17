@@ -33,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Relayer quotation logic
 
+## [1.2.0] - 2025-07-18
+
+### Added
+
+- sUSDS pool support
+- handling relayer fees processing
+
+### Changed 
+
+- changed withdrawal modal steps
+
 ## [1.1.0] - 2025-07-16
 
 ### Added
