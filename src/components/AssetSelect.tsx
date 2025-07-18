@@ -15,6 +15,7 @@ const ALL_TOKEN_OPTIONS: Option[] = [
   { value: 'ETH', label: 'ETH' },
   { value: 'USDS', label: 'USDS' },
   { value: 'sUSDS', label: 'sUSDS' },
+  { value: 'DAI', label: 'DAI' },
   { value: 'USDT', label: 'USDT' },
   { value: 'USDC', label: 'USDC' },
 ];
