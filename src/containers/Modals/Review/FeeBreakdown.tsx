@@ -76,6 +76,7 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
 
   // Extra gas amount (convert from wei to ETH)
   const extraGasETH = extraGasAmountETH ? parseFloat(formatUnits(BigInt(extraGasAmountETH), 18)) : null;
+  const extraGasETHFormatted = extraGasETH ? extraGasETH.toFixed(10).replace(/\.?0+$/, '') : null;
   const extraGasUSD = extraGasETH ? (extraGasETH * price).toFixed(2) : null;
 
   return (
@@ -160,7 +161,7 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
               <Tooltip
                 title={
                   <TooltipContent>
-                    <div>Amount: {extraGasETH?.toFixed(18)} ETH</div>
+                    <div>Amount: {extraGasETHFormatted} ETH</div>
                     <div>USD Value: ~${extraGasUSD}</div>
                     <div>This ETH will be sent to your withdrawal address to cover gas fees</div>
                   </TooltipContent>
@@ -168,7 +169,7 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
                 placement='top'
               >
                 <FeeValue positive>
-                  +{extraGasETH?.toString()} ETH (~${extraGasUSD} USD)
+                  +{extraGasETHFormatted} ETH (~${extraGasUSD} USD)
                 </FeeValue>
               </Tooltip>
             </FeeRow>
