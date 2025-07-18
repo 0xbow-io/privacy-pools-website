@@ -26,6 +26,8 @@ interface UseRequestQuoteParams {
 interface UseRequestQuoteReturn {
   quoteCommitment: FeeCommitment | null;
   feeBPS: number | null;
+  baseFeeBPS: number | null;
+  extraGasAmountETH: string | null;
   isQuoteValid: boolean;
   countdown: number;
   isQuoteLoading: boolean;
@@ -80,7 +82,13 @@ export const useRequestQuote = ({
       const newQuoteData = await getQuote(quoteInput);
 
       const remainingTime = calculateRemainingTime(newQuoteData.feeCommitment.expiration);
-      setQuoteData(newQuoteData.feeCommitment, Number(newQuoteData.feeBPS), remainingTime);
+      setQuoteData(
+        newQuoteData.feeCommitment,
+        Number(newQuoteData.feeBPS),
+        Number(newQuoteData.baseFeeBPS),
+        newQuoteData.detail?.extraGasFundAmount?.eth || null,
+        remainingTime,
+      );
     } catch (err) {
       const errorMessage = `Failed to get quote: ${err instanceof Error ? err.message : 'Unknown error'}`;
       console.error('executeFetchAndSetQuote error:', err);
@@ -171,6 +179,8 @@ export const useRequestQuote = ({
   return {
     quoteCommitment: quoteState.quoteCommitment,
     feeBPS: quoteState.feeBPS,
+    baseFeeBPS: quoteState.baseFeeBPS,
+    extraGasAmountETH: quoteState.extraGasAmountETH,
     isQuoteValid,
     countdown: quoteState.countdown,
     isQuoteLoading,

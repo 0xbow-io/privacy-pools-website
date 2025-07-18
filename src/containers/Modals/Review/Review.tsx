@@ -31,6 +31,7 @@ import { ModalContainer, ModalTitle } from '../Deposit';
 import { LinksSection } from '../LinksSection';
 import { DataSection } from './DataSection';
 import { ExitMessage } from './ExitMessage';
+import { FeeBreakdown } from './FeeBreakdown';
 import { PoolAccountSection } from './PoolAccountSection';
 
 export const ReviewModal = () => {
@@ -58,7 +59,7 @@ export const ReviewModal = () => {
 
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading } = relayerData || {};
-  const { isQuoteValid, isExpired, requestNewQuote } = useRequestQuote({
+  const { isQuoteValid, isExpired, feeBPS, baseFeeBPS, extraGasAmountETH, requestNewQuote } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
     quoteError: null,
@@ -116,6 +117,11 @@ export const ReviewModal = () => {
           <Divider />
         </Stack>
 
+        {/* Fee Breakdown for withdrawals with valid quote data */}
+        {actionType === EventType.WITHDRAWAL && isQuoteValid && feeBPS !== null && baseFeeBPS !== null && (
+          <FeeBreakdown feeBPS={feeBPS} baseFeeBPS={baseFeeBPS} extraGasAmountETH={extraGasAmountETH} amount={amount} />
+        )}
+
         <PoolAccountSection />
 
         {actionType === EventType.EXIT && <ExitMessage />}
@@ -127,7 +133,7 @@ export const ReviewModal = () => {
             </Typography>
             <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
               Get some ETH sent to your withdrawal address to cover gas fees for future transactions. This will increase
-              your withdrawal fee by ~3 swap transactions.
+              your withdrawal fee by 1 swap + 1 transfer.
             </Typography>
             <FormControlLabel
               control={

@@ -6,6 +6,8 @@ import { FeeCommitment } from '~/types';
 interface QuoteState {
   quoteCommitment: FeeCommitment | null;
   feeBPS: number | null;
+  baseFeeBPS: number | null;
+  extraGasAmountETH: string | null;
   countdown: number;
   isExpired: boolean;
   extraGas: boolean;
@@ -13,7 +15,13 @@ interface QuoteState {
 
 interface QuoteContextType {
   quoteState: QuoteState;
-  setQuoteData: (commitment: FeeCommitment, feeBPS: number, countdown: number) => void;
+  setQuoteData: (
+    commitment: FeeCommitment,
+    feeBPS: number,
+    baseFeeBPS: number,
+    extraGasAmountETH: string | null,
+    countdown: number,
+  ) => void;
   updateCountdown: (countdown: number) => void;
   resetQuote: () => void;
   markAsExpired: () => void;
@@ -26,20 +34,33 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
   const [quoteState, setQuoteState] = useState<QuoteState>({
     quoteCommitment: null,
     feeBPS: null,
+    baseFeeBPS: null,
+    extraGasAmountETH: null,
     countdown: 0,
     isExpired: false,
     extraGas: false,
   });
 
-  const setQuoteData = useCallback((commitment: FeeCommitment, feeBPS: number, countdown: number) => {
-    setQuoteState((prev) => ({
-      quoteCommitment: commitment,
-      feeBPS,
-      countdown,
-      isExpired: false,
-      extraGas: prev.extraGas, // Preserve current extraGas setting
-    }));
-  }, []);
+  const setQuoteData = useCallback(
+    (
+      commitment: FeeCommitment,
+      feeBPS: number,
+      baseFeeBPS: number,
+      extraGasAmountETH: string | null,
+      countdown: number,
+    ) => {
+      setQuoteState((prev) => ({
+        quoteCommitment: commitment,
+        feeBPS,
+        baseFeeBPS,
+        extraGasAmountETH,
+        countdown,
+        isExpired: false,
+        extraGas: prev.extraGas, // Preserve current extraGas setting
+      }));
+    },
+    [],
+  );
 
   const updateCountdown = useCallback((countdown: number) => {
     setQuoteState((prev) => ({
@@ -53,6 +74,8 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     setQuoteState((prev) => ({
       quoteCommitment: null,
       feeBPS: null,
+      baseFeeBPS: null,
+      extraGasAmountETH: null,
       countdown: 0,
       isExpired: false,
       extraGas: prev.extraGas, // Preserve extraGas setting when resetting quote

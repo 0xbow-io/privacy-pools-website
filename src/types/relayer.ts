@@ -94,6 +94,28 @@ export type FeeCommitment = {
 };
 
 /**
+ * Represents the detailed breakdown of transaction costs.
+ */
+export type TransactionCostDetail = {
+  /** Gas units required for the transaction. */
+  gas: string;
+  /** Cost in wei (ETH base units). */
+  eth: string;
+};
+
+/**
+ * Represents the detailed cost breakdown in the quote response.
+ */
+export type QuoteDetailBreakdown = {
+  /** Cost breakdown for the relay transaction. */
+  relayTxCost: TransactionCostDetail;
+  /** Amount of extra gas funding (only when extraGas is enabled). */
+  extraGasFundAmount?: TransactionCostDetail;
+  /** Cost breakdown for the extra gas transaction (only when extraGas is enabled). */
+  extraGasTxCost?: TransactionCostDetail;
+};
+
+/**
  * Represents the response received when requesting a withdrawal fee quote.
  */
 export type QuoteResponse = {
@@ -101,6 +123,10 @@ export type QuoteResponse = {
   baseFeeBPS: string;
   /** The dynamic fee rate adjusted for gas costs, in Basis Points (string representation). */
   feeBPS: string;
+  /** Current gas price used for calculations (in wei). */
+  gasPrice: string;
   /** The signed fee commitment from the relayer. */
   feeCommitment: FeeCommitment;
+  /** Detailed breakdown of costs and gas amounts. */
+  detail: QuoteDetailBreakdown;
 };
