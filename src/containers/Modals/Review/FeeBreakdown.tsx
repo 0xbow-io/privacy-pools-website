@@ -25,10 +25,14 @@ const formatFeeDisplay = (
   // Full precision for tooltip
   const fullPrecision = `${formatUnits(feeAmount, decimals)} ${symbol}`;
 
-  // Display text with reasonable precision, removing trailing zeros
-  const displayText = `${parseFloat(feeInToken).toString()} ${symbol} (~${usdValue} USD)`;
+  // Parse USD value and ensure 2 decimal places
+  const usdNumeric = parseFloat(usdValue.replace('$', ''));
+  const usdFormatted = `$${usdNumeric.toFixed(2)}`;
 
-  return { displayText, fullPrecision, usdValue };
+  // Display text with reasonable precision, removing trailing zeros
+  const displayText = `${parseFloat(feeInToken).toString()} ${symbol} (~${usdFormatted} USD)`;
+
+  return { displayText, fullPrecision, usdValue: usdFormatted };
 };
 
 export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: FeeBreakdownProps) => {
@@ -86,9 +90,9 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
       </Typography>
 
       <FeeStack spacing={1.5}>
-        {/* Total Fee */}
+        {/* Total */}
         <FeeRow>
-          <FeeLabel>Total Fee:</FeeLabel>
+          <FeeLabel>Total:</FeeLabel>
           <Tooltip
             title={
               <TooltipContent>
@@ -107,9 +111,12 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
           </Tooltip>
         </FeeRow>
 
-        {/* Base Fee (Relayer's Cut) */}
+        {/* Line separator */}
+        <FeeDivider />
+
+        {/* Base Fee (Relayer Fee) */}
         <FeeRow>
-          <FeeLabel>Relayer Cut:</FeeLabel>
+          <FeeLabel>Relayer Fee:</FeeLabel>
           <Tooltip
             title={
               <TooltipContent>
@@ -120,7 +127,7 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
                 <div>
                   Calculation: {baseFeeBPS}/10000 × {amount} = {baseFee.fullPrecision}
                 </div>
-                <div>This is the relayer&apos;s profit</div>
+                <div>This is the relayer&apos;s fee</div>
               </TooltipContent>
             }
             placement='top'
@@ -129,21 +136,21 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
           </Tooltip>
         </FeeRow>
 
-        {/* Relaying Costs */}
+        {/* Blockchain Fee */}
         <FeeRow>
-          <FeeLabel>Relaying Costs:</FeeLabel>
+          <FeeLabel>Blockchain Fee:</FeeLabel>
           <Tooltip
             title={
               <TooltipContent>
                 <div>Full precision: {relayingCost.fullPrecision}</div>
-                <div>Formula: Total Fee - Relayer Cut</div>
+                <div>Formula: Total - Relayer Fee</div>
                 <div>
                   Calculation: {feeBPS} BPS - {baseFeeBPS} BPS = {feeBPS - baseFeeBPS} BPS
                 </div>
                 <div>
                   Amount: ({feeBPS - baseFeeBPS}/10000) × {amount} = {relayingCost.fullPrecision}
                 </div>
-                <div>This covers gas costs and other operational expenses</div>
+                <div>This covers blockchain gas costs and operational expenses</div>
               </TooltipContent>
             }
             placement='top'
@@ -186,7 +193,9 @@ const Container = styled(Box)(({ theme }) => ({
   borderRadius: '8px',
   border: `1px solid ${theme.palette.divider}`,
   margin: '1rem 0',
-  maxWidth: '500px',
+  maxWidth: '400px',
+  width: '100%',
+  boxSizing: 'border-box',
 }));
 
 const FeeStack = styled(Stack)({

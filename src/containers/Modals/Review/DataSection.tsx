@@ -80,9 +80,6 @@ export const DataSection = () => {
   const relayerFees = (BigInt(effectiveFeeBPS) * parseUnits(amount, decimals)) / 100n / 100n;
 
   const fees = isDeposit ? aspDataFees : relayerFees;
-  const feeFormatted = formatUnits(fees, decimals);
-  const feeUSD = getUsdBalance(price, feeFormatted, decimals);
-  const feeText = `${feeFormatted} ${symbol} (~ ${feeUSD} USD)`;
 
   // Create full precision tooltips - show complete decimal precision
   const formatFullPrecision = (value: bigint, decimals: number) => {
@@ -94,8 +91,6 @@ export const DataSection = () => {
     const decimalPart = valueStr.slice(-decimals);
     return `${integerPart}.${decimalPart}`;
   };
-
-  const feeTooltip = `${formatFullPrecision(fees, decimals)} ${symbol}`;
 
   const feesCollectorAddress = isDeposit
     ? selectedPoolInfo.entryPointAddress
@@ -155,12 +150,6 @@ export const DataSection = () => {
             <Label variant='body2'>Fees Collector:</Label>
             <Tooltip title={feesCollectorAddress} placement='top'>
               <Value variant='body2'>{feesCollector}</Value>
-            </Tooltip>
-          </Row>
-          <Row>
-            <Label variant='body2'>Fees:</Label>
-            <Tooltip title={feeTooltip} placement='top'>
-              <Value variant='body2'>{feeText}</Value>
             </Tooltip>
           </Row>
           {actionType === EventType.WITHDRAWAL && (isQuoteValid || isExpired) && (
