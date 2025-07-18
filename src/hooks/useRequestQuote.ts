@@ -52,6 +52,8 @@ export const useRequestQuote = ({
   const { quoteState, setQuoteData, updateCountdown, resetQuote, markAsExpired } = useQuoteContext();
   const isFetchingRef = useRef(false);
   const previousExtraGasRef = useRef(quoteState.extraGas);
+  const expiredNotificationSentRef = useRef<string | null>(null);
+  const timerIdRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const canRequestQuote = useMemo(() => {
     return (
@@ -82,6 +84,10 @@ export const useRequestQuote = ({
       const newQuoteData = await getQuote(quoteInput);
 
       const remainingTime = calculateRemainingTime(newQuoteData.feeCommitment.expiration);
+
+      // Reset the notification flag for the new quote
+      expiredNotificationSentRef.current = null;
+
       setQuoteData(
         newQuoteData.feeCommitment,
         Number(newQuoteData.feeBPS),
@@ -135,31 +141,51 @@ export const useRequestQuote = ({
 
   // Effect to handle the countdown timer - NO auto-refetch on expiry
   useEffect(() => {
-    let timerId: NodeJS.Timeout | undefined;
+    // Clear any existing timer before setting up a new one
+    if (timerIdRef.current) {
+      clearInterval(timerIdRef.current);
+      timerIdRef.current = undefined;
+    }
 
     if (quoteState.quoteCommitment && quoteState.countdown > 0 && !quoteState.isExpired) {
-      timerId = setInterval(() => {
-        updateCountdown(quoteState.countdown - 1);
+      // Use a local variable to capture the current countdown value
+      let currentCountdown = quoteState.countdown;
+
+      timerIdRef.current = setInterval(() => {
+        currentCountdown -= 1;
+        updateCountdown(currentCountdown);
 
         // When countdown reaches 0, just mark as expired - don't auto-refetch
-        if (quoteState.countdown - 1 <= 0) {
-          clearInterval(timerId);
-          markAsExpired();
-          addNotification('warning', 'Quote has expired. Please request a new quote.');
+        if (currentCountdown <= 0) {
+          if (timerIdRef.current) {
+            clearInterval(timerIdRef.current);
+            timerIdRef.current = undefined;
+          }
+
+          // Only send notification once per quote
+          const currentQuoteId = quoteState.quoteCommitment?.signedRelayerCommitment;
+          if (currentQuoteId && expiredNotificationSentRef.current !== currentQuoteId) {
+            expiredNotificationSentRef.current = currentQuoteId;
+            markAsExpired();
+            addNotification('warning', 'Quote has expired. Please request a new quote.');
+          }
         }
       }, 1000);
     }
 
     return () => {
-      if (timerId) clearInterval(timerId);
+      if (timerIdRef.current) {
+        clearInterval(timerIdRef.current);
+        timerIdRef.current = undefined;
+      }
     };
   }, [
     quoteState.quoteCommitment,
-    quoteState.countdown,
     quoteState.isExpired,
     updateCountdown,
     markAsExpired,
     addNotification,
+    // Remove quoteState.countdown from dependencies to prevent re-creating timer on every tick
   ]);
 
   const isQuoteValid = useMemo(
