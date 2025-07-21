@@ -65,4 +65,5 @@ const TotalValue = styled(Value)(({ theme }) => ({
   color: theme.palette.grey[900],
   fontSize: '1.8rem',
   fontWeight: 300,
+  textAlign: 'center',
 }));
