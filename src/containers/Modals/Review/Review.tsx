@@ -113,7 +113,7 @@ export const ReviewModal = () => {
           {actionType === EventType.WITHDRAWAL && isStablecoin(selectedPoolInfo?.asset || '') && (
             <NativeTokenDropSection>
               <Typography variant='h6' gutterBottom>
-                Gas Token Drop
+                Send Gas With Your Withdrawal
               </Typography>
               <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
                 Get ETH for gas fees (1 swap + 1 transfer)
