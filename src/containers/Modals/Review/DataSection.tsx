@@ -17,6 +17,15 @@ import { EventType } from '~/types';
 import { getUsdBalance, truncateAddress } from '~/utils';
 import { FeeBreakdown } from './FeeBreakdown';
 
+const getMaxDisplayPrecision = (isStableAsset: boolean): number => {
+  // Stable assets (stablecoins and yield-bearing stablecoins) should have max 3 decimal places
+  if (isStableAsset) {
+    return 3;
+  }
+  // ETH and other tokens can show full precision (use high number)
+  return 18;
+};
+
 export const DataSection = () => {
   const { address } = useAccount();
   const [isFeeBreakdownOpen, setIsFeeBreakdownOpen] = useState(false);
@@ -40,6 +49,7 @@ export const DataSection = () => {
   } = usePoolAccountsContext();
   const { addNotification } = useNotifications();
   const isDeposit = actionType === EventType.DEPOSIT;
+  const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
 
   // Add quote timer for withdrawals
   const amountBN = parseUnits(amount, decimals);
@@ -139,7 +149,13 @@ export const DataSection = () => {
   }
   const netFeeFormatted = formatUnits(netFeeAmount, decimals);
   const netFeeUSD = getUsdBalance(price, netFeeFormatted, decimals);
-  const netFeeText = `${parseFloat(netFeeFormatted).toString()} ${symbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`;
+
+  // Net fee uses the same precision logic as fee breakdown
+  const netFeePrecision = getMaxDisplayPrecision(isStableAsset);
+  const netFeeNumeric = parseFloat(netFeeFormatted);
+  const netFeeDisplayValue = parseFloat(netFeeNumeric.toFixed(netFeePrecision)).toString();
+
+  const netFeeText = `${netFeeDisplayValue} ${symbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`;
   const netFeeTooltip = `${formatFullPrecision(netFeeAmount, decimals)} ${symbol}`;
 
   const totalText = `~${amount.slice(0, 6)} ${symbol} (~$${parseFloat(amountUSD.replace('$', '')).toFixed(2)} USD)`;
@@ -255,7 +271,7 @@ export const DataSection = () => {
         <TotalValueLabelReceived variant='body2'>
           {actionType !== EventType.EXIT ? 'Total Received:' : 'Value:'}
         </TotalValueLabelReceived>
-        <Tooltip title={totalTooltip} placement='top'>
+        <Tooltip title={valueText} placement='top'>
           <TotalValueReceived variant='body2'>{valueText}</TotalValueReceived>
         </Tooltip>
       </Row>{' '}

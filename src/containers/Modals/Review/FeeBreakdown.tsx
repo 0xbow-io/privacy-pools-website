@@ -13,11 +13,21 @@ interface FeeBreakdownProps {
   amount: string;
 }
 
+const getMaxDisplayPrecision = (isStableAsset: boolean): number => {
+  // Stable assets (stablecoins and yield-bearing stablecoins) should have max 3 decimal places
+  if (isStableAsset) {
+    return 3;
+  }
+  // ETH and other tokens can show full precision (use high number)
+  return 18;
+};
+
 const formatFeeDisplay = (
   feeAmount: bigint,
   symbol: string,
   decimals: number,
   price: number,
+  isStableAsset: boolean,
 ): { displayText: string; fullPrecision: string; usdValue: string } => {
   const feeInToken = formatUnits(feeAmount, decimals);
   const usdValue = getUsdBalance(price, feeInToken, decimals);
@@ -29,8 +39,17 @@ const formatFeeDisplay = (
   const usdNumeric = parseFloat(usdValue.replace('$', ''));
   const usdFormatted = `$${usdNumeric.toFixed(2)}`;
 
-  // Display text with reasonable precision, removing trailing zeros
-  const displayText = `${parseFloat(feeInToken).toString()} ${symbol} (~${usdFormatted} USD)`;
+  // Use the max precision based on asset type - no special cases needed
+  const displayPrecision = getMaxDisplayPrecision(isStableAsset);
+  const feeNumeric = parseFloat(feeInToken);
+
+  // For display, use precision based on asset type
+  const displayValue =
+    feeNumeric < Math.pow(10, -displayPrecision)
+      ? feeNumeric.toExponential(2)
+      : parseFloat(feeNumeric.toFixed(displayPrecision)).toString();
+
+  const displayText = `${displayValue} ${symbol} (~${usdFormatted} USD)`;
 
   return { displayText, fullPrecision, usdValue: usdFormatted };
 };
@@ -39,7 +58,10 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
   const {
     balanceBN: { symbol, decimals },
     price,
+    selectedPoolInfo,
   } = useChainContext();
+
+  const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
 
   // Guard against invalid inputs
   if (
@@ -74,9 +96,9 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
   // For now, we'll show the relaying cost as the difference between total and base fee
 
   // Format fees for display
-  const totalFee = formatFeeDisplay(totalFeeAmount, symbol, decimals, price);
-  const baseFee = formatFeeDisplay(baseFeeAmount, symbol, decimals, price);
-  const relayingCost = formatFeeDisplay(relayingCostAmount, symbol, decimals, price);
+  const totalFee = formatFeeDisplay(totalFeeAmount, symbol, decimals, price, isStableAsset);
+  const baseFee = formatFeeDisplay(baseFeeAmount, symbol, decimals, price, isStableAsset);
+  const relayingCost = formatFeeDisplay(relayingCostAmount, symbol, decimals, price, isStableAsset);
 
   // Extra gas amount (convert from wei to ETH)
   const extraGasETH = extraGasAmountETH ? parseFloat(formatUnits(BigInt(extraGasAmountETH), 18)) : null;

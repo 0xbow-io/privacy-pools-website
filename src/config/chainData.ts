@@ -27,6 +27,7 @@ export interface PoolInfo {
   asset: ChainAssets;
   assetDecimals?: number;
   icon?: string;
+  isStableAsset?: boolean; // Includes stablecoins and yield-bearing stablecoins
 }
 
 export interface ChainData {
@@ -71,6 +72,7 @@ const mainnetChainData: ChainData = {
         asset: 'ETH',
         assetDecimals: 18,
         icon: mainnetIcon.src,
+        isStableAsset: false,
       },
       {
         chainId: mainnet.id,
@@ -83,6 +85,7 @@ const mainnetChainData: ChainData = {
         asset: 'USDS',
         assetDecimals: 18,
         icon: usdsIcon.src,
+        isStableAsset: true,
       },
       {
         chainId: mainnet.id,
@@ -95,6 +98,7 @@ const mainnetChainData: ChainData = {
         asset: 'sUSDS',
         assetDecimals: 18,
         icon: susdsIcon.src,
+        isStableAsset: true,
       },
       {
         chainId: mainnet.id,
@@ -107,6 +111,7 @@ const mainnetChainData: ChainData = {
         asset: 'DAI',
         assetDecimals: 18,
         icon: daiIcon.src,
+        isStableAsset: true,
       },
     ],
   },
@@ -139,6 +144,7 @@ const testnetChainData: ChainData = {
         asset: 'ETH',
         assetDecimals: 18,
         icon: mainnetIcon.src,
+        isStableAsset: false,
       },
       {
         chainId: sepolia.id,
@@ -150,6 +156,7 @@ const testnetChainData: ChainData = {
         maxDeposit: parseUnits('100', 6),
         asset: 'USDT',
         assetDecimals: 6,
+        isStableAsset: true,
       },
       {
         chainId: sepolia.id,
@@ -161,6 +168,7 @@ const testnetChainData: ChainData = {
         maxDeposit: parseUnits('100', 6),
         asset: 'USDC',
         assetDecimals: 6,
+        isStableAsset: true,
       },
     ],
   },
