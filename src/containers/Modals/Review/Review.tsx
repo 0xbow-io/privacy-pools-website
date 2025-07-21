@@ -110,6 +110,26 @@ export const ReviewModal = () => {
 
         <Stack gap={2} px='1.6rem' width='100%'>
           <Divider />
+          {actionType === EventType.WITHDRAWAL && isStablecoin(selectedPoolInfo?.asset || '') && (
+            <NativeTokenDropSection>
+              <Typography variant='h6' gutterBottom>
+                Gas Token Drop
+              </Typography>
+              <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
+                Get ETH for gas fees (1 swap + 1 transfer)
+              </Typography>
+              <FormControlLabel
+                control={
+                  <GreenSwitch
+                    checked={quoteState.extraGas}
+                    onChange={(e) => setExtraGas(e.target.checked)}
+                    disabled={isQuoteLoading}
+                  />
+                }
+                label='Include native token drop for gas fees'
+              />
+            </NativeTokenDropSection>
+          )}
 
           <DataSection />
 
@@ -119,27 +139,6 @@ export const ReviewModal = () => {
         <PoolAccountSection />
 
         {actionType === EventType.EXIT && <ExitMessage />}
-
-        {actionType === EventType.WITHDRAWAL && isStablecoin(selectedPoolInfo?.asset || '') && (
-          <NativeTokenDropSection>
-            <Typography variant='h6' gutterBottom>
-              Gas Token Drop
-            </Typography>
-            <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
-              Get ETH for gas fees (1 swap + 1 transfer)
-            </Typography>
-            <FormControlLabel
-              control={
-                <GreenSwitch
-                  checked={quoteState.extraGas}
-                  onChange={(e) => setExtraGas(e.target.checked)}
-                  disabled={isQuoteLoading}
-                />
-              }
-              label='Include native token drop for gas fees'
-            />
-          </NativeTokenDropSection>
-        )}
 
         {actionType === EventType.WITHDRAWAL && isExpired ? (
           <PulsingButton
@@ -225,6 +224,6 @@ const NativeTokenDropSection = styled(Box)(({ theme }) => ({
   borderRadius: '8px',
   border: `2px solid ${theme.palette.success.main}`,
   margin: '1rem 0',
-  maxWidth: '400px',
+  maxWidth: '500px',
   boxShadow: `0 2px 8px ${theme.palette.success.main}20`,
 }));

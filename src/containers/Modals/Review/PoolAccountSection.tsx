@@ -63,6 +63,6 @@ const Value = styled(Label)(() => ({
 
 const TotalValue = styled(Value)(({ theme }) => ({
   color: theme.palette.grey[900],
-  fontSize: '3.2rem',
+  fontSize: '1.8rem',
   fontWeight: 300,
 }));

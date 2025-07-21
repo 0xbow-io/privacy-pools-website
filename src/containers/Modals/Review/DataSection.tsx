@@ -180,7 +180,6 @@ export const DataSection = () => {
           </Value>
         </Row>
       </Stack>
-
       {actionType !== EventType.EXIT && (
         <Stack>
           <Row>
@@ -199,13 +198,14 @@ export const DataSection = () => {
               )}
             </Row>
           )}
-          <Row>
-            <Label variant='body2'>Value:</Label>
-            <Tooltip title={valueTooltip} placement='top'>
-              <Value variant='body2'>{valueText}</Value>
-            </Tooltip>
-          </Row>
-
+          {actionType !== EventType.WITHDRAWAL && (isQuoteValid || isExpired) && (
+            <Row>
+              <Label variant='body2'>Value:</Label>
+              <Tooltip title={valueTooltip} placement='top'>
+                <Value variant='body2'>{valueText}</Value>
+              </Tooltip>
+            </Row>
+          )}
           {/* Net Fee row with dropdown for withdrawals */}
           {actionType === EventType.WITHDRAWAL && isQuoteValid && quoteFeesBPS !== null && quoteBaseFeeBPS !== null && (
             <>
@@ -241,13 +241,24 @@ export const DataSection = () => {
           )}
         </Stack>
       )}
-
       <Row>
-        <TotalValueLabel variant='body2'>{actionType !== EventType.EXIT ? 'Total:' : 'Value:'}</TotalValueLabel>
+        <TotalValueLabel variant='body2'>
+          {actionType !== EventType.EXIT
+            ? `Total${actionType === EventType.WITHDRAWAL ? ' Withdrawn' : ''}:`
+            : 'Value:'}
+        </TotalValueLabel>
         <Tooltip title={totalTooltip} placement='top'>
           <TotalValue variant='body2'>{totalText}</TotalValue>
         </Tooltip>
       </Row>
+      <Row>
+        <TotalValueLabelReceived variant='body2'>
+          {actionType !== EventType.EXIT ? 'Total Received:' : 'Value:'}
+        </TotalValueLabelReceived>
+        <Tooltip title={totalTooltip} placement='top'>
+          <TotalValueReceived variant='body2'>{valueText}</TotalValueReceived>
+        </Tooltip>
+      </Row>{' '}
     </Container>
   );
 };
@@ -296,6 +307,16 @@ const TotalValueLabel = styled(Label)(({ theme }) => ({
 
 const TotalValue = styled(Value)(({ theme }) => ({
   color: theme.palette.grey[900],
+}));
+
+const TotalValueReceived = styled(Value)(({ theme }) => ({
+  color: theme.palette.grey[900],
+  fontSize: '1.8rem',
+}));
+
+const TotalValueLabelReceived = styled(Label)(({ theme }) => ({
+  color: theme.palette.grey[900],
+  fontSize: '1.8rem',
 }));
 
 const QuoteTimer = styled(Value)(({ theme }) => ({
