@@ -128,6 +128,7 @@ export const useRequestQuote = ({
     setQuoteData,
   ]);
 
+  // Effect to fetch quote initially or when relevant inputs change
   useEffect(() => {
     if (canRequestQuote && !quoteState.quoteCommitment && !quoteState.isExpired) {
       executeFetchAndSetQuote();
@@ -136,6 +137,7 @@ export const useRequestQuote = ({
     }
   }, [canRequestQuote, executeFetchAndSetQuote, resetQuote, quoteState.quoteCommitment, quoteState.isExpired]);
 
+  // Effect to refetch quote when extraGas changes (only if we already have a quote)
   useEffect(() => {
     if (
       canRequestQuote &&
@@ -190,6 +192,7 @@ export const useRequestQuote = ({
     currentQuoteIdRef.current = null;
   }, []);
 
+  // effect to handle the countdown timer
   useEffect(() => {
     const currentQuoteId = quoteState.quoteCommitment?.signedRelayerCommitment || null;
 
