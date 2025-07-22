@@ -3,6 +3,10 @@ import { Stack, styled, Typography } from '@mui/material';
 export const LinksSection = () => {
   return (
     <Container gap='1.2rem' width='100%' alignItems='' direction='row' justifyContent='center'>
+      <Typography variant='body1' component='a' href='#' target='_blank'>
+        FAQ
+      </Typography>
+      <Divider />
       <Typography
         variant='body1'
         component='a'
@@ -27,6 +31,7 @@ const Container = styled(Stack)(({
     width: '100%',
     justifyContent: 'center',
     zIndex: 1,
+    alignItems: 'center',
 
     a: {
       fontSize: '1.2rem',
@@ -38,3 +43,9 @@ const Container = styled(Stack)(({
     },
   };
 });
+
+const Divider = styled('span')(({ theme }) => ({
+  width: '1px',
+  height: '16px',
+  backgroundColor: theme.palette.grey[300],
+}));

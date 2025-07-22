@@ -1,17 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Divider,
-  Stack,
-  styled,
-  FormControlLabel,
-  Switch,
-  Typography,
-} from '@mui/material';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { Box, Button, CircularProgress, Stack, styled, Switch, Typography } from '@mui/material';
 import { parseUnits } from 'viem';
 import { BaseModal } from '~/components';
 import { useQuoteContext } from '~/contexts/QuoteContext';
@@ -109,34 +100,31 @@ export const ReviewModal = () => {
         <ModalTitle>Review the {actionType}</ModalTitle>
 
         <Stack gap={2} px='1.6rem' width='100%'>
-          <Divider />
           {actionType === EventType.WITHDRAWAL && isStablecoin(selectedPoolInfo?.asset || '') && (
-            <NativeTokenDropSection>
-              <Typography variant='h6' gutterBottom>
-                Send Gas With Your Withdrawal
-              </Typography>
-              <Typography variant='body2' color='text.secondary' sx={{ mb: 2 }}>
-                Get ETH for gas fees (1 swap + 1 transfer)
-              </Typography>
-              <FormControlLabel
-                control={
-                  <GreenSwitch
-                    checked={quoteState.extraGas}
-                    onChange={(e) => setExtraGas(e.target.checked)}
-                    disabled={isQuoteLoading}
-                  />
-                }
-                label='Include native token drop for gas fees'
-              />
-            </NativeTokenDropSection>
+            <GasTokenDropSection>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <InfoIcon />
+                  <Box>
+                    <Typography variant='body1' fontWeight={600}>
+                      Send Gas With Your Withdrawal
+                    </Typography>
+                    <Typography variant='body2' color='text.secondary'>
+                      Get ETH for gas fees (1 swap + 1 transfer)
+                    </Typography>
+                  </Box>
+                </Box>
+                <GreenSwitch
+                  checked={quoteState.extraGas}
+                  onChange={(e) => setExtraGas(e.target.checked)}
+                  disabled={isQuoteLoading}
+                />
+              </Box>
+            </GasTokenDropSection>
           )}
 
           <DataSection />
-
-          <Divider />
         </Stack>
-
-        <PoolAccountSection />
 
         {actionType === EventType.EXIT && <ExitMessage />}
 
@@ -160,13 +148,23 @@ export const ReviewModal = () => {
             {!isLoading && !isConfirmClicked && (actionType !== EventType.WITHDRAWAL || !!feeCommitment) && 'Confirm'}
           </SButton>
         )}
+        <PoolAccountSection />
 
         <LinksSection />
       </ModalContainer>
     </BaseModal>
   );
 };
-
+const getTopDecorativeCirclePosition = (actionType: EventType, mobile: boolean) => {
+  switch (actionType) {
+    case EventType.EXIT:
+      return '-36%';
+    case EventType.WITHDRAWAL:
+      return '-5%';
+    default:
+      return mobile ? '-23%' : '-43%';
+  }
+};
 const DecorativeCircle = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'actionType',
 })<{ actionType: EventType }>(({ theme, actionType }) => {
@@ -178,9 +176,9 @@ const DecorativeCircle = styled(Box, {
     backgroundColor: theme.palette.background.default,
     border: '1px solid #D9D9D9',
     zIndex: 0,
-    top: actionType === EventType.EXIT ? '-36%' : '-43%',
+    top: getTopDecorativeCirclePosition(actionType, false),
     [theme.breakpoints.down('sm')]: {
-      top: actionType === EventType.EXIT ? '-36%' : '-23%',
+      top: getTopDecorativeCirclePosition(actionType, true),
     },
   };
 });
@@ -218,12 +216,17 @@ const GreenSwitch = styled(Switch)(({ theme }) => ({
   },
 }));
 
-const NativeTokenDropSection = styled(Box)(({ theme }) => ({
-  padding: '1.5rem',
-  backgroundColor: theme.palette.background.paper,
+const GasTokenDropSection = styled(Box)(() => ({
+  padding: '1rem 1.5rem',
+  backgroundColor: '#e8f5e9',
   borderRadius: '8px',
-  border: `2px solid ${theme.palette.success.main}`,
-  margin: '1rem 0',
-  maxWidth: '500px',
-  boxShadow: `0 2px 8px ${theme.palette.success.main}20`,
+  border: `1px solid #a5d6a7`,
+  margin: '0.5rem 0',
+  display: 'flex',
+  alignItems: 'center',
+}));
+
+const InfoIcon = styled(InfoOutlinedIcon)(() => ({
+  color: '#66bb6a',
+  fontSize: '20px',
 }));

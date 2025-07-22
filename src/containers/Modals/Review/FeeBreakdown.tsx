@@ -187,24 +187,23 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
           </Tooltip>
         </FeeRow>
 
-        {/* Native Gas Airdrop (only show if extraGasAmountETH exists) */}
+        {/* Gas token received (only show if extraGasAmountETH exists) */}
         {extraGasETH && extraGasUSD && (
           <>
-            <FeeDivider />
             <FeeRow>
-              <FeeLabel>Native Gas Airdrop:</FeeLabel>
+              <FeeLabel>Gas token received:</FeeLabel>
               <Tooltip
                 title={
                   <TooltipContent>
                     <div>Amount: {extraGasETHFormatted} ETH</div>
                     <div>USD Value: ~${extraGasUSD}</div>
-                    <div>This ETH will be sent to your withdrawal address to cover gas fees</div>
+                    <div>This amount is deducted from your withdrawal to provide ETH for gas fees</div>
                   </TooltipContent>
                 }
                 placement='top'
               >
-                <FeeValue positive>
-                  +{extraGasETHFormatted} ETH (~${extraGasUSD} USD)
+                <FeeValue negative>
+                  -0.001 {symbol} (~${extraGasUSD})
                 </FeeValue>
               </Tooltip>
             </FeeRow>
@@ -244,11 +243,11 @@ const FeeLabel = styled(Typography)(({ theme }) => ({
 }));
 
 const FeeValue = styled(Typography, {
-  shouldForwardProp: (prop) => prop !== 'positive',
-})<{ positive?: boolean }>(({ theme, positive }) => ({
+  shouldForwardProp: (prop) => prop !== 'positive' && prop !== 'negative',
+})<{ positive?: boolean; negative?: boolean }>(({ theme, positive, negative }) => ({
   fontSize: '14px',
   fontWeight: 600,
-  color: positive ? theme.palette.success.main : theme.palette.text.primary,
+  color: positive ? theme.palette.success.main : negative ? '#4caf50' : theme.palette.text.primary,
   cursor: 'help',
   '&:hover': {
     opacity: 0.8,

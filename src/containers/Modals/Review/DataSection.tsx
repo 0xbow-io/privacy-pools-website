@@ -158,7 +158,6 @@ export const DataSection = () => {
   const netFeeText = `${netFeeDisplayValue} ${symbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`;
   const netFeeTooltip = `${formatFullPrecision(netFeeAmount, decimals)} ${symbol}`;
 
-  const totalText = `~${amount.slice(0, 6)} ${symbol} (~$${parseFloat(amountUSD.replace('$', '')).toFixed(2)} USD)`;
   const totalAmountBN = parseUnits(amount, decimals);
   const totalTooltip = `${formatFullPrecision(totalAmountBN, decimals)} ${symbol}`;
 
@@ -248,7 +247,7 @@ export const DataSection = () => {
                   <FeeBreakdown
                     feeBPS={quoteFeesBPS}
                     baseFeeBPS={quoteBaseFeeBPS}
-                    extraGasAmountETH={quoteExtraGasAmountETH}
+                    extraGasAmountETH={quoteState.extraGas ? quoteExtraGasAmountETH : null}
                     amount={amount}
                   />
                 </FeeBreakdownContainer>
@@ -257,24 +256,31 @@ export const DataSection = () => {
           )}
         </Stack>
       )}
-      <Row>
-        <TotalValueLabel variant='body2'>
-          {actionType !== EventType.EXIT
-            ? `Total${actionType === EventType.WITHDRAWAL ? ' Withdrawn' : ''}:`
-            : 'Value:'}
-        </TotalValueLabel>
-        <Tooltip title={totalTooltip} placement='top'>
-          <TotalValue variant='body2'>{totalText}</TotalValue>
-        </Tooltip>
-      </Row>
-      <Row>
-        <TotalValueLabelReceived variant='body2'>
-          {actionType !== EventType.EXIT ? 'Total Received:' : 'Value:'}
-        </TotalValueLabelReceived>
-        <Tooltip title={valueText} placement='top'>
-          <TotalValueReceived variant='body2'>{valueText}</TotalValueReceived>
-        </Tooltip>
-      </Row>{' '}
+
+      {/* Totals Section for Withdrawals */}
+      {actionType === EventType.WITHDRAWAL && (
+        <TotalsContainer>
+          <TotalBox>
+            <TotalLabel>Total Withdrawn</TotalLabel>
+            <Tooltip title={totalTooltip} placement='top'>
+              <TotalAmount>
+                {amount} {symbol}
+              </TotalAmount>
+            </Tooltip>
+            <TotalUSD>${parseFloat(amountUSD.replace('$', '')).toFixed(2)}</TotalUSD>
+          </TotalBox>
+
+          <TotalBox>
+            <TotalLabel>Total Received</TotalLabel>
+            <Tooltip title={valueTooltip} placement='top'>
+              <TotalAmount>
+                {parseFloat(amountWithFee).toFixed(3)} {symbol}
+              </TotalAmount>
+            </Tooltip>
+            <TotalUSD>${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)}</TotalUSD>
+          </TotalBox>
+        </TotalsContainer>
+      )}
     </Container>
   );
 };
@@ -315,24 +321,6 @@ const Label = styled(Typography)(({ theme }) => ({
 
 const Value = styled(Label)(() => ({
   fontWeight: 400,
-}));
-
-const TotalValueLabel = styled(Label)(({ theme }) => ({
-  color: theme.palette.grey[900],
-}));
-
-const TotalValue = styled(Value)(({ theme }) => ({
-  color: theme.palette.grey[900],
-}));
-
-const TotalValueReceived = styled(Value)(({ theme }) => ({
-  color: theme.palette.grey[900],
-  fontSize: '1.8rem',
-}));
-
-const TotalValueLabelReceived = styled(Label)(({ theme }) => ({
-  color: theme.palette.grey[900],
-  fontSize: '1.8rem',
 }));
 
 const QuoteTimer = styled(Value)(({ theme }) => ({
@@ -390,3 +378,60 @@ const FeeBreakdownContainer = styled('div')({
   marginTop: '8px',
   marginLeft: '16px',
 });
+
+const TotalsContainer = styled('div')(({ theme }) => ({
+  display: 'flex',
+  marginTop: '24px',
+  justifyContent: 'space-between',
+  position: 'relative',
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    left: '50%',
+    top: '0',
+    bottom: '0',
+    width: '1px',
+    backgroundColor: theme.palette.divider,
+    transform: 'translateX(-50%)',
+  },
+}));
+
+const TotalBox = styled('div')(() => ({
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: '0 0 16px',
+  gap: '4px',
+  backgroundColor: 'transparent',
+  minWidth: '208px',
+  height: '86px',
+}));
+
+const TotalLabel = styled(Typography)(({ theme }) => ({
+  fontFamily: 'IBM Plex Mono',
+  fontSize: '14px',
+  fontWeight: 400,
+  lineHeight: '18px',
+  color: theme.palette.text.secondary,
+  textAlign: 'center',
+}));
+
+const TotalAmount = styled(Typography)(({ theme }) => ({
+  fontFamily: 'IBM Plex Mono',
+  fontSize: '20px',
+  fontWeight: 700,
+  lineHeight: '26px',
+  color: theme.palette.text.primary,
+  textAlign: 'center',
+  cursor: 'help',
+}));
+
+const TotalUSD = styled(Typography)(({ theme }) => ({
+  fontFamily: 'IBM Plex Mono',
+  fontSize: '14px',
+  fontWeight: 400,
+  lineHeight: '18px',
+  color: theme.palette.text.secondary,
+  textAlign: 'center',
+}));
