@@ -22,7 +22,7 @@ const getMaxDisplayPrecision = (isStableAsset: boolean): number => {
   return 18;
 };
 
-const formatFeeDisplay = (
+export const formatFeeDisplay = (
   feeAmount: bigint,
   symbol: string,
   decimals: number,

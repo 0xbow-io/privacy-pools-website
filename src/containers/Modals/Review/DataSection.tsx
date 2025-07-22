@@ -15,7 +15,7 @@ import {
 } from '~/hooks';
 import { EventType } from '~/types';
 import { getUsdBalance, truncateAddress } from '~/utils';
-import { FeeBreakdown } from './FeeBreakdown';
+import { FeeBreakdown, formatFeeDisplay } from './FeeBreakdown';
 
 const getMaxDisplayPrecision = (isStableAsset: boolean): number => {
   // Stable assets (stablecoins and yield-bearing stablecoins) should have max 3 decimal places
@@ -264,7 +264,7 @@ export const DataSection = () => {
             <TotalLabel>Total Withdrawn</TotalLabel>
             <Tooltip title={totalTooltip} placement='top'>
               <TotalAmount>
-                {amount} {symbol}
+                {formatFeeDisplay(totalAmountBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
               </TotalAmount>
             </Tooltip>
             <TotalUSD>${parseFloat(amountUSD.replace('$', '')).toFixed(2)}</TotalUSD>
@@ -274,7 +274,7 @@ export const DataSection = () => {
             <TotalLabel>Total Received</TotalLabel>
             <Tooltip title={valueTooltip} placement='top'>
               <TotalAmount>
-                {parseFloat(amountWithFee).toFixed(3)} {symbol}
+                {formatFeeDisplay(amountWithFeeBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
               </TotalAmount>
             </Tooltip>
             <TotalUSD>${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)}</TotalUSD>
