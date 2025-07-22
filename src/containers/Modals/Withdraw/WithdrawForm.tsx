@@ -2,8 +2,19 @@
 
 import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Box, Button, CircularProgress, FormControl, SelectChangeEvent, Stack, styled, TextField } from '@mui/material';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  SelectChangeEvent,
+  Stack,
+  styled,
+  TextField,
+  Avatar,
+} from '@mui/material';
 import { Address, formatUnits, getAddress, isAddress, parseUnits } from 'viem';
+import { useEnsAddress, useEnsAvatar, useEnsName } from 'wagmi';
 import { CoinIcon, ImageContainer, InputContainer, ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
@@ -40,8 +51,65 @@ export const WithdrawForm = () => {
   const [isLoadingMinAmount, setIsLoadingMinAmount] = useState(false);
   const [targetAddressHasError, setTargetAddressHasError] = useState(false);
 
+  // ENS-related state
+  const [inputValue, setInputValue] = useState(target);
+  const [ensName, setEnsName] = useState<string | null>(null);
+
   const balanceFormatted = formatUnits(poolAccount?.balance ?? BigInt(0), decimals);
   const balanceUSD = getUsdBalance(currentPrice, balanceFormatted, decimals);
+
+  // ENS hooks
+  const isEnsName = useMemo(() => {
+    // Must have at least one dot followed by 3+ characters
+    const dotIndex = inputValue.lastIndexOf('.');
+    if (dotIndex === -1) return false; // No dot found
+
+    const tld = inputValue.slice(dotIndex + 1);
+    return tld.length >= 3; // At least 3 characters after the dot
+  }, [inputValue]);
+
+  const normalizedName = useMemo(() => {
+    if (!isEnsName) return undefined;
+    // Simple normalization - just lowercase and trim
+    return inputValue.toLowerCase().trim();
+  }, [isEnsName, inputValue]);
+
+  const {
+    data: ensAddress,
+    isLoading: isLoadingEnsAddress,
+    error: ensError,
+  } = useEnsAddress({
+    name: normalizedName,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  const { data: ensAvatar } = useEnsAvatar({
+    name: normalizedName,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  const { data: reverseEnsName } = useEnsName({
+    address: isAddress(target) ? target : undefined,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  // Effect to handle ENS resolution
+  useEffect(() => {
+    if (isEnsName && ensAddress) {
+      setTarget(ensAddress as Address);
+      setTargetAddressHasError(false);
+      setEnsName(inputValue);
+      addNotification('success', `ENS name resolved to ${ensAddress}`);
+    } else if (isEnsName && !isLoadingEnsAddress && !ensAddress && normalizedName) {
+      if (ensError) {
+        console.error('ENS Resolution Error:', ensError);
+        addNotification('error', `ENS resolution failed: ${ensError.message || 'Unknown error'}`);
+      } else {
+        addNotification('error', `Could not resolve ENS name: ${inputValue}`);
+      }
+      setTargetAddressHasError(true);
+    }
+  }, [ensAddress, isEnsName, isLoadingEnsAddress, inputValue, normalizedName, ensError, setTarget, addNotification]);
 
   const amountBN = useMemo(() => {
     try {
@@ -190,10 +258,28 @@ export const WithdrawForm = () => {
   };
 
   const handleTargetAddressChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setTarget(e.target.value as Address);
-    if (targetAddressHasError) {
-      setTargetAddressHasError(false);
+    const value = e.target.value;
+    setInputValue(value);
+
+    // Clear any previous errors when user is typing
+    setTargetAddressHasError(false);
+
+    // If it's a valid address, set it directly
+    if (isAddress(value)) {
+      setTarget(value as Address);
+      setEnsName(null);
+    } else {
+      // Check if it looks like a complete ENS name (dot + 3+ chars)
+      const dotIndex = value.lastIndexOf('.');
+      const isCompleteEns = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
+
+      if (!isCompleteEns) {
+        // If it's not a complete ENS name and not a valid address, clear the target
+        setTarget('' as Address);
+        setEnsName(null);
+      }
     }
+    // ENS resolution will be handled by the useEffect
   };
 
   const handleTargetAddressBlur: FocusEventHandler<HTMLInputElement> = (e) => {
@@ -269,16 +355,32 @@ export const WithdrawForm = () => {
 
       <Stack gap={2} width='100%' maxWidth='32.8rem' zIndex='1'>
         <FormControl fullWidth>
-          <TextField
-            id='target-address'
-            placeholder='Target Address'
-            value={target}
-            error={targetAddressHasError || (target !== '' && !isAddress(target))}
-            onChange={handleTargetAddressChange}
-            onBlur={handleTargetAddressBlur}
-            helperText={targetAddressHasError || (target !== '' && !isAddress(target)) ? 'Invalid address' : ''}
-            data-testid='target-address-input'
-          />
+          <Box sx={{ position: 'relative' }}>
+            <TextField
+              id='target-address'
+              placeholder='Target Address or ENS name'
+              value={inputValue}
+              error={targetAddressHasError}
+              onChange={handleTargetAddressChange}
+              onBlur={handleTargetAddressBlur}
+              spellCheck={false}
+              helperText={
+                targetAddressHasError
+                  ? 'Invalid address or ENS name'
+                  : ensName
+                    ? `Resolved to: ${target.slice(0, 6)}...${target.slice(-4)}`
+                    : reverseEnsName
+                      ? `ENS: ${reverseEnsName}`
+                      : ''
+              }
+              data-testid='target-address-input'
+              fullWidth
+              InputProps={{
+                startAdornment: ensAvatar ? <Avatar src={ensAvatar} sx={{ width: 24, height: 24, mr: 1 }} /> : null,
+                endAdornment: isLoadingEnsAddress ? <CircularProgress size={20} /> : null,
+              }}
+            />
+          </Box>
         </FormControl>
 
         <PoolAccountSelectorSection

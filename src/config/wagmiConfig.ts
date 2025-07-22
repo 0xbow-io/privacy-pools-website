@@ -9,6 +9,7 @@ import {
   metaMaskWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { HttpTransport } from 'viem';
+import { mainnet } from 'viem/chains';
 import { createConfig, http } from 'wagmi';
 import { mock } from 'wagmi/connectors';
 import { getConfig, whitelistedChains, chainData } from '~/config';
@@ -36,16 +37,27 @@ const connectors = connectorsForWallets(
   },
 );
 
-export const transports = whitelistedChains.reduce(
+// Always include mainnet for ENS resolution, even on testnet
+const allChains = whitelistedChains.includes(mainnet)
+  ? whitelistedChains
+  : ([mainnet, ...whitelistedChains] as readonly [Chain, ...Chain[]]);
+
+export const transports = allChains.reduce(
   (acc, chain) => {
-    acc[chain.id] = http(chainData[chain.id].rpcUrl);
+    // Use mainnet data if available, otherwise use Alchemy
+    const rpcUrl =
+      chainData[chain.id]?.rpcUrl ||
+      (chain.id === 1
+        ? `https://eth-mainnet.g.alchemy.com/v2/${getConfig().env.ALCHEMY_KEY}`
+        : chain.rpcUrls.default.http[0]);
+    acc[chain.id] = http(rpcUrl);
     return acc;
   },
   {} as Record<number, HttpTransport>,
 );
 
 export const defaultConfig = createConfig({
-  chains: whitelistedChains,
+  chains: allChains,
   ssr: false,
   storage: null,
   transports,
@@ -57,7 +69,7 @@ export const defaultConfig = createConfig({
 export const USER_TEST_ADDRESS = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
 
 const testConfig = createConfig({
-  chains: whitelistedChains,
+  chains: allChains,
   connectors: [
     mock({
       accounts: [USER_TEST_ADDRESS],

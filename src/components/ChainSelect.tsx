@@ -5,13 +5,18 @@ import Image from 'next/image';
 import { ListItemIcon, Menu as MuiMenu, MenuItem, styled, IconButton } from '@mui/material';
 import { Chain } from 'viem';
 import { useChains } from 'wagmi';
-import { chainData } from '~/config';
+import { chainData, whitelistedChains } from '~/config';
 import { useChainContext } from '~/hooks';
 import { zIndex } from '~/utils';
 
 export const ChainSelect = () => {
   const chains = useChains();
   const { chainId, setChainId } = useChainContext();
+
+  // Only show chains that are whitelisted and have chainData
+  const availableChains = chains.filter(
+    (chain) => whitelistedChains.some((wc) => wc.id === chain.id) && chainData[chain.id],
+  );
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -52,7 +57,7 @@ export const ChainSelect = () => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         elevation={0}
       >
-        {chains.map((chain: Chain) => (
+        {availableChains.map((chain: Chain) => (
           <SMenuItem key={chain.id} onClick={() => handleChainChange(chain.id)}>
             <ListItemIcon>
               <Image src={chainData[chain.id].image} alt={chain.name} width={16} height={16} />

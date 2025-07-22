@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import { Stack, styled, Typography, IconButton, Collapse } from '@mui/material';
-import { formatUnits, parseUnits } from 'viem';
-import { useAccount } from 'wagmi';
+import { Stack, styled, Typography, IconButton, Collapse, Avatar, Box } from '@mui/material';
+import { formatUnits, parseUnits, isAddress } from 'viem';
+import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
 import { ExtendedTooltip as Tooltip } from '~/components';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import {
@@ -91,6 +91,17 @@ export const DataSection = () => {
 
   const fromAddress = isDeposit ? address : '';
   const toAddress = isDeposit ? '' : target;
+
+  // ENS hooks for the target address
+  const { data: ensName } = useEnsName({
+    address: isAddress(toAddress) ? (toAddress as `0x${string}`) : undefined,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  const { data: ensAvatar } = useEnsAvatar({
+    name: ensName || undefined,
+    chainId: 1, // Always use mainnet for ENS
+  });
 
   // Use fresh quote fees for withdrawals, fallback to context fees if no quote
   const effectiveFeeBPS = isDeposit ? feeBPSForWithdraw : (quoteFeesBPS ?? feeBPSForWithdraw ?? 0);
@@ -186,12 +197,15 @@ export const DataSection = () => {
         <Row>
           <Label variant='body2'>To:</Label>
           <Value variant='body2'>
-            <Tooltip title={toAddress} placement='top'>
-              <span>
-                {toAddress && truncateAddress(toAddress)}
-                {!toAddress && 'New Pool Account'}
-              </span>
-            </Tooltip>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {ensAvatar && <Avatar src={ensAvatar} sx={{ width: 20, height: 20 }} />}
+              <Tooltip title={toAddress} placement='top'>
+                <span>
+                  {toAddress && (ensName || truncateAddress(toAddress))}
+                  {!toAddress && 'New Pool Account'}
+                </span>
+              </Tooltip>
+            </Box>
           </Value>
         </Row>
       </Stack>
