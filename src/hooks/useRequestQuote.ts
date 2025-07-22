@@ -57,8 +57,6 @@ export const useRequestQuote = ({
   const expiredNotificationSentRef = useRef<string | null>(null);
   const timerIdRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const currentQuoteIdRef = useRef<string | null>(null);
-  const timerRunningRef = useRef(false);
-  const isTimerOwnerRef = useRef(false);
 
   const updateCountdownRef = useRef(updateCountdown);
   const markAsExpiredRef = useRef(markAsExpired);
@@ -151,13 +149,11 @@ export const useRequestQuote = ({
   }, [quoteState.extraGas, canRequestQuote, quoteState.quoteCommitment, quoteState.isExpired, executeFetchAndSetQuote]);
 
   const startTimer = useCallback((quoteId: string, initialCountdown: number) => {
-    if (timerRunningRef.current || timerIdRef.current || globalTimerInstanceActive) {
+    if (timerIdRef.current || globalTimerInstanceActive) {
       return;
     }
 
     globalTimerInstanceActive = true;
-    isTimerOwnerRef.current = true;
-    timerRunningRef.current = true;
     currentQuoteIdRef.current = quoteId;
     let currentCountdown = initialCountdown;
 
@@ -170,9 +166,7 @@ export const useRequestQuote = ({
           clearInterval(timerIdRef.current);
           timerIdRef.current = undefined;
         }
-        timerRunningRef.current = false;
         globalTimerInstanceActive = false;
-        isTimerOwnerRef.current = false;
 
         const alreadyNotified = expiredNotificationSentRef.current === quoteId;
 
@@ -192,11 +186,7 @@ export const useRequestQuote = ({
       clearInterval(timerIdRef.current);
       timerIdRef.current = undefined;
     }
-    timerRunningRef.current = false;
-    if (isTimerOwnerRef.current) {
-      globalTimerInstanceActive = false;
-      isTimerOwnerRef.current = false;
-    }
+    globalTimerInstanceActive = false;
     currentQuoteIdRef.current = null;
   }, []);
 
@@ -209,7 +199,6 @@ export const useRequestQuote = ({
       !quoteState.isExpired &&
       currentQuoteId &&
       currentQuoteId !== currentQuoteIdRef.current &&
-      !timerRunningRef.current &&
       !globalTimerInstanceActive
     ) {
       startTimer(currentQuoteId, quoteState.countdown);
