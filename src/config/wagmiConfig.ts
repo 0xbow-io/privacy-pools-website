@@ -9,7 +9,7 @@ import {
   metaMaskWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { HttpTransport } from 'viem';
-import { mainnet } from 'viem/chains';
+import { mainnet, type Chain } from 'viem/chains';
 import { createConfig, http } from 'wagmi';
 import { mock } from 'wagmi/connectors';
 import { getConfig, whitelistedChains, chainData } from '~/config';

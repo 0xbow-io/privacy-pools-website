@@ -52,7 +52,7 @@ export const WithdrawForm = () => {
   const [targetAddressHasError, setTargetAddressHasError] = useState(false);
 
   // ENS-related state
-  const [inputValue, setInputValue] = useState(target);
+  const [inputValue, setInputValue] = useState<string>(target);
   const [ensName, setEnsName] = useState<string | null>(null);
 
   const balanceFormatted = formatUnits(poolAccount?.balance ?? BigInt(0), decimals);
