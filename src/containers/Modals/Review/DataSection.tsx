@@ -423,7 +423,6 @@ const TotalBox = styled('div')(() => ({
 }));
 
 const TotalLabel = styled(Typography)(({ theme }) => ({
-  fontFamily: 'IBM Plex Mono',
   fontSize: '14px',
   fontWeight: 400,
   lineHeight: '18px',
@@ -432,7 +431,6 @@ const TotalLabel = styled(Typography)(({ theme }) => ({
 }));
 
 const TotalAmount = styled(Typography)(({ theme }) => ({
-  fontFamily: 'IBM Plex Mono',
   fontSize: '20px',
   fontWeight: 700,
   lineHeight: '26px',
@@ -442,7 +440,6 @@ const TotalAmount = styled(Typography)(({ theme }) => ({
 }));
 
 const TotalUSD = styled(Typography)(({ theme }) => ({
-  fontFamily: 'IBM Plex Mono',
   fontSize: '14px',
   fontWeight: 400,
   lineHeight: '18px',

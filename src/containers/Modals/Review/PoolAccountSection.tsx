@@ -116,7 +116,6 @@ const RemainingContainer = styled('div')(() => ({
 }));
 
 const RemainingText = styled(Typography)(({ theme }) => ({
-  fontFamily: 'IBM Plex Mono',
   fontStyle: 'normal',
   fontWeight: 400,
   fontSize: '14px',
@@ -126,7 +125,6 @@ const RemainingText = styled(Typography)(({ theme }) => ({
 }));
 
 const RemainingAmount = styled(Typography)(({ theme }) => ({
-  fontFamily: 'IBM Plex Mono',
   fontStyle: 'normal',
   fontWeight: 300,
   fontSize: '20px',
