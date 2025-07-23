@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - UX of withdrawal modal
 
+### Fixed
+
+- Bug with duplicated quote expiry notification
+
 ## [1.3.0] - 2025-07-19
 
 ### Added
