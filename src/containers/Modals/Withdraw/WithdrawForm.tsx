@@ -13,7 +13,7 @@ import {
   TextField,
   Avatar,
 } from '@mui/material';
-import { Address, formatUnits, getAddress, isAddress, parseUnits } from 'viem';
+import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useEnsAddress, useEnsAvatar, useEnsName } from 'wagmi';
 import { CoinIcon, ImageContainer, InputContainer, ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
@@ -288,10 +288,27 @@ export const WithdrawForm = () => {
       setTargetAddressHasError(false);
       return;
     }
-    try {
-      getAddress(value);
+
+    // Check if it's a valid address
+    if (isAddress(value)) {
       setTargetAddressHasError(false);
-    } catch {
+      return;
+    }
+
+    // Check if it's a valid ENS name format
+    const dotIndex = value.lastIndexOf('.');
+    const isValidEnsFormat = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
+
+    if (isValidEnsFormat) {
+      // If ENS is resolved or still loading, don't show error
+      if (ensAddress || isLoadingEnsAddress || ensName === value) {
+        setTargetAddressHasError(false);
+      } else {
+        // Only show error if ENS resolution failed
+        setTargetAddressHasError(!ensAddress && !isLoadingEnsAddress);
+      }
+    } else {
+      // Not a valid address or ENS format
       setTargetAddressHasError(true);
     }
   };
