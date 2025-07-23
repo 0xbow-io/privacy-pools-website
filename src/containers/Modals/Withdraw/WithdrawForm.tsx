@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
+import { Copy, Checkmark } from '@carbon/icons-react';
 import {
   Box,
   Button,
@@ -12,13 +13,15 @@ import {
   styled,
   TextField,
   Avatar,
+  Tooltip,
+  useTheme,
 } from '@mui/material';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useEnsAddress, useEnsAvatar, useEnsName } from 'wagmi';
 import { CoinIcon, ImageContainer, InputContainer, ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
-import { getUsdBalance, relayerClient } from '~/utils';
+import { getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -29,6 +32,7 @@ const minWithdrawCache = new Map<string, string>();
 export const WithdrawForm = () => {
   const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
+  const theme = useTheme();
 
   const {
     balanceBN: { symbol, decimals: balanceDecimals },
@@ -54,6 +58,40 @@ export const WithdrawForm = () => {
   // ENS-related state
   const [inputValue, setInputValue] = useState<string>(target);
   const [ensName, setEnsName] = useState<string | null>(null);
+
+  // Clipboard for copying resolved address
+  const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
+
+  // Handle copying resolved address
+  const handleCopyResolvedAddress = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    copyToClipboard(target);
+  };
+
+  // Resolved address display component
+  const ResolvedAddressDisplay = () => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <span>Resolved to: {truncateAddress(target)}</span>
+      <Tooltip title={`${target} (Click to copy)`}>
+        <Box
+          component='span'
+          onClick={handleCopyResolvedAddress}
+          sx={{
+            ml: 0.5,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+          }}
+        >
+          {copied ? (
+            <Checkmark size={12} color={theme.palette.text.disabled} />
+          ) : (
+            <Copy size={12} color={theme.palette.text.disabled} />
+          )}
+        </Box>
+      </Tooltip>
+    </Box>
+  );
 
   const balanceFormatted = formatUnits(poolAccount?.balance ?? BigInt(0), decimals);
   const balanceUSD = getUsdBalance(currentPrice, balanceFormatted, decimals);
@@ -99,7 +137,7 @@ export const WithdrawForm = () => {
       setTarget(ensAddress as Address);
       setTargetAddressHasError(false);
       setEnsName(inputValue);
-      addNotification('success', `ENS name resolved to ${ensAddress}`);
+      addNotification('success', `ENS name resolved to ${truncateAddress(ensAddress)}`);
     } else if (isEnsName && !isLoadingEnsAddress && !ensAddress && normalizedName) {
       if (ensError) {
         console.error('ENS Resolution Error:', ensError);
@@ -382,13 +420,15 @@ export const WithdrawForm = () => {
               onBlur={handleTargetAddressBlur}
               spellCheck={false}
               helperText={
-                targetAddressHasError
-                  ? 'Invalid address or ENS name'
-                  : ensName
-                    ? `Resolved to: ${target.slice(0, 6)}...${target.slice(-4)}`
-                    : reverseEnsName
-                      ? `ENS: ${reverseEnsName}`
-                      : ''
+                targetAddressHasError ? (
+                  'Invalid address or ENS name'
+                ) : ensName ? (
+                  <ResolvedAddressDisplay />
+                ) : reverseEnsName ? (
+                  `ENS: ${reverseEnsName}`
+                ) : (
+                  ''
+                )
               }
               data-testid='target-address-input'
               fullWidth
