@@ -248,6 +248,7 @@ const FeeValue = styled(Typography, {
   fontSize: '14px',
   fontWeight: 600,
   color: positive ? theme.palette.success.main : negative ? '#4caf50' : theme.palette.text.primary,
+  textAlign: 'right',
   cursor: 'help',
   '&:hover': {
     opacity: 0.8,
