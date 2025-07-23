@@ -203,7 +203,7 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
                 placement='top'
               >
                 <FeeValue negative>
-                  -0.001 {symbol} (~${extraGasUSD})
+                  {extraGasETHFormatted} ETH (~${extraGasUSD})
                 </FeeValue>
               </Tooltip>
             </FeeRow>
