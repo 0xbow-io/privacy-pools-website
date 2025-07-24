@@ -4,7 +4,9 @@ import { getEnv } from '~/config/env';
 import daiIcon from '~/assets/icons/dai.svg';
 import mainnetIcon from '~/assets/icons/mainnet_color.svg';
 import susdsIcon from '~/assets/icons/susds.svg';
+import usdcIcon from '~/assets/icons/usdc.svg';
 import usdsIcon from '~/assets/icons/usds.svg';
+import usdtIcon from '~/assets/icons/usdt.svg';
 
 const { ALCHEMY_KEY, IS_TESTNET, ASP_ENDPOINT } = getEnv();
 
@@ -111,6 +113,32 @@ const mainnetChainData: ChainData = {
         asset: 'DAI',
         assetDecimals: 18,
         icon: daiIcon.src,
+        isStableAsset: true,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xe859C0bD25f260BaEE534Fb52e307D3b64D24572',
+        assetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+        scope: 15021418340692283880916004685565940332387258944710606800522765380598358159605n,
+        deploymentBlock: 22988421n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 6),
+        asset: 'USDT',
+        assetDecimals: 6,
+        icon: usdtIcon.src,
+        isStableAsset: true,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xb419c2867aB3CBc78921660cB95150d95A94ce86',
+        assetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+        scope: 16452108168275993030962142353354044100680963945240756716593099151407051066232n,
+        deploymentBlock: 22988431n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 6),
+        asset: 'USDC',
+        assetDecimals: 6,
+        icon: usdcIcon.src,
         isStableAsset: true,
       },
     ],
