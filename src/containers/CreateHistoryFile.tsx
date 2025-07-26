@@ -1,13 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, FormControlLabel, Link, Stack, styled, Typography } from '@mui/material';
+import { Button, Checkbox, FormControlLabel, Link, Stack, styled, Typography, TextField } from '@mui/material';
 import { BackButton } from '~/components';
 import { getConstants } from '~/config/constants';
 import { SeedPhraseForm } from '~/containers';
-import { useModal, usePoolAccountsContext, useAuthContext, useGoTo, useAccountContext, useChainContext } from '~/hooks';
+import {
+  useModal,
+  usePoolAccountsContext,
+  useAuthContext,
+  useGoTo,
+  useAccountContext,
+  useChainContext,
+  useEncryptedSeedContext,
+} from '~/hooks';
 import { EventType, ModalType } from '~/types';
 import { generateSeedPhrase, ROUTER } from '~/utils';
+import { encryptSeedPhrase } from '~/utils/seedPhrase';
 
 const { TOC_URL } = getConstants();
 
@@ -18,18 +27,29 @@ export const CreateHistoryFile = () => {
   const { maxDeposit } = useChainContext();
   const { login } = useAuthContext();
   const { setModalOpen } = useModal();
+  const { setEncryptedSeed } = useEncryptedSeedContext();
   const [seedPhrase, setSeedPhrase] = useState('');
+  const [encryptedBlob, setEncryptedBlob] = useState('');
 
   const [isHistoryFileCreated, setIsHistoryFileCreated] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isBlobConfirmed, setIsBlobConfirmed] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [password, setPassword] = useState('');
+  const [isPasswordSet, setIsPasswordSet] = useState(false);
 
   const isDepositDisabled = !BigInt(maxDeposit);
 
   const handleCreateHistoryFile = () => {
-    if (!isConfirmed || !isVerified) return;
+    if (!isConfirmed || !isBlobConfirmed || !isVerified) return;
 
     createAccount(seedPhrase);
+
+    // Save the encrypted seed to context for future use
+    if (encryptedBlob) {
+      setEncryptedSeed(encryptedBlob);
+    }
+
     setIsHistoryFileCreated(true);
   };
 
@@ -53,6 +73,20 @@ export const CreateHistoryFile = () => {
 
   const handleVerificationComplete = (verified: boolean) => {
     setIsVerified(verified);
+    // Don't generate encrypted blob immediately - wait for password
+  };
+
+  const handlePasswordSubmit = () => {
+    if (!password.trim() || !seedPhrase) return;
+
+    try {
+      const encrypted = encryptSeedPhrase(seedPhrase, password);
+      setEncryptedBlob(encrypted);
+      setIsPasswordSet(true);
+    } catch (error) {
+      console.error('Failed to encrypt seed phrase:', error);
+      // Could add error state here if needed
+    }
   };
 
   useEffect(() => {
@@ -108,12 +142,76 @@ export const CreateHistoryFile = () => {
           onVerificationComplete={handleVerificationComplete}
         />
 
-        {isVerified && (
+        {isVerified && !isPasswordSet && (
+          <Stack gap={2} width='100%' alignItems='center' maxWidth='400px'>
+            <Typography variant='h6' textAlign='center'>
+              Set Encryption Password
+            </Typography>
+            <Typography variant='body2' textAlign='center' color='text.secondary'>
+              Choose a strong password to encrypt your seed phrase. You&aposll need this password to log in later.
+            </Typography>
+            <TextField
+              label='Encryption Password'
+              type='password'
+              variant='outlined'
+              fullWidth
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && password.trim()) {
+                  handlePasswordSubmit();
+                }
+              }}
+              placeholder='Enter a strong password...'
+              slotProps={{
+                htmlInput: {
+                  autoComplete: 'new-password',
+                  autoCorrect: 'off',
+                  autoCapitalize: 'off',
+                  spellCheck: false,
+                },
+              }}
+            />
+            <Button onClick={handlePasswordSubmit} disabled={!password.trim()} variant='contained' fullWidth>
+              Generate Encrypted Blob
+            </Button>
+          </Stack>
+        )}
+
+        {isVerified && isPasswordSet && (
           <>
+            <TextField
+              label='Encrypted Blob'
+              variant='outlined'
+              fullWidth
+              multiline
+              rows={4}
+              value={encryptedBlob}
+              slotProps={{
+                htmlInput: {
+                  readOnly: true,
+                  style: { fontFamily: 'monospace', fontSize: '0.875rem' },
+                },
+              }}
+              sx={{
+                mb: 2,
+                '& .MuiInputBase-input': {
+                  cursor: 'text',
+                  userSelect: 'all',
+                },
+              }}
+              helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
+            />
             <SFormControlLabel
               control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
               label="I've saved my Recovery Phrase"
               data-testid='save-recovery-phrase'
+              sx={{ fontSize: '1rem' }}
+            />
+            <SFormControlLabel
+              control={<Checkbox checked={isBlobConfirmed} onChange={() => setIsBlobConfirmed(!isBlobConfirmed)} />}
+              label="I've saved my encrypted blob"
+              data-testid='save-encrypted-blob'
               sx={{ fontSize: '1rem' }}
             />
             <Typography variant='caption' textAlign='center' maxWidth='32rem'>
@@ -127,8 +225,13 @@ export const CreateHistoryFile = () => {
         )}
       </Stack>
 
-      {isVerified && (
-        <Button onClick={handleCreateHistoryFile} disabled={!isConfirmed} data-testid='create-account-button' fullWidth>
+      {isVerified && isPasswordSet && (
+        <Button
+          onClick={handleCreateHistoryFile}
+          disabled={!isConfirmed || !isBlobConfirmed}
+          data-testid='create-account-button'
+          fullWidth
+        >
           Create
         </Button>
       )}
