@@ -246,7 +246,7 @@ export const CreateHistoryFile = () => {
             variant='contained'
             fullWidth
           >
-            Generate Encrypted Blob
+            Generate Login Blob
           </Button>
         </Stack>
       </CreateHistoryFileContainer>
@@ -259,16 +259,16 @@ export const CreateHistoryFile = () => {
       <BackButton back={() => setStep('password')} />
       <Stack gap={2} maxWidth='32rem'>
         <Typography variant='h5' fontWeight='bold' align='center'>
-          Save Your Encrypted Blob
+          Save Your Login Blob
         </Typography>
         <Typography variant='body1' align='center'>
-          Copy and save this encrypted blob safely. You&apos;ll need it to log in later.
+          Copy and save this login blob safely. You&apos;ll need it to log in later.
         </Typography>
       </Stack>
 
       <Box sx={{ width: '100%', maxWidth: '500px' }}>
         <TextField
-          label='Encrypted Blob'
+          label='Login Blob'
           variant='outlined'
           fullWidth
           multiline
@@ -292,11 +292,11 @@ export const CreateHistoryFile = () => {
               userSelect: 'all',
             },
           }}
-          helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
+          helperText="Copy this login blob and store it safely. You'll need it to log in later. If you lose it or forget your password, you'll need your seed phrase to access your account."
         />
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Button variant='outlined' onClick={() => copyToClipboard(encryptedBlob)} sx={{ textTransform: 'none' }}>
-            Copy Encrypted Blob
+            Copy Login Blob
           </Button>
         </Box>
       </Box>
@@ -304,13 +304,13 @@ export const CreateHistoryFile = () => {
       <Stack gap={1} width='100%' alignItems='center' maxWidth='400px'>
         <SFormControlLabel
           control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
-          label="I've saved my Recovery Phrase"
+          label="I've backup saved my Recovery Phrase somewhere offline and secure"
           data-testid='save-recovery-phrase'
           sx={{ fontSize: '1rem' }}
         />
         <SFormControlLabel
           control={<Checkbox checked={isBlobConfirmed} onChange={() => setIsBlobConfirmed(!isBlobConfirmed)} />}
-          label="I've saved my encrypted blob"
+          label="I've saved my Login Blob safely"
           data-testid='save-encrypted-blob'
           sx={{ fontSize: '1rem' }}
         />

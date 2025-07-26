@@ -101,7 +101,7 @@ export const LoadHistoryFile = () => {
     navigator.clipboard
       .writeText(encryptedBlob)
       .then(() => {
-        addNotification('success', 'Encrypted blob copied to clipboard!');
+        addNotification('success', 'Login blob copied to clipboard!');
       })
       .catch(() => {
         addNotification('error', 'Failed to copy to clipboard');
@@ -239,7 +239,7 @@ export const LoadHistoryFile = () => {
           variant='contained'
           fullWidth
         >
-          Generate Encrypted Blob
+          Generate Login Blob
         </Button>
       </LoadHistoryFileContainer>
     );
@@ -252,16 +252,16 @@ export const LoadHistoryFile = () => {
 
       <Stack gap={2} maxWidth='32rem'>
         <Typography variant='h5' fontWeight='bold' align='center'>
-          Save Your Encrypted Blob
+          Save Your Login Blob
         </Typography>
         <Typography variant='body1' align='center'>
-          Copy and save this encrypted blob safely. You can use it to log in faster next time.
+          Copy and save this login blob safely. You can use it to log in faster next time.
         </Typography>
       </Stack>
 
       <Box sx={{ width: '100%', maxWidth: '500px' }}>
         <TextField
-          label='Encrypted Blob'
+          label='Login Blob'
           variant='outlined'
           fullWidth
           multiline
@@ -289,7 +289,7 @@ export const LoadHistoryFile = () => {
               fontSize: '0.75rem',
             },
           }}
-          helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
+          helperText="Copy this login blob and store it safely. You'll need it to log in later. If you lose it or forget your password, you'll need your seed phrase to access your account."
         />
 
         <Button onClick={copyToClipboard} variant='outlined' fullWidth sx={{ mb: 2 }}>

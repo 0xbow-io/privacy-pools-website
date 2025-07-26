@@ -43,7 +43,7 @@ export const Welcome = () => {
 
           <Typography variant='body1' align='center'>
             If you already have one: <br />
-            <b>Load your Account.</b>
+            <b>Load your Account,</b> either from a <b>Login Blob (recommended)</b> or a <b> raw Seed Phrase</b>.
           </Typography>
         </Stack>
       </Stack>
@@ -52,7 +52,7 @@ export const Welcome = () => {
           Create Account
         </SButton>
         <SButton onClick={handleLogin} data-testid='import-account'>
-          Load Account from Blob
+          Load Account from Login Blob
         </SButton>
         <SButton onClick={handleImport} data-testid='import-account'>
           Load Account from Seed
