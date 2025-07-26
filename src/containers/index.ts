@@ -6,6 +6,7 @@ export * from './ActionMenu';
 export * from './Welcome';
 export * from './CreateHistoryFile';
 export * from './LoadHistoryFile';
+export * from './AccountLogin';
 export * from './PoolAccountsFull';
 export * from './PoolAccountsPreview';
 export * from './Modals';

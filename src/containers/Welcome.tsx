@@ -16,6 +16,10 @@ export const Welcome = () => {
     goTo(ROUTER.account.children.load);
   };
 
+  const handleLogin = () => {
+    goTo(ROUTER.account.children.login);
+  };
+
   const back = () => {
     goTo(ROUTER.home.base);
   };
@@ -47,8 +51,11 @@ export const Welcome = () => {
         <Button onClick={handleCreate} data-testid='create-account'>
           Create Account
         </Button>
+        <Button onClick={handleLogin} data-testid='import-account'>
+          Load Account from Blob
+        </Button>
         <Button onClick={handleImport} data-testid='import-account'>
-          Load Account
+          Load Account from Seed
         </Button>
       </Stack>
     </WelcomeContainer>

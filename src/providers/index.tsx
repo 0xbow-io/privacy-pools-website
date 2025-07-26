@@ -4,6 +4,7 @@ import { AccountProvider } from './AccountProvider';
 import { AuthProvider } from './AuthProvider';
 import { ChainProvider } from './ChainProvider';
 import { CircuitProvider } from './CircuitProvider';
+import { EncryptedSeedProvider } from './EncryptedSeedProvider';
 import { ModalProvider } from './ModalProvider';
 import { NotificationProvider } from './NotificationProvider';
 import { PoolAccountsProvider } from './PoolAccountsProvider';
@@ -18,21 +19,23 @@ export const Providers = ({ children }: Props) => {
   return (
     <ThemeProvider>
       <NotificationProvider>
-        <CircuitProvider>
-          <WalletProvider>
-            <ChainProvider>
-              <PoolAccountsProvider>
-                <AccountProvider>
-                  <AuthProvider>
-                    <QuoteProvider>
-                      <ModalProvider>{children}</ModalProvider>
-                    </QuoteProvider>
-                  </AuthProvider>
-                </AccountProvider>
-              </PoolAccountsProvider>
-            </ChainProvider>
-          </WalletProvider>
-        </CircuitProvider>
+        <EncryptedSeedProvider>
+          <CircuitProvider>
+            <WalletProvider>
+              <ChainProvider>
+                <PoolAccountsProvider>
+                  <AccountProvider>
+                    <AuthProvider>
+                      <QuoteProvider>
+                        <ModalProvider>{children}</ModalProvider>
+                      </QuoteProvider>
+                    </AuthProvider>
+                  </AccountProvider>
+                </PoolAccountsProvider>
+              </ChainProvider>
+            </WalletProvider>
+          </CircuitProvider>
+        </EncryptedSeedProvider>
       </NotificationProvider>
     </ThemeProvider>
   );

@@ -36,7 +36,7 @@ export const encryptSeedPhrase = (seedPhrase: string, password: string) => {
     throw new Error('Seed phrase and password are required for encryption');
   }
 
-  return encryptpwd(seedPhrase, password);
+  return encryptpwd.encrypt(seedPhrase, password);
 };
 
 export const decryptSeedPhrase = (encryptedSeedPhrase: string, password: string) => {

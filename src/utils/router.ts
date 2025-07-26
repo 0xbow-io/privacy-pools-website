@@ -7,6 +7,7 @@ export const ROUTER = {
     children: {
       load: '/account/load',
       create: '/account/create',
+      login: '/account/login',
     },
   },
   poolAccounts: {
