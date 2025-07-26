@@ -48,15 +48,15 @@ export const Welcome = () => {
         </Stack>
       </Stack>
       <Stack gap={2} flexDirection={['column', 'row']}>
-        <Button onClick={handleCreate} data-testid='create-account'>
+        <SButton onClick={handleCreate} data-testid='create-account'>
           Create Account
-        </Button>
-        <Button onClick={handleLogin} data-testid='import-account'>
+        </SButton>
+        <SButton onClick={handleLogin} data-testid='import-account'>
           Load Account from Blob
-        </Button>
-        <Button onClick={handleImport} data-testid='import-account'>
+        </SButton>
+        <SButton onClick={handleImport} data-testid='import-account'>
           Load Account from Seed
-        </Button>
+        </SButton>
       </Stack>
     </WelcomeContainer>
   );
@@ -76,4 +76,13 @@ const WelcomeContainer = styled(Stack)(({ theme }) => ({
     marginTop: '6rem',
     maxWidth: '32rem',
   },
+}));
+
+const SButton = styled(Button)(() => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textAlign: 'center',
+  minHeight: '48px',
+  padding: '12px 24px',
 }));
