@@ -52,7 +52,7 @@ export const AccountLogin = () => {
     } catch (err) {
       console.error('Login failed:', err);
       if (err instanceof Error && err.message.includes('Invalid recovery phrase')) {
-        setError('Invalid password or corrupted login blob. Please check your credentials.');
+        setError('Invalid password or corrupted login key. Please check your credentials.');
       } else {
         setError('Failed to load account. Please try again.');
         addNotification('error', 'Failed to load account. Please try again.');
@@ -68,7 +68,7 @@ export const AccountLogin = () => {
         Sign In to Privacy Pools
       </Typography>
       <Typography variant='body1' color='text.secondary' sx={{ mb: 3 }}>
-        Enter your encrypted seed and password to access your privacy pool account.
+        Enter your login key and password to access your privacy pool account.
       </Typography>
 
       {error && (
@@ -79,14 +79,14 @@ export const AccountLogin = () => {
 
       <SForm onSubmit={handleSubmit}>
         <TextField
-          label='Login Blob (Encrypted Seed)'
+          label='Login Key'
           variant='outlined'
           fullWidth
           multiline
           rows={4}
           value={loginBlob}
           onChange={(e) => setLoginBlob(e.target.value)}
-          placeholder='Enter your encrypted seed data...'
+          placeholder='Enter your login key data...'
           sx={{ mb: 2 }}
           disabled={isLoading}
         />

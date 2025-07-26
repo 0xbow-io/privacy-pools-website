@@ -246,7 +246,7 @@ export const CreateHistoryFile = () => {
             variant='contained'
             fullWidth
           >
-            Generate Login Blob
+            Generate Login Key
           </Button>
         </Stack>
       </CreateHistoryFileContainer>
@@ -259,16 +259,16 @@ export const CreateHistoryFile = () => {
       <BackButton back={() => setStep('password')} />
       <Stack gap={2} maxWidth='32rem'>
         <Typography variant='h5' fontWeight='bold' align='center'>
-          Save Your Login Blob
+          Save Your Login Key
         </Typography>
         <Typography variant='body1' align='center'>
-          Copy and save this login blob safely. You&apos;ll need it to log in later.
+          Copy and save this login key safely. You&apos;ll need it to log in later.
         </Typography>
       </Stack>
 
       <Box sx={{ width: '100%', maxWidth: '500px' }}>
         <TextField
-          label='Login Blob'
+          label='Login Key'
           variant='outlined'
           fullWidth
           multiline
@@ -292,11 +292,11 @@ export const CreateHistoryFile = () => {
               userSelect: 'all',
             },
           }}
-          helperText="Copy this login blob and store it safely. You'll need it to log in later. If you lose it or forget your password, you'll need your seed phrase to access your account."
+          helperText="Copy this login key and store it safely. You'll need it to log in later. If you lose it or forget your password, you'll need your seed phrase to access your account."
         />
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Button variant='outlined' onClick={() => copyToClipboard(encryptedBlob)} sx={{ textTransform: 'none' }}>
-            Copy Login Blob
+            Copy Login Key
           </Button>
         </Box>
       </Box>
@@ -310,7 +310,7 @@ export const CreateHistoryFile = () => {
         />
         <SFormControlLabel
           control={<Checkbox checked={isBlobConfirmed} onChange={() => setIsBlobConfirmed(!isBlobConfirmed)} />}
-          label="I've saved my Login Blob safely"
+          label="I've saved my Login Key safely"
           data-testid='save-encrypted-blob'
           sx={{ fontSize: '1rem' }}
         />
