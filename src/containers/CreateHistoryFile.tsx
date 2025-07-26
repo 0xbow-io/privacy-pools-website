@@ -33,12 +33,14 @@ export const CreateHistoryFile = () => {
   const [seedPhrase, setSeedPhrase] = useState('');
   const [encryptedBlob, setEncryptedBlob] = useState('');
 
+  // Multi-step flow state
+  const [step, setStep] = useState<'seedphrase' | 'password' | 'encrypted'>('seedphrase');
+
   const [isHistoryFileCreated, setIsHistoryFileCreated] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isBlobConfirmed, setIsBlobConfirmed] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [password, setPassword] = useState('');
-  const [isPasswordSet, setIsPasswordSet] = useState(false);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -84,7 +86,9 @@ export const CreateHistoryFile = () => {
 
   const handleVerificationComplete = (verified: boolean) => {
     setIsVerified(verified);
-    // Don't generate encrypted blob immediately - wait for password
+    if (verified) {
+      setStep('password');
+    }
   };
 
   const handlePasswordSubmit = () => {
@@ -93,7 +97,7 @@ export const CreateHistoryFile = () => {
     try {
       const encrypted = encryptSeedPhrase(seedPhrase, password);
       setEncryptedBlob(encrypted);
-      setIsPasswordSet(true);
+      setStep('encrypted');
     } catch (error) {
       console.error('Failed to encrypt seed phrase:', error);
       // Could add error state here if needed
@@ -132,130 +136,156 @@ export const CreateHistoryFile = () => {
     );
   }
 
+  // Step 1: Seed phrase verification
+  if (step === 'seedphrase') {
+    return (
+      <CreateHistoryFileContainer>
+        <BackButton back={back} />
+        <Stack gap={2} maxWidth='32rem'>
+          <Typography variant='h5' fontWeight='bold' align='center'>
+            Create an Account
+          </Typography>
+          <Typography variant='body1' align='center'>
+            This phrase is the ONLY way to recover your account.
+          </Typography>
+        </Stack>
+
+        <Stack gap={2} width='100%' alignItems='center'>
+          <SeedPhraseForm
+            type='create'
+            seedPhrase={seedPhrase}
+            setSeedPhrase={setSeedPhrase}
+            onEnterKey={handleEnterKey}
+            onVerificationComplete={handleVerificationComplete}
+          />
+        </Stack>
+      </CreateHistoryFileContainer>
+    );
+  }
+
+  // Step 2: Password setting
+  if (step === 'password') {
+    return (
+      <CreateHistoryFileContainer>
+        <BackButton back={() => setStep('seedphrase')} />
+        <Stack gap={2} maxWidth='32rem'>
+          <Typography variant='h5' fontWeight='bold' align='center'>
+            Set Encryption Password
+          </Typography>
+          <Typography variant='body1' align='center'>
+            Choose a strong password to encrypt your seed phrase. You&apos;ll need this password to log in later.
+          </Typography>
+        </Stack>
+
+        <Stack gap={2} width='100%' alignItems='center' maxWidth='400px'>
+          <TextField
+            label='Encryption Password'
+            type='password'
+            variant='outlined'
+            fullWidth
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && password.trim()) {
+                handlePasswordSubmit();
+              }
+            }}
+            placeholder='Enter a strong password...'
+            slotProps={{
+              htmlInput: {
+                autoComplete: 'new-password',
+                autoCorrect: 'off',
+                autoCapitalize: 'off',
+                spellCheck: false,
+              },
+            }}
+          />
+          <Button onClick={handlePasswordSubmit} disabled={!password.trim()} variant='contained' fullWidth>
+            Generate Encrypted Blob
+          </Button>
+        </Stack>
+      </CreateHistoryFileContainer>
+    );
+  }
+
+  // Step 3: Show encrypted blob and complete creation
   return (
     <CreateHistoryFileContainer>
-      <BackButton back={back} />
+      <BackButton back={() => setStep('password')} />
       <Stack gap={2} maxWidth='32rem'>
         <Typography variant='h5' fontWeight='bold' align='center'>
-          Create an Account
+          Save Your Encrypted Blob
         </Typography>
         <Typography variant='body1' align='center'>
-          This phrase is the ONLY way to recover your account.
+          Copy and save this encrypted blob safely. You&apos;ll need it to log in later.
         </Typography>
       </Stack>
 
-      <Stack gap={2} width='100%' alignItems='center'>
-        <SeedPhraseForm
-          type='create'
-          seedPhrase={seedPhrase}
-          setSeedPhrase={setSeedPhrase}
-          onEnterKey={handleEnterKey}
-          onVerificationComplete={handleVerificationComplete}
+      <Box sx={{ width: '100%', maxWidth: '500px' }}>
+        <TextField
+          label='Encrypted Blob'
+          variant='outlined'
+          fullWidth
+          multiline
+          minRows={6}
+          maxRows={8}
+          value={encryptedBlob}
+          slotProps={{
+            htmlInput: {
+              readOnly: true,
+              style: {
+                fontFamily: 'monospace',
+                fontSize: '0.75rem',
+                wordBreak: 'break-all',
+              },
+            },
+          }}
+          sx={{
+            mb: 1,
+            '& .MuiInputBase-input': {
+              cursor: 'text',
+              userSelect: 'all',
+            },
+          }}
+          helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
         />
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <Button variant='outlined' onClick={() => copyToClipboard(encryptedBlob)} sx={{ textTransform: 'none' }}>
+            Copy Encrypted Blob
+          </Button>
+        </Box>
+      </Box>
 
-        {isVerified && !isPasswordSet && (
-          <Stack gap={2} width='100%' alignItems='center' maxWidth='400px'>
-            <Typography variant='h6' textAlign='center'>
-              Set Encryption Password
-            </Typography>
-            <Typography variant='body2' textAlign='center' color='text.secondary'>
-              Choose a strong password to encrypt your seed phrase. You&aposll need this password to log in later.
-            </Typography>
-            <TextField
-              label='Encryption Password'
-              type='password'
-              variant='outlined'
-              fullWidth
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && password.trim()) {
-                  handlePasswordSubmit();
-                }
-              }}
-              placeholder='Enter a strong password...'
-              slotProps={{
-                htmlInput: {
-                  autoComplete: 'new-password',
-                  autoCorrect: 'off',
-                  autoCapitalize: 'off',
-                  spellCheck: false,
-                },
-              }}
-            />
-            <Button onClick={handlePasswordSubmit} disabled={!password.trim()} variant='contained' fullWidth>
-              Generate Encrypted Blob
-            </Button>
-          </Stack>
-        )}
-
-        {isVerified && isPasswordSet && (
-          <>
-            <TextField
-              label='Encrypted Blob'
-              variant='outlined'
-              fullWidth
-              multiline
-              minRows={6}
-              maxRows={8}
-              value={encryptedBlob}
-              slotProps={{
-                htmlInput: {
-                  readOnly: true,
-                  style: {
-                    fontFamily: 'monospace',
-                    fontSize: '0.75rem',
-                    wordBreak: 'break-all',
-                  },
-                },
-              }}
-              sx={{
-                mb: 1,
-                '& .MuiInputBase-input': {
-                  cursor: 'text',
-                  userSelect: 'all',
-                },
-              }}
-              helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
-            />
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-              <Button variant='outlined' onClick={() => copyToClipboard(encryptedBlob)} sx={{ textTransform: 'none' }}>
-                Copy Encrypted Blob
-              </Button>
-            </Box>
-            <SFormControlLabel
-              control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
-              label="I've saved my Recovery Phrase"
-              data-testid='save-recovery-phrase'
-              sx={{ fontSize: '1rem' }}
-            />
-            <SFormControlLabel
-              control={<Checkbox checked={isBlobConfirmed} onChange={() => setIsBlobConfirmed(!isBlobConfirmed)} />}
-              label="I've saved my encrypted blob"
-              data-testid='save-encrypted-blob'
-              sx={{ fontSize: '1rem' }}
-            />
-            <Typography variant='caption' textAlign='center' maxWidth='32rem'>
-              By creating an account, you agree to our{' '}
-              <Link href={TOC_URL} target='_blank'>
-                Privacy Policy & Terms of Use
-              </Link>
-              .
-            </Typography>
-          </>
-        )}
+      <Stack gap={1} width='100%' alignItems='center' maxWidth='400px'>
+        <SFormControlLabel
+          control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
+          label="I've saved my Recovery Phrase"
+          data-testid='save-recovery-phrase'
+          sx={{ fontSize: '1rem' }}
+        />
+        <SFormControlLabel
+          control={<Checkbox checked={isBlobConfirmed} onChange={() => setIsBlobConfirmed(!isBlobConfirmed)} />}
+          label="I've saved my encrypted blob"
+          data-testid='save-encrypted-blob'
+          sx={{ fontSize: '1rem' }}
+        />
+        <Typography variant='caption' textAlign='center' maxWidth='32rem'>
+          By creating an account, you agree to our{' '}
+          <Link href={TOC_URL} target='_blank'>
+            Privacy Policy & Terms of Use
+          </Link>
+          .
+        </Typography>
       </Stack>
 
-      {isVerified && isPasswordSet && (
-        <Button
-          onClick={handleCreateHistoryFile}
-          disabled={!isConfirmed || !isBlobConfirmed}
-          data-testid='create-account-button'
-          fullWidth
-        >
-          Create
-        </Button>
-      )}
+      <Button
+        onClick={handleCreateHistoryFile}
+        disabled={!isConfirmed || !isBlobConfirmed}
+        data-testid='create-account-button'
+        fullWidth
+      >
+        Create
+      </Button>
     </CreateHistoryFileContainer>
   );
 };
