@@ -19,3 +19,4 @@ export * from './context/usePoolAccountsContext';
 export * from './context/useAccountContext';
 export * from './context/useAuthContext';
 export * from './context/useNotificationsContext';
+export * from './context/useEncryptedSeedContext';
