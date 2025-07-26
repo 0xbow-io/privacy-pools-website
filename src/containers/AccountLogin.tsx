@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { Box, Typography, TextField, Button, styled } from '@mui/material';
-import { useEncryptedSeedContext, useAccountContext } from '~/hooks';
+import { useEncryptedSeedContext, useAccountContext, useGoTo, useAuthContext, useNotifications } from '~/hooks';
+import { ROUTER } from '~/utils';
 import { decryptSeedPhrase } from '~/utils/seedPhrase';
 
 export const AccountLogin = () => {
   const { encryptedSeed, setEncryptedSeed } = useEncryptedSeedContext();
-  const { setSeed } = useAccountContext();
+  const { setSeed, loadAccount } = useAccountContext();
+  const { login } = useAuthContext();
+  const { addNotification } = useNotifications();
+  const goTo = useGoTo();
   const [loginBlob, setLoginBlob] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,17 +33,30 @@ export const AccountLogin = () => {
       // Attempt to decrypt the seed phrase
       const seedPhrase: string = await decryptSeedPhrase(loginBlob, password);
 
-      // If decryption succeeds, set the seed in account context
+      // Set the seed in account context
       setSeed(seedPhrase);
 
       // Save the encrypted seed for future use
       setEncryptedSeed(loginBlob);
 
-      console.log('Login successful - seed phrase decrypted and set');
-      // TODO: route
+      // Load the account (similar to LoadHistoryFile)
+      await loadAccount(seedPhrase);
+
+      // Login with the seed phrase
+      login(seedPhrase);
+
+      console.log('Login successful - seed phrase decrypted and account loaded');
+
+      // Navigate to base/home page
+      goTo(ROUTER.home.base);
     } catch (err) {
-      console.error('Decryption failed:', err);
-      setError('Invalid password or corrupted login blob. Please check your credentials.');
+      console.error('Login failed:', err);
+      if (err instanceof Error && err.message.includes('Invalid recovery phrase')) {
+        setError('Invalid password or corrupted login blob. Please check your credentials.');
+      } else {
+        setError('Failed to load account. Please try again.');
+        addNotification('error', 'Failed to load account. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
