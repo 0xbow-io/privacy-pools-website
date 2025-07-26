@@ -39,12 +39,12 @@ export const encryptSeedPhrase = (seedPhrase: string, password: string) => {
   return encryptpwd.encrypt(seedPhrase, password);
 };
 
-export const decryptSeedPhrase = (encryptedSeedPhrase: string, password: string) => {
+export const decryptSeedPhrase = async (encryptedSeedPhrase: string, password: string) => {
   if (!encryptedSeedPhrase || !password) {
     throw new Error('Encrypted seed phrase and password are required for decryption');
   }
 
-  const decryptedSeedPhrase = encryptpwd.decrypt(encryptedSeedPhrase, password);
+  const decryptedSeedPhrase = await encryptpwd.decrypt(encryptedSeedPhrase, password);
   verifyAndSanitizeSeedPhrase(decryptedSeedPhrase);
   return decryptedSeedPhrase;
 };
