@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Button, Stack, styled, Typography, TextField } from '@mui/material';
+import { Button, Stack, styled, Typography, TextField, Box } from '@mui/material';
 import { BackButton } from '~/components';
 import { SeedPhraseForm } from '~/containers/SeedPhraseForm';
 import { useAuthContext, useGoTo, useAccountContext, useNotifications, useEncryptedSeedContext } from '~/hooks';
@@ -85,6 +85,17 @@ export const LoadHistoryFile = () => {
         setIsLoading(false);
       });
   }, [sanitizedSeedPhrase, encryptedBlob, loadAccount, login, setSeed, setEncryptedSeed, addNotification, goTo]);
+
+  const copyToClipboard = useCallback(() => {
+    navigator.clipboard
+      .writeText(encryptedBlob)
+      .then(() => {
+        addNotification('success', 'Encrypted blob copied to clipboard!');
+      })
+      .catch(() => {
+        addNotification('error', 'Failed to copy to clipboard');
+      });
+  }, [encryptedBlob, addNotification]);
 
   const back = () => {
     goTo(ROUTER.account.base);
@@ -205,29 +216,43 @@ export const LoadHistoryFile = () => {
         </Typography>
       </Stack>
 
-      <TextField
-        label='Encrypted Blob'
-        variant='outlined'
-        fullWidth
-        multiline
-        rows={4}
-        value={encryptedBlob}
-        slotProps={{
-          htmlInput: {
-            readOnly: true,
-            style: { fontFamily: 'monospace', fontSize: '0.875rem' },
-          },
-        }}
-        sx={{
-          mb: 2,
-          maxWidth: '500px',
-          '& .MuiInputBase-input': {
-            cursor: 'text',
-            userSelect: 'all',
-          },
-        }}
-        helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
-      />
+      <Box sx={{ width: '100%', maxWidth: '500px' }}>
+        <TextField
+          label='Encrypted Blob'
+          variant='outlined'
+          fullWidth
+          multiline
+          minRows={6}
+          maxRows={8}
+          value={encryptedBlob}
+          slotProps={{
+            htmlInput: {
+              readOnly: true,
+              style: {
+                fontFamily: 'monospace',
+                fontSize: '0.75rem',
+                lineHeight: '1.2',
+                wordBreak: 'break-all',
+              },
+            },
+          }}
+          sx={{
+            mb: 2,
+            '& .MuiInputBase-input': {
+              cursor: 'text',
+              userSelect: 'all',
+            },
+            '& .MuiInputBase-root': {
+              fontSize: '0.75rem',
+            },
+          }}
+          helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
+        />
+
+        <Button onClick={copyToClipboard} variant='outlined' fullWidth sx={{ mb: 2 }}>
+          Copy to Clipboard
+        </Button>
+      </Box>
 
       <Button onClick={handleFinalSubmit} variant='contained' fullWidth data-testid='complete-load-button'>
         Complete Setup

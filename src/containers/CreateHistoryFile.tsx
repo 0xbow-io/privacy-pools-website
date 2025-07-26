@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, FormControlLabel, Link, Stack, styled, Typography, TextField } from '@mui/material';
+import { Button, Checkbox, FormControlLabel, Link, Stack, styled, Typography, TextField, Box } from '@mui/material';
 import { BackButton } from '~/components';
 import { getConstants } from '~/config/constants';
 import { SeedPhraseForm } from '~/containers';
@@ -13,6 +13,7 @@ import {
   useAccountContext,
   useChainContext,
   useEncryptedSeedContext,
+  useNotifications,
 } from '~/hooks';
 import { EventType, ModalType } from '~/types';
 import { generateSeedPhrase, ROUTER } from '~/utils';
@@ -28,6 +29,7 @@ export const CreateHistoryFile = () => {
   const { login } = useAuthContext();
   const { setModalOpen } = useModal();
   const { setEncryptedSeed } = useEncryptedSeedContext();
+  const { addNotification } = useNotifications();
   const [seedPhrase, setSeedPhrase] = useState('');
   const [encryptedBlob, setEncryptedBlob] = useState('');
 
@@ -37,6 +39,15 @@ export const CreateHistoryFile = () => {
   const [isVerified, setIsVerified] = useState(false);
   const [password, setPassword] = useState('');
   const [isPasswordSet, setIsPasswordSet] = useState(false);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      addNotification('success', 'Copied to clipboard!');
+    } catch {
+      addNotification('error', 'Failed to copy to clipboard');
+    }
+  };
 
   const isDepositDisabled = !BigInt(maxDeposit);
 
@@ -185,16 +196,21 @@ export const CreateHistoryFile = () => {
               variant='outlined'
               fullWidth
               multiline
-              rows={4}
+              minRows={6}
+              maxRows={8}
               value={encryptedBlob}
               slotProps={{
                 htmlInput: {
                   readOnly: true,
-                  style: { fontFamily: 'monospace', fontSize: '0.875rem' },
+                  style: {
+                    fontFamily: 'monospace',
+                    fontSize: '0.75rem',
+                    wordBreak: 'break-all',
+                  },
                 },
               }}
               sx={{
-                mb: 2,
+                mb: 1,
                 '& .MuiInputBase-input': {
                   cursor: 'text',
                   userSelect: 'all',
@@ -202,6 +218,11 @@ export const CreateHistoryFile = () => {
               }}
               helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
             />
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Button variant='outlined' onClick={() => copyToClipboard(encryptedBlob)} sx={{ textTransform: 'none' }}>
+                Copy Encrypted Blob
+              </Button>
+            </Box>
             <SFormControlLabel
               control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
               label="I've saved my Recovery Phrase"
