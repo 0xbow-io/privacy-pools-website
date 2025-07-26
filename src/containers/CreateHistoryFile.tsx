@@ -41,6 +41,7 @@ export const CreateHistoryFile = () => {
   const [isBlobConfirmed, setIsBlobConfirmed] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -92,7 +93,17 @@ export const CreateHistoryFile = () => {
   };
 
   const handlePasswordSubmit = () => {
-    if (!password.trim() || !seedPhrase) return;
+    if (!password.trim() || !confirmPassword.trim() || !seedPhrase) return;
+
+    if (password.length < 6) {
+      addNotification('error', 'Password must be at least 6 characters long');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      addNotification('error', 'Passwords do not match');
+      return;
+    }
 
     try {
       const encrypted = encryptSeedPhrase(seedPhrase, password);
@@ -100,7 +111,7 @@ export const CreateHistoryFile = () => {
       setStep('encrypted');
     } catch (error) {
       console.error('Failed to encrypt seed phrase:', error);
-      // Could add error state here if needed
+      addNotification('error', 'Failed to encrypt seed phrase. Please try again.');
     }
   };
 
@@ -185,11 +196,6 @@ export const CreateHistoryFile = () => {
             fullWidth
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && password.trim()) {
-                handlePasswordSubmit();
-              }
-            }}
             placeholder='Enter a strong password...'
             slotProps={{
               htmlInput: {
@@ -199,8 +205,47 @@ export const CreateHistoryFile = () => {
                 spellCheck: false,
               },
             }}
+            error={Boolean(password && password.length < 6)}
+            helperText={password && password.length < 6 ? 'Password must be at least 6 characters' : ''}
           />
-          <Button onClick={handlePasswordSubmit} disabled={!password.trim()} variant='contained' fullWidth>
+          <TextField
+            label='Confirm Password'
+            type='password'
+            variant='outlined'
+            fullWidth
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === 'Enter' &&
+                password.trim() &&
+                confirmPassword.trim() &&
+                password.length >= 6 &&
+                password === confirmPassword
+              ) {
+                handlePasswordSubmit();
+              }
+            }}
+            placeholder='Confirm your password...'
+            slotProps={{
+              htmlInput: {
+                autoComplete: 'new-password',
+                autoCorrect: 'off',
+                autoCapitalize: 'off',
+                spellCheck: false,
+              },
+            }}
+            error={Boolean(confirmPassword && password !== confirmPassword)}
+            helperText={confirmPassword && password !== confirmPassword ? 'Passwords do not match' : ''}
+          />
+          <Button
+            onClick={handlePasswordSubmit}
+            disabled={
+              !password.trim() || !confirmPassword.trim() || password.length < 6 || password !== confirmPassword
+            }
+            variant='contained'
+            fullWidth
+          >
             Generate Encrypted Blob
           </Button>
         </Stack>
