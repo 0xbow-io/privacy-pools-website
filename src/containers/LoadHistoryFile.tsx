@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Button, Stack, styled, Typography } from '@mui/material';
+import { Button, Stack, styled, Typography, TextField } from '@mui/material';
 import { BackButton } from '~/components';
 import { SeedPhraseForm } from '~/containers/SeedPhraseForm';
-import { useAuthContext, useGoTo, useAccountContext, useNotifications } from '~/hooks';
+import { useAuthContext, useGoTo, useAccountContext, useNotifications, useEncryptedSeedContext } from '~/hooks';
 import { FOOTER_HEIGHT, ROUTER, verifyAndSanitizeSeedPhrase } from '~/utils';
+import { encryptSeedPhrase } from '~/utils/seedPhrase';
 
 export const LoadHistoryFile = () => {
   const goTo = useGoTo();
@@ -14,6 +15,13 @@ export const LoadHistoryFile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { loadAccount, setSeed } = useAccountContext();
   const { login } = useAuthContext();
+  const { setEncryptedSeed } = useEncryptedSeedContext();
+
+  // New state for the multi-step flow
+  const [step, setStep] = useState<'seedphrase' | 'password' | 'encrypted'>('seedphrase');
+  const [password, setPassword] = useState('');
+  const [encryptedBlob, setEncryptedBlob] = useState('');
+  const [sanitizedSeedPhrase, setSanitizedSeedPhrase] = useState('');
 
   const handleSetSeedPhrase = (newSeedPhrase: string) => {
     if (newSeedPhrase === seedPhrase) return;
@@ -24,10 +32,10 @@ export const LoadHistoryFile = () => {
   const handleLoad = useCallback(() => {
     if (!seedPhrase) return;
 
-    let sanitizedSeedPhrase = seedPhrase;
+    let validatedSeedPhrase = seedPhrase;
 
     try {
-      sanitizedSeedPhrase = verifyAndSanitizeSeedPhrase(seedPhrase);
+      validatedSeedPhrase = verifyAndSanitizeSeedPhrase(seedPhrase);
     } catch (e) {
       console.error(e);
       addNotification('error', e instanceof Error ? e.message : 'Invalid recovery phrase');
@@ -35,20 +43,48 @@ export const LoadHistoryFile = () => {
       return;
     }
 
+    // Store the sanitized seed phrase and move to password step
+    setSanitizedSeedPhrase(validatedSeedPhrase);
+    setStep('password');
+  }, [seedPhrase, addNotification]);
+
+  const handlePasswordSubmit = useCallback(() => {
+    if (!password.trim() || !sanitizedSeedPhrase) return;
+
+    try {
+      const encrypted = encryptSeedPhrase(sanitizedSeedPhrase, password);
+      setEncryptedBlob(encrypted);
+      setStep('encrypted');
+    } catch (error) {
+      console.error('Failed to encrypt seed phrase:', error);
+      addNotification('error', 'Failed to encrypt seed phrase. Please try again.');
+    }
+  }, [password, sanitizedSeedPhrase, addNotification]);
+
+  const handleFinalSubmit = useCallback(() => {
+    if (!sanitizedSeedPhrase) return;
+
     setIsLoading(true);
     setSeed(sanitizedSeedPhrase);
 
-    loadAccount(seedPhrase)
+    // Save the encrypted seed to context
+    if (encryptedBlob) {
+      setEncryptedSeed(encryptedBlob);
+    }
+
+    loadAccount(sanitizedSeedPhrase)
       .then(() => {
         setIsLoading(false);
-        login(seedPhrase);
+        login(sanitizedSeedPhrase);
+        // Navigate to home after successful login
+        goTo(ROUTER.home.base);
       })
       .catch((e) => {
         console.error(e);
         addNotification('error', 'Failed to load account. Please try again.');
         setIsLoading(false);
       });
-  }, [seedPhrase, loadAccount, login, addNotification, setSeed]);
+  }, [sanitizedSeedPhrase, encryptedBlob, loadAccount, login, setSeed, setEncryptedSeed, addNotification, goTo]);
 
   const back = () => {
     goTo(ROUTER.account.base);
@@ -71,7 +107,7 @@ export const LoadHistoryFile = () => {
             Syncing
           </Typography>
           <Typography variant='body2' align='center'>
-            We’re loading your data
+            We&apos;re loading your data
           </Typography>
         </Stack>
         <Circle />
@@ -79,28 +115,122 @@ export const LoadHistoryFile = () => {
     );
   }
 
+  // Step 1: Seed phrase input
+  if (step === 'seedphrase') {
+    return (
+      <LoadHistoryFileContainer>
+        <BackButton back={back} />
+
+        <Stack gap={2} maxWidth='32rem'>
+          <Typography variant='h5' fontWeight='bold' align='center'>
+            Load your Account
+          </Typography>
+          <Typography variant='body1' align='center'>
+            Enter your Recovery Phrase to load your account. You can paste it from your clipboard.
+          </Typography>
+        </Stack>
+
+        <SeedPhraseForm
+          type='load'
+          seedPhrase={seedPhrase}
+          setSeedPhrase={handleSetSeedPhrase}
+          onEnterKey={handleEnterKey}
+        />
+
+        <Button onClick={handleLoad} disabled={!seedPhrase} data-testid='load-account-button' fullWidth>
+          Continue
+        </Button>
+      </LoadHistoryFileContainer>
+    );
+  }
+
+  // Step 2: Password input
+  if (step === 'password') {
+    return (
+      <LoadHistoryFileContainer>
+        <BackButton back={() => setStep('seedphrase')} />
+
+        <Stack gap={2} maxWidth='32rem'>
+          <Typography variant='h5' fontWeight='bold' align='center'>
+            Set Encryption Password
+          </Typography>
+          <Typography variant='body1' align='center'>
+            Choose a strong password to encrypt your seed phrase. You&apos;ll need this password to log in later.
+          </Typography>
+        </Stack>
+
+        <Stack gap={2} width='100%' alignItems='center' maxWidth='400px'>
+          <TextField
+            label='Encryption Password'
+            type='password'
+            variant='outlined'
+            fullWidth
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && password.trim()) {
+                handlePasswordSubmit();
+              }
+            }}
+            placeholder='Enter a strong password...'
+            slotProps={{
+              htmlInput: {
+                autoComplete: 'new-password',
+                autoCorrect: 'off',
+                autoCapitalize: 'off',
+                spellCheck: false,
+              },
+            }}
+          />
+        </Stack>
+
+        <Button onClick={handlePasswordSubmit} disabled={!password.trim()} variant='contained' fullWidth>
+          Generate Encrypted Blob
+        </Button>
+      </LoadHistoryFileContainer>
+    );
+  }
+
+  // Step 3: Show encrypted blob and complete login
   return (
     <LoadHistoryFileContainer>
-      <BackButton back={back} />
+      <BackButton back={() => setStep('password')} />
 
       <Stack gap={2} maxWidth='32rem'>
         <Typography variant='h5' fontWeight='bold' align='center'>
-          Load your Account
+          Save Your Encrypted Blob
         </Typography>
         <Typography variant='body1' align='center'>
-          Enter your Recovery Phrase to load your account. You can paste it from your clipboard.
+          Copy and save this encrypted blob safely. You can use it to log in faster next time.
         </Typography>
       </Stack>
 
-      <SeedPhraseForm
-        type='load'
-        seedPhrase={seedPhrase}
-        setSeedPhrase={handleSetSeedPhrase}
-        onEnterKey={handleEnterKey}
+      <TextField
+        label='Encrypted Blob'
+        variant='outlined'
+        fullWidth
+        multiline
+        rows={4}
+        value={encryptedBlob}
+        slotProps={{
+          htmlInput: {
+            readOnly: true,
+            style: { fontFamily: 'monospace', fontSize: '0.875rem' },
+          },
+        }}
+        sx={{
+          mb: 2,
+          maxWidth: '500px',
+          '& .MuiInputBase-input': {
+            cursor: 'text',
+            userSelect: 'all',
+          },
+        }}
+        helperText="Copy this encrypted blob and store it safely. You'll need it to log in later."
       />
 
-      <Button onClick={handleLoad} disabled={!seedPhrase} data-testid='load-account-button' fullWidth>
-        Load Account
+      <Button onClick={handleFinalSubmit} variant='contained' fullWidth data-testid='complete-load-button'>
+        Complete Setup
       </Button>
     </LoadHistoryFileContainer>
   );
