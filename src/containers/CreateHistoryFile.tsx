@@ -304,7 +304,7 @@ export const CreateHistoryFile = () => {
       <Stack gap={1} width='100%' alignItems='center' maxWidth='400px'>
         <SFormControlLabel
           control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
-          label="I've backup saved my Recovery Phrase somewhere offline and secure"
+          label="I've backed up my Recovery Phrase somewhere offline and secure"
           data-testid='save-recovery-phrase'
           sx={{ fontSize: '1rem' }}
         />
