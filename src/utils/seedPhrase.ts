@@ -1,3 +1,4 @@
+import encryptpwd from 'encrypt-with-password';
 import { english, generateMnemonic, mnemonicToAccount } from 'viem/accounts';
 
 export const generateSeedPhrase = () => {
@@ -27,4 +28,23 @@ export const verifyAndSanitizeSeedPhrase = (seedPhrase: string) => {
   }
 
   return sanitizedSeedPhrase;
+};
+
+export const encryptSeedPhrase = (seedPhrase: string, password: string) => {
+  verifyAndSanitizeSeedPhrase(seedPhrase);
+  if (!seedPhrase || !password) {
+    throw new Error('Seed phrase and password are required for encryption');
+  }
+
+  return encryptpwd(seedPhrase, password);
+};
+
+export const decryptSeedPhrase = (encryptedSeedPhrase: string, password: string) => {
+  if (!encryptedSeedPhrase || !password) {
+    throw new Error('Encrypted seed phrase and password are required for decryption');
+  }
+
+  const decryptedSeedPhrase = encryptpwd.decrypt(encryptedSeedPhrase, password);
+  verifyAndSanitizeSeedPhrase(decryptedSeedPhrase);
+  return decryptedSeedPhrase;
 };
