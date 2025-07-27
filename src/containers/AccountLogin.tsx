@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Box, Typography, TextField, Button, styled } from '@mui/material';
+import { ChevronLeft } from '@carbon/icons-react';
+import { Box, Typography, TextField, Button, styled, IconButton } from '@mui/material';
 import { useEncryptedSeedContext, useAccountContext, useGoTo, useAuthContext, useNotifications } from '~/hooks';
 import { ROUTER } from '~/utils';
 import { decryptSeedPhrase } from '~/utils/seedPhrase';
@@ -64,6 +65,9 @@ export const AccountLogin = () => {
 
   return (
     <SContainer>
+      <SBackButton onClick={() => goTo(ROUTER.account.base)}>
+        <ChevronLeft size={20} />
+      </SBackButton>
       <Typography variant='h4' gutterBottom>
         Sign In to Privacy Pools
       </Typography>
@@ -132,12 +136,24 @@ const SContainer = styled(Box)(({ theme }) => ({
   justifyContent: 'center',
   minHeight: '60vh',
   padding: theme.spacing(4),
+  paddingTop: theme.spacing(8), // Add more top padding for the back button
   textAlign: 'center',
   maxWidth: '500px',
   margin: '0 auto',
+  position: 'relative',
 }));
 
 const SForm = styled('form')(() => ({
   width: '100%',
   maxWidth: '400px',
+}));
+
+const SBackButton = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  top: theme.spacing(1),
+  left: theme.spacing(1),
+  color: theme.palette.text.primary,
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+  },
 }));
