@@ -18,7 +18,7 @@ export const AccountLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-populate loginBlob when encryptedSeed is available
+  // Auto-populate encrypted seed (aka login key) when encryptedSeed is available
   useEffect(() => {
     if (encryptedSeed) {
       setLoginBlob(encryptedSeed);
@@ -40,7 +40,7 @@ export const AccountLogin = () => {
       // Save the encrypted seed for future use
       setEncryptedSeed(loginBlob);
 
-      // Load the account (similar to LoadHistoryFile)
+      // Load the account
       await loadAccount(seedPhrase);
 
       // Login with the seed phrase
