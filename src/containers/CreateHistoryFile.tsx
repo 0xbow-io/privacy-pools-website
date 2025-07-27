@@ -16,7 +16,7 @@ import {
   useNotifications,
 } from '~/hooks';
 import { EventType, ModalType } from '~/types';
-import { generateSeedPhrase, ROUTER } from '~/utils';
+import { generateSeedPhrase, ROUTER, useClipboard } from '~/utils';
 import { encryptSeedPhrase } from '~/utils/seedPhrase';
 
 const { TOC_URL } = getConstants();
@@ -30,6 +30,7 @@ export const CreateHistoryFile = () => {
   const { setModalOpen } = useModal();
   const { setEncryptedSeed } = useEncryptedSeedContext();
   const { addNotification } = useNotifications();
+  const { copied, copyToClipboard } = useClipboard({ timeout: 3000 });
   const [seedPhrase, setSeedPhrase] = useState('');
   const [encryptedBlob, setEncryptedBlob] = useState('');
 
@@ -42,15 +43,6 @@ export const CreateHistoryFile = () => {
   const [isVerified, setIsVerified] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      addNotification('success', 'Copied to clipboard!');
-    } catch {
-      addNotification('error', 'Failed to copy to clipboard');
-    }
-  };
 
   const isDepositDisabled = !BigInt(maxDeposit);
 
@@ -296,7 +288,7 @@ export const CreateHistoryFile = () => {
         />
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Button variant='outlined' onClick={() => copyToClipboard(encryptedBlob)} sx={{ textTransform: 'none' }}>
-            Copy Login Key
+            {copied ? 'Copied!' : 'Copy Login Key'}
           </Button>
         </Box>
       </Box>
