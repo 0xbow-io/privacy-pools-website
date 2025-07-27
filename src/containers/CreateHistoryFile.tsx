@@ -51,7 +51,7 @@ export const CreateHistoryFile = () => {
 
     createAccount(seedPhrase);
 
-    // Save the encrypted seed to context for future use
+    // Save the encrypted seed to context / local storage for future use
     if (encryptedBlob) {
       setEncryptedSeed(encryptedBlob);
     }
