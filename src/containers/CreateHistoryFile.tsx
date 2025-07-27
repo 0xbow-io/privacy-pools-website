@@ -301,7 +301,7 @@ export const CreateHistoryFile = () => {
         </Box>
       </Box>
 
-      <Stack gap={1} width='100%' alignItems='center' maxWidth='400px'>
+      <Stack gap={1} width='100%' alignItems='flex-start' maxWidth='400px'>
         <SFormControlLabel
           control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
           label="I've backed up my Recovery Phrase somewhere offline and secure"
@@ -310,7 +310,7 @@ export const CreateHistoryFile = () => {
         />
         <SFormControlLabel
           control={<Checkbox checked={isBlobConfirmed} onChange={() => setIsBlobConfirmed(!isBlobConfirmed)} />}
-          label="I've saved my Login Key safely"
+          label="I've saved my Login Key somewhere easily accessible"
           data-testid='save-encrypted-blob'
           sx={{ fontSize: '1rem' }}
         />
