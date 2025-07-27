@@ -33,10 +33,10 @@ export const LoadHistoryFile = () => {
   const handleLoad = useCallback(() => {
     if (!seedPhrase) return;
 
-    let validatedSeedPhrase = seedPhrase;
+    let sanitizedSeedPhrase = seedPhrase;
 
     try {
-      validatedSeedPhrase = verifyAndSanitizeSeedPhrase(seedPhrase);
+      sanitizedSeedPhrase = verifyAndSanitizeSeedPhrase(seedPhrase);
     } catch (e) {
       console.error(e);
       addNotification('error', e instanceof Error ? e.message : 'Invalid recovery phrase');
@@ -45,7 +45,7 @@ export const LoadHistoryFile = () => {
     }
 
     // Store the sanitized seed phrase and move to password step
-    setSanitizedSeedPhrase(validatedSeedPhrase);
+    setSanitizedSeedPhrase(sanitizedSeedPhrase);
     setStep('password');
   }, [seedPhrase, addNotification]);
 
