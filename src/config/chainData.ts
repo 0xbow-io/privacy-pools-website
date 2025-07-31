@@ -150,7 +150,7 @@ const mainnetChainData: ChainData = {
         scope: 472674026048933344947929992064610492276304547390666782210980269768303717449n,
         deploymentBlock: 23039970n,
         entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
-        maxDeposit: parseUnits('100000', 6),
+        maxDeposit: parseUnits('100000', 18),
         asset: 'wstETH',
         assetDecimals: 18,
         icon: wstethIcon.src,
