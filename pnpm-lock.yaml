@@ -15,8 +15,8 @@ importers:
   .:
     dependencies:
       '@0xbow/privacy-pools-core-sdk':
-        specifier: 0.1.21
-        version: 0.1.21(bufferutil@4.0.9)(utf-8-validate@5.0.10)(zod@3.22.4)
+        specifier: 0.1.22
+        version: 0.1.22(bufferutil@4.0.9)(utf-8-validate@5.0.10)(zod@3.22.4)
       '@carbon/icons-react':
         specifier: 11.52.0
         version: 11.52.0(react@19.0.0)
@@ -192,8 +192,8 @@ importers:
 
 packages:
 
-  '@0xbow/privacy-pools-core-sdk@0.1.21':
-    resolution: {integrity: sha512-UTNPHSkdR1XdQoU2u7XLaGcRCh09WP9C9yIlXrUgF0SUkiaaE2ZnyUIrhtT/oW7/zreYNZArWv8v647uVSNCzw==}
+  '@0xbow/privacy-pools-core-sdk@0.1.22':
+    resolution: {integrity: sha512-DMNiokTHfRMkUGgOsd7qyOyKPUf3MoxDS75ovB1HG5Zv/d6l9bGX4m2MNUB5hg3MbFsYGlrsvKtDHjIfKvp0lQ==}
 
   '@adraffy/ens-normalize@1.10.0':
     resolution: {integrity: sha512-nA9XHtlAkYfJxY7bce8DcN7eKxWWCWkU+1GR9d+U6MbNpfwQp8TI7vqOsBsMcHoT4mBu2kypKoSKnghEzOOq5Q==}
@@ -2655,14 +2655,17 @@ packages:
   '@zk-kit/eddsa-poseidon@1.1.0':
     resolution: {integrity: sha512-Djc+zOZjd73FpLLf32/XeVZi8GX4ShPQJGS4Iig1QMAR/2CggEi++6Jrkr9N2FM3M4MRCH1qxz2u22DjOLtASg==}
 
-  '@zk-kit/lean-imt@2.2.2':
-    resolution: {integrity: sha512-rscIPEgBBcu9vP/DJ3J+3187G/ObKETl343G5enPawNT81oeQSdHx3e2ZapTC+GfrZ/AS2AHHUOpRS1FfdSwjg==}
+  '@zk-kit/lean-imt@2.2.4':
+    resolution: {integrity: sha512-uoRl99DID9Z5EuhfecDuIGP0KLrGEndVH0+texwVQBmlXTvve+grkKT4w06C+VFzRmfYNVuRo9tXvqIzQ3dqPA==}
 
   '@zk-kit/poseidon-cipher@0.3.2':
     resolution: {integrity: sha512-Ezz1e0mj/GRDlHdU5m0uhj5iHY72zWJU0BP8DsCCvPubU7LPI2tVaPpxrAjT4JQqatbVRQHLIhixW7F7BPzaFg==}
 
   '@zk-kit/utils@1.2.1':
     resolution: {integrity: sha512-H2nTsyWdicVOyvqC5AjgU7tsTgmR6PDrruFJNmlmdhKp7RxEia/E1B1swMZjaasYa2QMp4Zc6oB7cWchty7B2Q==}
+
+  '@zk-kit/utils@1.4.1':
+    resolution: {integrity: sha512-IoXzy3ElfkvRfC/s6uk3eFQO8uxkCdAOVxKlJlaEjM7pgckX5AK46Q+7n5yMQD/v/o6OL0mMtet065o5EpUocA==}
 
   abab@2.0.6:
     resolution: {integrity: sha512-j2afSsaIENvHZN2B8GOpF566vZ5WVk5opAiMTvWgaQT8DkbOqsTfvNAvHoRGU2zzP8cPoqys+xHTRDWW8L+/BA==}
@@ -3771,6 +3774,10 @@ packages:
 
   ethers@5.8.0:
     resolution: {integrity: sha512-DUq+7fHrCg1aPDFCHx6UIPb3nmt2XMpM7Y/g2gLhsl3lIBqeAfOJIl1qEvRf2uq3BiKxmh6Fh5pfp2ieyek7Kg==}
+
+  ethers@6.13.5:
+    resolution: {integrity: sha512-+knKNieu5EKRThQJWwqaJ10a6HE9sSehGeqWN65//wE7j47ZpFhKAnHB/JJFibwwg61I/koxaPsXbXpD/skNOQ==}
+    engines: {node: '>=14.0.0'}
 
   ethers@6.14.1:
     resolution: {integrity: sha512-JnFiPFi3sK2Z6y7jZ3qrafDMwiXmU+6cNZ0M+kPq+mTy9skqEzwqAdFW3nb/em2xjlIVXX6Lz8ID6i3LmS4+fQ==}
@@ -6678,10 +6685,10 @@ packages:
 
 snapshots:
 
-  '@0xbow/privacy-pools-core-sdk@0.1.21(bufferutil@4.0.9)(utf-8-validate@5.0.10)(zod@3.22.4)':
+  '@0xbow/privacy-pools-core-sdk@0.1.22(bufferutil@4.0.9)(utf-8-validate@5.0.10)(zod@3.22.4)':
     dependencies:
       '@types/snarkjs': 0.7.9
-      '@zk-kit/lean-imt': 2.2.2
+      '@zk-kit/lean-imt': 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       maci-crypto: 2.5.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       snarkjs: 0.7.5
       typescript: 5.8.3
@@ -9946,9 +9953,12 @@ snapshots:
       buffer: 6.0.3
       poseidon-lite: 0.3.0
 
-  '@zk-kit/lean-imt@2.2.2':
+  '@zk-kit/lean-imt@2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
-      '@zk-kit/utils': 1.2.1
+      '@zk-kit/utils': 1.4.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@zk-kit/poseidon-cipher@0.3.2':
     dependencies:
@@ -9958,6 +9968,14 @@ snapshots:
   '@zk-kit/utils@1.2.1':
     dependencies:
       buffer: 6.0.3
+
+  '@zk-kit/utils@1.4.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
+    dependencies:
+      buffer: 6.0.3
+      ethers: 6.13.5(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   abab@2.0.6: {}
 
@@ -11332,6 +11350,19 @@ snapshots:
       '@ethersproject/wallet': 5.8.0
       '@ethersproject/web': 5.8.0
       '@ethersproject/wordlists': 5.8.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  ethers@6.13.5(bufferutil@4.0.9)(utf-8-validate@5.0.10):
+    dependencies:
+      '@adraffy/ens-normalize': 1.10.1
+      '@noble/curves': 1.2.0
+      '@noble/hashes': 1.3.2
+      '@types/node': 22.7.5
+      aes-js: 4.0.0-beta.5
+      tslib: 2.7.0
+      ws: 8.17.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
