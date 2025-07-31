@@ -140,13 +140,13 @@ export const verifyWithdrawalProof = async (proof: WithdrawalProof) => {
 };
 
 export const createAccount = (seed: string) => {
-  const accountService = new AccountService(dataService, seed);
+  const accountService = new AccountService(dataService, { mnemonic: seed });
 
   return accountService;
 };
 
 export const loadAccount = async (seed: string) => {
-  const accountService = new AccountService(dataService, seed);
+  const accountService = new AccountService(dataService, { mnemonic: seed });
   await accountService.retrieveHistory(pools);
   return accountService;
 };
