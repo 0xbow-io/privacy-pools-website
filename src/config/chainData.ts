@@ -7,6 +7,8 @@ import susdsIcon from '~/assets/icons/susds.svg';
 import usdcIcon from '~/assets/icons/usdc.svg';
 import usdsIcon from '~/assets/icons/usds.svg';
 import usdtIcon from '~/assets/icons/usdt.svg';
+import wbtcIcon from '~/assets/icons/wbtc.svg';
+import wstethIcon from '~/assets/icons/wsteth.svg';
 
 const { ALCHEMY_KEY, IS_TESTNET, ASP_ENDPOINT } = getEnv();
 
@@ -16,7 +18,7 @@ const testnetChains: readonly [Chain, ...Chain[]] = [sepolia];
 
 export const whitelistedChains = IS_TESTNET ? testnetChains : mainnetChains;
 
-export type ChainAssets = 'ETH' | 'USDS' | 'sUSDS' | 'DAI' | 'USDC' | 'USDT';
+export type ChainAssets = 'ETH' | 'USDS' | 'sUSDS' | 'DAI' | 'USDC' | 'USDT' | 'wstETH' | 'wBTC';
 
 export interface PoolInfo {
   chainId: number;
@@ -140,6 +142,32 @@ const mainnetChainData: ChainData = {
         assetDecimals: 6,
         icon: usdcIcon.src,
         isStableAsset: true,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0x1A604E9DFa0EFDC7FFda378AF16Cb81243b61633',
+        assetAddress: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
+        scope: 472674026048933344947929992064610492276304547390666782210980269768303717449n,
+        deploymentBlock: 23039970n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('100000', 6),
+        asset: 'wstETH',
+        assetDecimals: 18,
+        icon: wstethIcon.src,
+        isStableAsset: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xF973f4B180A568157Cd7A0E6006449139E6Bfc32',
+        assetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+        scope: 9583811136054309663087994285053104517603064138421869930481915957893514499997n,
+        deploymentBlock: 23039980n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('100', 8),
+        asset: 'wBTC',
+        assetDecimals: 8,
+        icon: wbtcIcon.src,
+        isStableAsset: false,
       },
     ],
   },
