@@ -19,7 +19,7 @@ export const useSafeTransactions = () => {
       tokenAddress: Address,
       spenderAddress: Address,
       amount: bigint,
-      vettingFeeBPS: bigint,
+      _vettingFeeBPS: bigint,
       depositTarget: Address,
       depositData: `0x${string}`,
     ): BaseTransaction[] => {
