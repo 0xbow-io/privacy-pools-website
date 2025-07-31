@@ -46,7 +46,6 @@ export const useAccountType = () => {
     try {
       // First check if we're in a Safe App environment using React SDK
       if (isSafeApp && safe) {
-        console.log('✅ Safe App environment detected via React SDK');
         setAccountType('Safe App');
         setSafeInfo(safe);
         setIsLoading(false);
@@ -63,7 +62,6 @@ export const useAccountType = () => {
           smartWalletType !== 'Unknown' &&
           smartWalletType !== 'Unknown Smart Contract'
         ) {
-          console.log('✅ Smart wallet detected:', smartWalletType);
           setAccountType(smartWalletType);
           setIsLoading(false);
           return;
@@ -72,7 +70,6 @@ export const useAccountType = () => {
 
       // Check for WalletConnect Safe connection by connector name
       if (connector?.name?.toLowerCase().includes('safe')) {
-        console.log('✅ Safe wallet detected via connector name');
         setAccountType('Safe Wallet');
         setIsLoading(false);
         return;

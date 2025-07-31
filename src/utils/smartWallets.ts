@@ -32,19 +32,14 @@ export const isSmartContract = async (address: Address, provider: BytecodeProvid
  */
 export const detectSmartWalletType = async (address: Address, provider: BytecodeProvider): Promise<SmartWalletType> => {
   try {
-    console.log('🔍 Detecting smart wallet type for:', address);
-
     // First check if it's a smart contract
     const isContract = await isSmartContract(address, provider);
     if (!isContract) {
       return 'Standard EOA';
     }
 
-    console.log('📋 Address is a smart contract');
-
     // For now, we'll return Unknown Smart Contract for all smart contracts
     // Safe detection is handled separately through the Safe SDK
-    console.log('❓ Unknown smart contract type');
     return 'Unknown Smart Contract';
   } catch (error) {
     console.error('❌ Error in smart wallet detection:', error);

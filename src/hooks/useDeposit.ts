@@ -123,20 +123,14 @@ export const useDeposit = () => {
           if (!selectedPoolInfo.assetAddress) throw new Error('Asset address missing for token deposit');
 
           // Check for batching support (MetaMask Smart Account or Safe)
-          console.log('🔍 Checking batching support for:', { address, chainId, assetAllowance, value });
 
           // Check for Safe App environment using React SDK
-          console.log('🔍 Checking for Safe App and batching support...');
-          console.log('🔒 Safe App status:', { isSafeApp });
 
           // Check for MetaMask Smart Account
           const supportsEIP7702 = await supportsEIP7702Batching(address, chainId);
-          console.log('🎯 EIP-7702 support result:', supportsEIP7702);
-          console.log('💰 Allowance check:', { assetAllowance, value, needsApproval: assetAllowance < value });
 
           // Safe App batching path - prioritize Safe Apps SDK over legacy detection
           if (isSafeApp && assetAllowance < value) {
-            console.log('✅ Using Safe App batching path');
             addNotification('info', 'Using Safe App - batching approval + deposit...');
 
             // Create the deposit call data
@@ -158,12 +152,9 @@ export const useDeposit = () => {
 
             // Send through Safe Apps SDK
             const safeTxResponse = await sendSafeBatchTransaction(safeTxs);
-            console.log('🔒 Safe transaction response:', safeTxResponse);
-            console.log('🔒 Safe transaction response type:', typeof safeTxResponse);
 
             // Ensure we have a string hash
             const safeTxHash = typeof safeTxResponse === 'string' ? safeTxResponse : String(safeTxResponse);
-            console.log('🔒 Safe transaction hash:', safeTxHash);
 
             // For Safe, show immediate notification about proposal
             addNotification('info', 'Safe transaction proposed! Waiting for execution...');
@@ -182,29 +173,20 @@ export const useDeposit = () => {
             // Update with the actual on-chain transaction hash
             hash = actualTxHash as ViemHash;
             setTransactionHash(hash);
-            console.log('✅ Using actual transaction hash:', hash);
           }
           // MetaMask Smart Account batching path
           else if (supportsEIP7702 && assetAllowance < value) {
-            console.log('✅ Using MetaMask Smart Account batching path');
             // True single-transaction batching using MetaMask Smart Account wallet_sendCalls API
             addNotification('info', 'Using Smart Account - batching approval + deposit in single transaction...');
 
             // Create the deposit call data directly without simulation
             // (simulation would fail because allowance isn't approved yet)
-            console.log('🔧 Creating deposit call with args:', {
-              asset: selectedPoolInfo.assetAddress,
-              value: value.toString(),
-              precommitment: precommitmentHash.toString(),
-            });
 
             const depositCallData = encodeFunctionData({
               abi: entrypointAbi,
               functionName: 'deposit',
               args: [selectedPoolInfo.assetAddress, value, precommitmentHash],
             });
-
-            console.log('📝 Created deposit call data:', depositCallData);
 
             // Create the batch calls
             const batchCalls = createApprovalDepositBatch(
@@ -219,16 +201,6 @@ export const useDeposit = () => {
             // Send batch transaction using MetaMask Smart Account API
             const batchId = await sendBatchTransaction(batchCalls, address, chainId);
 
-            console.log('🔍 DEBUGGING: Raw batch ID from sendBatchTransaction:', batchId);
-            console.log('🔍 DEBUGGING: Type of batch ID:', typeof batchId);
-            console.log('🔍 DEBUGGING: JSON.stringify batch ID:', JSON.stringify(batchId));
-            console.log('🔍 DEBUGGING: String conversion:', String(batchId));
-            console.log('🔍 DEBUGGING: Is it an object?', typeof batchId === 'object');
-            if (typeof batchId === 'object') {
-              console.log('🔍 DEBUGGING: Object keys:', Object.keys(batchId));
-              console.log('🔍 DEBUGGING: Object.values:', Object.values(batchId));
-            }
-
             addNotification('info', 'Batch transaction submitted, waiting for confirmation...');
 
             // Poll for batch status
@@ -239,11 +211,6 @@ export const useDeposit = () => {
             do {
               await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
               batchStatus = await getBatchStatus(batchId);
-              console.log('📊 Batch status check:', {
-                status: batchStatus.status,
-                attempts,
-                hasReceipts: !!batchStatus.receipts,
-              });
               attempts++;
             } while (batchStatus.status === 100 && attempts < maxAttempts); // 100 = PENDING
 
@@ -256,17 +223,6 @@ export const useDeposit = () => {
             }
 
             // Debug the receipt structure
-            console.log('🔍 Full batch status:', JSON.stringify(batchStatus, null, 2));
-            console.log('📋 Number of receipts:', batchStatus.receipts?.length);
-            console.log(
-              '📋 Receipt details:',
-              batchStatus.receipts?.map((r, i) => ({
-                index: i,
-                transactionHash: r.transactionHash,
-                status: r.status,
-                logs: r.logs?.length || 0,
-              })),
-            );
 
             // Extract the deposit transaction hash from the batch receipts
             if (!batchStatus.receipts || batchStatus.receipts.length === 0) {
@@ -277,22 +233,18 @@ export const useDeposit = () => {
             let depositReceipt;
             if (batchStatus.receipts.length === 1) {
               // Single receipt might contain both transactions
-              console.log('📋 Single receipt found - using it for deposit hash');
               depositReceipt = batchStatus.receipts[0];
             } else if (batchStatus.receipts.length === 2) {
               // Two receipts - deposit is the second one
-              console.log('📋 Two receipts found - using second one for deposit hash');
               depositReceipt = batchStatus.receipts[1];
             } else {
               throw new Error(`Unexpected number of receipts: ${batchStatus.receipts.length}`);
             }
 
             hash = depositReceipt.transactionHash as ViemHash;
-            console.log('🎯 Using transaction hash:', hash);
 
             addNotification('success', 'Smart Account batch transaction confirmed!');
           } else {
-            console.log('⚠️ Using standard flow - either no Smart Account support or sufficient allowance');
             // Standard flow - check allowance and approve if needed
             if (assetAllowance < value) {
               addNotification('info', 'Allowance insufficient. Requesting approval...');
@@ -335,12 +287,10 @@ export const useDeposit = () => {
         // Only check for ETH deposits (non-batched) through Safe
         if (isSafeApp && selectedPoolInfo.asset === DEFAULT_ASSET && hash.startsWith('0x') && hash.length === 66) {
           // For ETH deposits through Safe, check if this is a Safe transaction hash
-          console.log('🔍 Checking if this is a Safe transaction hash for ETH deposit:', hash);
 
           // Try to wait for the actual transaction
           const actualTxHash = await waitForSafeTransaction(hash);
           if (actualTxHash) {
-            console.log('✅ Got actual transaction hash from Safe:', actualTxHash);
             hash = actualTxHash as ViemHash;
           }
         }

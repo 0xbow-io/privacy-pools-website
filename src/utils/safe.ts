@@ -34,8 +34,6 @@ export const detectSafeEnvironment = async (): Promise<{
 
     // Method 1: Check if running inside Safe App (iframe)
     if (window.parent !== window) {
-      console.log('🔍 Checking for Safe App environment (iframe)...');
-
       try {
         // Initialize Safe Apps SDK if not already done
         if (!safeAppsSdk) {
@@ -47,16 +45,13 @@ export const detectSafeEnvironment = async (): Promise<{
 
         // Try to get Safe info - this will only work inside Safe App
         const safeInfo = await safeAppsSdk.safe.getInfo();
-        console.log('✅ Safe App detected:', safeInfo);
 
         return {
           isSafe: true,
           safeType: 'Safe App',
           safeInfo,
         };
-      } catch {
-        console.log('⚠️ Not running in Safe App iframe');
-      }
+      } catch {}
     }
 
     // Method 2: Check if connected via WalletConnect to a Safe
@@ -65,7 +60,6 @@ export const detectSafeEnvironment = async (): Promise<{
     if (window.ethereum) {
       // We'll integrate this with the main app's wallet connection
       // For now, return false - this will be enhanced later
-      console.log('🔍 Checking for Safe via WalletConnect...');
     }
 
     return {
@@ -99,11 +93,8 @@ export const createSafeBatchTransaction = (
   depositTarget: Address,
   depositData: `0x${string}`,
 ) => {
-  console.log('🏗️ Creating Safe batch transaction...');
-
   // Calculate the approval amount (just the deposit amount, not including fee)
   const approvalAmount = amount;
-  console.log('💰 Approval amount:', approvalAmount.toString());
 
   // Encode approve call
   const approveData = encodeFunctionData({
@@ -128,7 +119,6 @@ export const createSafeBatchTransaction = (
     },
   ];
 
-  console.log('📦 Safe batch transactions:', transactions);
   return transactions;
 };
 
@@ -149,12 +139,9 @@ export const sendSafeBatchTransaction = async (
     throw new Error('Safe Apps SDK not initialized - not running in Safe App');
   }
 
-  console.log('🚀 Sending Safe batch transaction...');
-
   try {
     // Send transaction through Safe Apps SDK
     const { safeTxHash } = await safeAppsSdk.txs.send({ txs: transactions });
-    console.log('✅ Safe transaction hash:', safeTxHash);
 
     // Note: Safe transactions need to be signed by threshold owners
     // The SDK handles proposing the transaction to the Safe
@@ -214,7 +201,6 @@ export const isSafeWallet = async (address: Address, provider: Provider): Promis
     const safeProxyPattern = '0x608060405273';
     const isSafe = code.startsWith(safeProxyPattern) && code.length > 1000;
 
-    console.log('🔍 Address bytecode check:', { address, codeLength: code.length, isSafe });
     return isSafe;
   } catch (error) {
     console.error('❌ Failed to check if address is Safe:', error);

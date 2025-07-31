@@ -86,14 +86,6 @@ export const useWithdraw = () => {
     feeBPSForWithdraw,
   } = usePoolAccountsContext();
 
-  /*  console.log('🔍 useWithdraw debug:', {
-      feeCommitment,
-      feeBPSForWithdraw: feeBPSForWithdraw || 'undefined',
-      feeBPSType: typeof feeBPSForWithdraw,
-      target,
-      poolAccount: !!poolAccount,
-    });*/
-
   const commitment = poolAccount?.lastCommitment;
   const aspLeaves = aspData.mtLeavesData?.aspLeaves;
   const stateLeaves = aspData.mtLeavesData?.stateTreeLeaves;
@@ -390,18 +382,6 @@ export const useWithdraw = () => {
       if (!TEST_MODE) {
         const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
 
-        console.log('🔍 withdraw() validation debug:', {
-          proof: !!currentProof,
-          withdrawal: !!currentWithdrawal,
-          commitment: !!commitment,
-          target: !!target,
-          relayerDetails: !!relayerDetails,
-          relayerAddress: !!relayerDetails?.relayerAddress,
-          feeCommitment: !!feeCommitment,
-          newSecretKeys: !!currentNewSecretKeys,
-          accountService: !!accountService,
-        });
-
         if (
           !currentProof ||
           !currentWithdrawal ||
@@ -467,18 +447,10 @@ export const useWithdraw = () => {
           if (!receipt) throw new Error('Receipt not found');
 
           const events = decodeEventsFromReceipt(receipt, withdrawEventAbi);
-          console.log('🔍 Decoded events:', events);
-          console.log('🔍 All receipt logs:', receipt.logs);
           const withdrawnEvents = events.filter((event) => event.eventName === 'Withdrawn');
-          console.log('🔍 Withdrawn events found:', withdrawnEvents.length);
 
           // More robust event handling - try to find any event that looks like a withdrawal
           if (!withdrawnEvents.length) {
-            console.log(
-              '🔍 Available event names:',
-              events.map((e) => e.eventName),
-            );
-
             // Try to find any event that might be the withdrawal event
             const possibleWithdrawEvents = events.filter(
               (event) =>
@@ -488,7 +460,6 @@ export const useWithdraw = () => {
             );
 
             if (possibleWithdrawEvents.length > 0) {
-              console.log('🔍 Found possible withdraw events:', possibleWithdrawEvents);
               // Use the first possible event
               withdrawnEvents.push(possibleWithdrawEvents[0]);
             } else {
@@ -598,12 +569,9 @@ export const useWithdraw = () => {
         progress: number;
       }) => void,
     ) => {
-      console.log('🚀 generateProofAndWithdraw() function called');
-
       try {
         // Generate proof and call withdraw when complete
         await generateProof(onProgress, (proof, withdrawal, newSecretKeys) => {
-          console.log('✅ Proof generation completed, calling withdraw');
           withdraw(proof, withdrawal, newSecretKeys);
         });
       } catch (error) {

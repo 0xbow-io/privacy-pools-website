@@ -223,12 +223,10 @@ export const useExit = () => {
           // For Safe, we need to handle the transaction hash differently
           if (isSafeApp && hash.startsWith('0x') && hash.length === 66) {
             // Check if this looks like a Safe transaction hash (not an on-chain tx hash)
-            console.log('🔍 Checking if this is a Safe transaction hash:', hash);
 
             // Try to wait for the actual transaction
             const actualTxHash = await waitForSafeTransaction(hash);
             if (actualTxHash) {
-              console.log('✅ Got actual transaction hash from Safe:', actualTxHash);
               hash = actualTxHash as `0x${string}`;
             }
           }

@@ -23,13 +23,6 @@ export const useSafeTransactions = () => {
       depositTarget: Address,
       depositData: `0x${string}`,
     ): BaseTransaction[] => {
-      console.log('🏗️ Creating Safe batch transaction:', {
-        tokenAddress,
-        spenderAddress,
-        amount,
-        vettingFeeBPS,
-      });
-
       // Create approval transaction
       const approveData = encodeFunctionData({
         abi: parseAbi(['function approve(address spender, uint256 amount) external returns (bool)']),
@@ -50,7 +43,6 @@ export const useSafeTransactions = () => {
         },
       ];
 
-      console.log('📝 Safe batch transactions created:', transactions);
       return transactions;
     },
     [],
@@ -62,23 +54,18 @@ export const useSafeTransactions = () => {
         throw new Error('Safe App not connected');
       }
 
-      console.log('🚀 Sending Safe batch transaction:', transactions);
-
       try {
         const response = await sdk.txs.send({ txs: transactions });
-        console.log('✅ Safe transaction submitted:', response);
 
         // The response might be an object with safeTxHash property
         const safeTxHash = typeof response === 'string' ? response : response.safeTxHash || response;
 
         if (typeof safeTxHash !== 'string') {
-          console.error('❌ Unexpected response format from Safe SDK:', response);
           throw new Error('Invalid Safe transaction hash format');
         }
 
         return safeTxHash;
       } catch (error) {
-        console.error('❌ Failed to send Safe batch transaction:', error);
         throw error;
       }
     },
@@ -95,7 +82,6 @@ export const useSafeTransactions = () => {
         const safeTx = await sdk.txs.getBySafeTxHash(safeTxHash);
         return safeTx;
       } catch (error) {
-        console.error('❌ Failed to get Safe transaction status:', error);
         throw error;
       }
     },
@@ -110,11 +96,8 @@ export const useSafeTransactions = () => {
 
       // Ensure we have a string hash
       if (typeof safeTxHash !== 'string') {
-        console.error('❌ Invalid Safe transaction hash type:', safeTxHash);
         return null;
       }
-
-      console.log('⏳ Waiting for Safe transaction execution:', safeTxHash);
 
       // Poll for transaction status
       let attempts = 0;
@@ -123,11 +106,9 @@ export const useSafeTransactions = () => {
       while (attempts < maxAttempts) {
         try {
           const safeTx = await sdk.txs.getBySafeTxHash(safeTxHash);
-          console.log('🔍 Safe transaction status:', safeTx);
 
           // Check if transaction has been executed
           if (safeTx && safeTx.txHash) {
-            console.log('✅ Safe transaction executed with hash:', safeTx.txHash);
             return safeTx.txHash;
           }
 
@@ -135,14 +116,13 @@ export const useSafeTransactions = () => {
           await new Promise((resolve) => setTimeout(resolve, 5000));
           attempts++;
         } catch (error) {
-          console.log('⚠️ Error checking Safe transaction status:', error);
+          console.log(error);
           // Continue polling even if there's an error
           await new Promise((resolve) => setTimeout(resolve, 5000));
           attempts++;
         }
       }
 
-      console.warn('⏱️ Timeout waiting for Safe transaction execution');
       return null;
     },
     [connected, sdk],
