@@ -13,13 +13,13 @@ export interface Option {
 
 const ALL_TOKEN_OPTIONS: Option[] = [
   { value: 'ETH', label: 'ETH' },
+  { value: 'wstETH', label: 'wstETH' },
+  { value: 'wBTC', label: 'wBTC' },
+  { value: 'USDC', label: 'USDC' },
+  { value: 'USDT', label: 'USDT' },
   { value: 'USDS', label: 'USDS' },
   { value: 'sUSDS', label: 'sUSDS' },
   { value: 'DAI', label: 'DAI' },
-  { value: 'USDT', label: 'USDT' },
-  { value: 'USDC', label: 'USDC' },
-  { value: 'wstETH', label: 'wstETH' },
-  { value: 'wBTC', label: 'wBTC' },
 ];
 
 const MENU_STYLING = {
