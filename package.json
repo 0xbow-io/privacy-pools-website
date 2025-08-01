@@ -1,7 +1,7 @@
 {
   "name": "privacy-pools-website",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.6.0",
   "type": "module",
   "license": "MIT",
   "author": "Wonderland",
@@ -29,7 +29,7 @@
     "src/**/*.{js,jsx,ts,tsx,css,scss,md,html}": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "@0xbow/privacy-pools-core-sdk": "0.1.21",
+    "@0xbow/privacy-pools-core-sdk": "0.1.22",
     "@carbon/icons-react": "11.52.0",
     "@emotion/cache": "11.13.1",
     "@emotion/react": "11.14.0",
@@ -40,6 +40,8 @@
     "@mui/material": "6.1.6",
     "@mui/material-nextjs": "6.1.6",
     "@rainbow-me/rainbowkit": "2.2.4",
+    "@safe-global/safe-apps-react-sdk": "^4.7.2",
+    "@safe-global/safe-apps-sdk": "^9.1.0",
     "@sentry/nextjs": "9.25.1",
     "@tanstack/react-query": "5.56.2",
     "@vercel/analytics": "1.5.0",
@@ -55,9 +57,9 @@
     "@eslint/compat": "1.2.4",
     "@eslint/eslintrc": "3.1.0",
     "@jest/globals": "29.7.0",
+    "@next/eslint-plugin-next": "15.3.3",
     "@playwright/test": "1.52.0",
     "@synthetixio/synpress": "4.1.0",
-    "@next/eslint-plugin-next": "15.3.3",
     "@types/jest": "29.5.12",
     "@types/jsdom": "21.1.7",
     "@types/lodash.merge": "4.6.7",
