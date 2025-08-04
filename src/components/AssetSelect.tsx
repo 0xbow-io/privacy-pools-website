@@ -40,7 +40,6 @@ export const AssetSelect: React.FC = () => {
     }
   };
   const selectedOption_new = filteredTokenOptions_new.find((option) => option.value === selectedAsset) || undefined;
-  console.log(filteredTokenOptions_new, getAssetIcon_new, handleChange_new, selectedOption_new);
 
   return (
     <StyledAutocomplete
@@ -118,5 +117,3 @@ const IconWrapper = styled('div')(() => ({
     height: '100%',
   },
 }));
-
-console.log(StyledAutocomplete, TextField);
