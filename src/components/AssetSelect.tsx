@@ -18,6 +18,9 @@ const ALL_TOKEN_OPTIONS: Option[] = [
   { value: 'USDT', label: 'USDT' },
   { value: 'USDS', label: 'USDS' },
   { value: 'sUSDS', label: 'sUSDS' },
+  { value: 'USDe', label: 'USDe' },
+  { value: 'USD1', label: 'USD1' },
+  { value: 'FRXUSD', label: 'FRXUSD' },
   { value: 'DAI', label: 'DAI' },
 ];
 
