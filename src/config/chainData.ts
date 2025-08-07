@@ -2,9 +2,12 @@ import { Address, parseEther, parseUnits } from 'viem';
 import { Chain, mainnet, sepolia } from 'viem/chains';
 import { getEnv } from '~/config/env';
 import daiIcon from '~/assets/icons/dai.svg';
+import frxusdIcon from '~/assets/icons/frxusd.svg';
 import mainnetIcon from '~/assets/icons/mainnet_color.svg';
 import susdsIcon from '~/assets/icons/susds.svg';
+import usd1Icon from '~/assets/icons/usd1.svg';
 import usdcIcon from '~/assets/icons/usdc.svg';
+import usdeIcon from '~/assets/icons/usde.svg';
 import usdsIcon from '~/assets/icons/usds.svg';
 import usdtIcon from '~/assets/icons/usdt.svg';
 import wbtcIcon from '~/assets/icons/wbtc.svg';
@@ -18,7 +21,18 @@ const testnetChains: readonly [Chain, ...Chain[]] = [sepolia];
 
 export const whitelistedChains = IS_TESTNET ? testnetChains : mainnetChains;
 
-export type ChainAssets = 'ETH' | 'USDS' | 'sUSDS' | 'DAI' | 'USDC' | 'USDT' | 'wstETH' | 'wBTC';
+export type ChainAssets =
+  | 'ETH'
+  | 'USDS'
+  | 'sUSDS'
+  | 'DAI'
+  | 'USDC'
+  | 'USDT'
+  | 'wstETH'
+  | 'wBTC'
+  | 'USDe'
+  | 'USD1'
+  | 'FRXUSD';
 
 export interface PoolInfo {
   chainId: number;
@@ -168,6 +182,45 @@ const mainnetChainData: ChainData = {
         assetDecimals: 8,
         icon: wbtcIcon.src,
         isStableAsset: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xe6D36B33b00A7C0cB0C2a8d39D07e7dB0c526Abc',
+        assetAddress: '0x4c9EDD5852cd905f086C759E8383e09bff1E68B3',
+        scope: 14948241600724488898497604617894553378727680542246736212613234875544074387056n,
+        deploymentBlock: 23090290n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'USDe',
+        assetDecimals: 18,
+        icon: usdeIcon.src,
+        isStableAsset: true,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xc0A8Bc0F4F982b4d4f1fFae8F4FCCb58c9B29c98',
+        assetAddress: '0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d',
+        scope: 2226641097145324517602489545296816163847340455393839014355318716099039951794n,
+        deploymentBlock: 23090298n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'USD1',
+        assetDecimals: 18,
+        icon: usd1Icon.src,
+        isStableAsset: true,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xC6C769fac7AABEadd31a03fAe5Ca0Ec5B4C50f84',
+        assetAddress: '0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29',
+        scope: 6204545812131907406091007816562088763876564430686560668923081212690640630114n,
+        deploymentBlock: 23090335n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'FRXUSD',
+        assetDecimals: 18,
+        icon: frxusdIcon.src,
+        isStableAsset: true,
       },
     ],
   },

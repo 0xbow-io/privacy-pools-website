@@ -42,11 +42,6 @@ export const ReviewModal = () => {
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
   const { addNotification } = useNotifications();
 
-  // Helper function to determine if current asset is a stablecoin
-  const isStablecoin = (assetSymbol: string): boolean => {
-    return ['USDT', 'USDC', 'USDS', 'sUSDS', 'DAI'].includes(assetSymbol);
-  };
-
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading } = relayerData || {};
   const { isQuoteValid, isExpired, requestNewQuote } = useRequestQuote({
@@ -100,7 +95,7 @@ export const ReviewModal = () => {
         <ModalTitle>Review the {actionType}</ModalTitle>
 
         <Stack gap={2} px='1.6rem' width='100%'>
-          {actionType === EventType.WITHDRAWAL && isStablecoin(selectedPoolInfo?.asset || '') && (
+          {actionType === EventType.WITHDRAWAL && selectedPoolInfo?.isStableAsset && (
             <GasTokenDropSection>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
