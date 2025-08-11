@@ -6,9 +6,17 @@ import { getAddress, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import { getConfig } from '~/config';
-import { useChainContext, useAccountContext, useModal, useNotifications, usePoolAccountsContext } from '~/hooks';
+import {
+  useChainContext,
+  useAccountContext,
+  useModal,
+  useNotifications,
+  usePoolAccountsContext,
+  useSafeApp,
+} from '~/hooks';
 import { Hash, ModalType, RagequitProof } from '~/types';
 import { decodeEventsFromReceipt, generateRagequitProof, privacyPoolAbi, ragequitEventAbi } from '~/utils';
+import { useSafeTransactions } from './useSafeTransactions';
 
 const {
   env: { TEST_MODE },
@@ -25,6 +33,8 @@ export const useExit = () => {
   const { data: walletClient } = useWalletClient({ chainId });
   const publicClient = usePublicClient({ chainId });
   const [isLoading, setIsLoading] = useState(false);
+  const { isSafeApp } = useSafeApp();
+  const { waitForSafeTransaction } = useSafeTransactions();
 
   const logErrorToSentry = useCallback(
     (error: Error | unknown, context: Record<string, unknown>) => {
@@ -160,7 +170,11 @@ export const useExit = () => {
 
         setIsClosable(false);
         setIsLoading(true);
-        await switchChainAsync({ chainId });
+
+        // Only switch chain if not already on the correct chain and not using Safe
+        if (!isSafeApp && walletClient?.chain?.id !== chainId) {
+          await switchChainAsync({ chainId });
+        }
 
         if (!TEST_MODE) {
           if (!walletClient || !publicClient) throw new Error('Wallet or Public client not found');
@@ -204,7 +218,18 @@ export const useExit = () => {
               throw err;
             });
 
-          const hash = await walletClient.writeContract(request);
+          let hash = await walletClient.writeContract(request);
+
+          // For Safe, we need to handle the transaction hash differently
+          if (isSafeApp && hash.startsWith('0x') && hash.length === 66) {
+            // Check if this looks like a Safe transaction hash (not an on-chain tx hash)
+
+            // Try to wait for the actual transaction
+            const actualTxHash = await waitForSafeTransaction(hash);
+            if (actualTxHash) {
+              hash = actualTxHash as `0x${string}`;
+            }
+          }
 
           setTransactionHash(hash);
           setModalOpen(ModalType.PROCESSING);
@@ -294,6 +319,8 @@ export const useExit = () => {
       logErrorToSentry,
       getDefaultErrorMessage,
       addNotification,
+      isSafeApp,
+      waitForSafeTransaction,
     ],
   );
 

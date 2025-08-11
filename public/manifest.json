@@ -1,0 +1,17 @@
+{
+  "name": "Privacy Pools",
+  "description": "Privacy Pools by 0xbow - Compliant anonymous payments on Ethereum. Deposit, withdraw & exit with full privacy while blocking illicit actors.",
+  "iconPath": "logo.svg",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "favicon.ico",
+      "sizes": "32x32",
+      "type": "image/x-icon"
+    }
+  ]
+}

@@ -2,9 +2,6 @@
 import { Commitment, MerkleProof, RagequitProof, Withdrawal, WithdrawalProof } from '~/types';
 
 export function generateMerkleProof(_leaves: bigint[], _leaf: bigint): MerkleProof {
-  // console.log('Leaves:', _leaves);
-  // console.log('Leaf:', _leaf);
-
   return {
     root: BigInt('0x1234'),
     siblings: [BigInt(1), BigInt(2), BigInt(3)],
@@ -21,16 +18,6 @@ export async function proveWithdrawal(
   _aspRoot: bigint,
   _withdrawal: Withdrawal,
 ): Promise<WithdrawalProof> {
-  // console.log(
-  //   'Commitment: ' + _commitment,
-  //   'Withdraw amount: ' + _withdrawAmount,
-  //   'State merkle proof: ' + _stateMerkleProof,
-  //   'ASP merkle proof: ' + _aspMerkleProof,
-  //   'State root: ' + _stateRoot,
-  //   'ASP root: ' + _aspRoot,
-  //   'Withdrawal: ' + _withdrawal,
-  // );
-
   return {
     proof: {
       pi_a: ['0x1234', '0x5678'],

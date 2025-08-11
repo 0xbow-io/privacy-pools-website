@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import { Stack, styled, Typography, IconButton, Collapse, Avatar, Box } from '@mui/material';
+import { Stack, styled, Typography, IconButton, Collapse, Avatar } from '@mui/material';
 import { formatUnits, parseUnits, isAddress } from 'viem';
 import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
 import { ExtendedTooltip as Tooltip } from '~/components';
@@ -196,16 +196,14 @@ export const DataSection = () => {
 
         <Row>
           <Label variant='body2'>To:</Label>
-          <Value variant='body2'>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {ensAvatar && <Avatar src={ensAvatar} sx={{ width: 20, height: 20 }} />}
-              <Tooltip title={toAddress} placement='top'>
-                <span>
-                  {toAddress && (ensName || truncateAddress(toAddress))}
-                  {!toAddress && 'New Pool Account'}
-                </span>
-              </Tooltip>
-            </Box>
+          <Value variant='body2' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {ensAvatar && <Avatar src={ensAvatar} sx={{ width: 20, height: 20 }} />}
+            <Tooltip title={toAddress} placement='top'>
+              <span>
+                {toAddress && (ensName || truncateAddress(toAddress))}
+                {!toAddress && 'New Pool Account'}
+              </span>
+            </Tooltip>
           </Value>
         </Row>
       </Stack>

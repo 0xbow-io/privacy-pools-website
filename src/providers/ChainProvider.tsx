@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useEffect, useMemo, useState, useRef } from 'react';
+import { createContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { parseEther } from 'viem';
 import { useAccount, useBalance } from 'wagmi';
@@ -60,6 +60,22 @@ export const ChainProvider = ({ children }: Props) => {
   const [selectedRelayer, setSelectedRelayer] = useState<SelectedRelayerType | undefined>(
     () => chainData[chainId].relayers[0],
   );
+
+  const handleSetSelectedAsset = useCallback((value: ChainAssets) => {
+    setSelectedAsset(value);
+  }, []);
+
+  const handleSetSelectedRelayer = useCallback((value: SelectedRelayerType | undefined) => {
+    setSelectedRelayer(value);
+  }, []);
+
+  const handleSetChainId = useCallback((value: number) => {
+    setChainId(value);
+  }, []);
+
+  const handleSetBalanceInPool = useCallback((value: string) => {
+    setBalanceInPool(value);
+  }, []);
   const notificationShownRef = useRef(false);
 
   const chain = useMemo(() => chainData[chainId], [chainId]);
@@ -160,38 +176,53 @@ export const ChainProvider = ({ children }: Props) => {
 
     if (firstAvailable) {
       if (firstAvailable.url !== selectedRelayer?.url) {
-        setSelectedRelayer({ name: firstAvailable.name, url: firstAvailable.url });
+        handleSetSelectedRelayer({ name: firstAvailable.name, url: firstAvailable.url });
       }
     } else {
       if (selectedRelayer !== undefined) {
-        setSelectedRelayer(undefined);
+        handleSetSelectedRelayer(undefined);
       }
     }
-  }, [relayersData, selectedRelayer]);
+  }, [relayersData, selectedRelayer, handleSetSelectedRelayer]);
 
-  return (
-    <ChainContext.Provider
-      value={{
-        setChainId,
-        chain,
-        balanceBN,
-        balanceInPoolBN,
-        setBalanceInPool,
-        price,
-        maxDeposit: selectedPoolInfo?.maxDeposit.toString() ?? '0',
-        chainId,
-        selectedRelayer,
-        setSelectedRelayer,
-        relayers: chain.relayers,
-        relayersData,
-        isLoadingRelayers: allQueriesAreLoading,
-        hasSomeRelayerAvailable,
-        selectedAsset,
-        setSelectedAsset,
-        selectedPoolInfo,
-      }}
-    >
-      {children}
-    </ChainContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      setChainId: handleSetChainId,
+      chain,
+      balanceBN,
+      balanceInPoolBN,
+      setBalanceInPool: handleSetBalanceInPool,
+      price,
+      maxDeposit: selectedPoolInfo?.maxDeposit.toString() ?? '0',
+      chainId,
+      selectedRelayer,
+      setSelectedRelayer: handleSetSelectedRelayer,
+      relayers: chain.relayers,
+      relayersData,
+      isLoadingRelayers: allQueriesAreLoading,
+      hasSomeRelayerAvailable,
+      selectedAsset,
+      setSelectedAsset: handleSetSelectedAsset,
+      selectedPoolInfo,
+    }),
+    [
+      handleSetChainId,
+      chain,
+      balanceBN,
+      balanceInPoolBN,
+      handleSetBalanceInPool,
+      price,
+      selectedPoolInfo,
+      chainId,
+      selectedRelayer,
+      handleSetSelectedRelayer,
+      relayersData,
+      allQueriesAreLoading,
+      hasSomeRelayerAvailable,
+      selectedAsset,
+      handleSetSelectedAsset,
+    ],
   );
+
+  return <ChainContext.Provider value={contextValue}>{children}</ChainContext.Provider>;
 };

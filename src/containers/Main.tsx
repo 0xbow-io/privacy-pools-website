@@ -1,17 +1,20 @@
 'use client';
 
 import { styled } from '@mui/material';
+import { SafeAppWrapper } from '~/components';
 import { ActivityPreview, GlobalPool, PoolAccountsPreview } from '~/containers';
 
 export const Main = () => {
   return (
-    <MainContainer>
-      <PoolAccountsPreview />
+    <SafeAppWrapper>
+      <MainContainer>
+        <PoolAccountsPreview />
 
-      <GlobalPool />
+        <GlobalPool />
 
-      <ActivityPreview />
-    </MainContainer>
+        <ActivityPreview />
+      </MainContainer>
+    </SafeAppWrapper>
   );
 };
 

@@ -12,3 +12,4 @@ export * from './sdk';
 export * from './withdraw';
 export * from './seedPhrase';
 export * from './clipboard';
+export * from './eip7702';

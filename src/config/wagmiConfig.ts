@@ -11,7 +11,7 @@ import {
 import { HttpTransport } from 'viem';
 import { mainnet, type Chain } from 'viem/chains';
 import { createConfig, http } from 'wagmi';
-import { mock } from 'wagmi/connectors';
+import { mock, safe } from 'wagmi/connectors';
 import { getConfig, whitelistedChains, chainData } from '~/config';
 
 const { PROJECT_ID, TEST_MODE } = getConfig().env;
@@ -56,13 +56,16 @@ export const transports = allChains.reduce(
   {} as Record<number, HttpTransport>,
 );
 
+// Add Safe connector to the list
+const allConnectors = [...connectors, safe()];
+
 export const defaultConfig = createConfig({
   chains: allChains,
   ssr: false,
   storage: null,
   transports,
   batch: { multicall: true },
-  connectors,
+  connectors: allConnectors,
 });
 
 // Random test address

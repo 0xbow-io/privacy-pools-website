@@ -10,7 +10,7 @@ import { getUniqueConnectors, ROUTER } from '~/utils';
 import { ModalContainer, ModalTitle } from './Deposit';
 
 export const ConnectModal = () => {
-  const { availableConnectors, customConnect } = useCustomConnect();
+  const { availableConnectors, customConnect, autoConnectSafe, isSafeApp } = useCustomConnect();
   const { closeModal } = useModal();
   const goTo = useGoTo();
 
@@ -22,18 +22,37 @@ export const ConnectModal = () => {
     closeModal();
   };
 
+  const handleSafeConnect = async () => {
+    await autoConnectSafe();
+    goTo(ROUTER.account.base);
+    closeModal();
+  };
+
   return (
     <SModal type={ModalType.CONNECT} size='small'>
       <ModalContainer data-testid='wallet-modal'>
-        <ModalTitle variant='h2'> Sign in with</ModalTitle>
+        <ModalTitle variant='h2'>{isSafeApp ? 'Connect to Safe Wallet' : 'Sign in with'}</ModalTitle>
 
         <Stack gap={2} width='100%' maxWidth='26.4rem'>
+          {isSafeApp && (
+            <SButton
+              fullWidth
+              onClick={handleSafeConnect}
+              data-testid='wallet-option-safe'
+              variant='contained'
+              color='primary'
+            >
+              Connect Safe Wallet
+            </SButton>
+          )}
+
           {uniqueConnectors.map((connector) => (
             <SButton
               key={connector.uid}
               fullWidth
               onClick={() => handleConnect(connector)}
               data-testid={`wallet-option-${connector.id}`}
+              variant={isSafeApp ? 'outlined' : 'contained'}
             >
               {(connector as { rkDetails?: { name?: string } })?.rkDetails?.name || connector.name}
             </SButton>

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { addBreadcrumb, captureException, withScope } from '@sentry/nextjs';
 import { getAddress, Hex, parseUnits, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
-import { useAccount, usePublicClient, useSwitchChain } from 'wagmi';
+import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import { getConfig } from '~/config';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import {
@@ -12,6 +12,7 @@ import {
   useNotifications,
   usePoolAccountsContext,
   useChainContext,
+  useSafeApp,
 } from '~/hooks';
 import { Hash, ModalType, Secret, ProofRelayerPayload, WithdrawalRelayerPayload } from '~/types';
 import {
@@ -56,7 +57,9 @@ export const useWithdraw = () => {
   const { setModalOpen, setIsClosable } = useModal();
   const { aspData, relayerData } = useExternalServices();
   const { switchChainAsync } = useSwitchChain();
+  const { data: walletClient } = useWalletClient();
   const { resetQuote } = useQuoteContext();
+  const { isSafeApp } = useSafeApp();
   const {
     selectedPoolInfo,
     chainId,
@@ -82,14 +85,6 @@ export const useWithdraw = () => {
     feeCommitment,
     feeBPSForWithdraw,
   } = usePoolAccountsContext();
-
-  /*  console.log('🔍 useWithdraw debug:', {
-      feeCommitment,
-      feeBPSForWithdraw: feeBPSForWithdraw || 'undefined',
-      feeBPSType: typeof feeBPSForWithdraw,
-      target,
-      poolAccount: !!poolAccount,
-    });*/
 
   const commitment = poolAccount?.lastCommitment;
   const aspLeaves = aspData.mtLeavesData?.aspLeaves;
@@ -387,18 +382,6 @@ export const useWithdraw = () => {
       if (!TEST_MODE) {
         const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
 
-        console.log('🔍 withdraw() validation debug:', {
-          proof: !!currentProof,
-          withdrawal: !!currentWithdrawal,
-          commitment: !!commitment,
-          target: !!target,
-          relayerDetails: !!relayerDetails,
-          relayerAddress: !!relayerDetails?.relayerAddress,
-          feeCommitment: !!feeCommitment,
-          newSecretKeys: !!currentNewSecretKeys,
-          accountService: !!accountService,
-        });
-
         if (
           !currentProof ||
           !currentWithdrawal ||
@@ -412,7 +395,10 @@ export const useWithdraw = () => {
         )
           throw new Error('Missing required data to withdraw');
 
-        await switchChainAsync({ chainId });
+        // Only switch chain if not already on the correct chain and not using Safe
+        if (!isSafeApp && walletClient?.chain?.id !== chainId) {
+          await switchChainAsync({ chainId });
+        }
 
         const poolScope = await getScope(publicClient, selectedPoolInfo.address);
 
@@ -461,18 +447,10 @@ export const useWithdraw = () => {
           if (!receipt) throw new Error('Receipt not found');
 
           const events = decodeEventsFromReceipt(receipt, withdrawEventAbi);
-          console.log('🔍 Decoded events:', events);
-          console.log('🔍 All receipt logs:', receipt.logs);
           const withdrawnEvents = events.filter((event) => event.eventName === 'Withdrawn');
-          console.log('🔍 Withdrawn events found:', withdrawnEvents.length);
 
           // More robust event handling - try to find any event that looks like a withdrawal
           if (!withdrawnEvents.length) {
-            console.log(
-              '🔍 Available event names:',
-              events.map((e) => e.eventName),
-            );
-
             // Try to find any event that might be the withdrawal event
             const possibleWithdrawEvents = events.filter(
               (event) =>
@@ -482,7 +460,6 @@ export const useWithdraw = () => {
             );
 
             if (possibleWithdrawEvents.length > 0) {
-              console.log('🔍 Found possible withdraw events:', possibleWithdrawEvents);
               // Use the first possible event
               withdrawnEvents.push(possibleWithdrawEvents[0]);
             } else {
@@ -580,6 +557,8 @@ export const useWithdraw = () => {
       getDefaultErrorMessage,
       relayerData,
       resetQuote,
+      isSafeApp,
+      walletClient?.chain?.id,
     ],
   );
 
@@ -590,12 +569,9 @@ export const useWithdraw = () => {
         progress: number;
       }) => void,
     ) => {
-      console.log('🚀 generateProofAndWithdraw() function called');
-
       try {
         // Generate proof and call withdraw when complete
         await generateProof(onProgress, (proof, withdrawal, newSecretKeys) => {
-          console.log('✅ Proof generation completed, calling withdraw');
           withdraw(proof, withdrawal, newSecretKeys);
         });
       } catch (error) {
