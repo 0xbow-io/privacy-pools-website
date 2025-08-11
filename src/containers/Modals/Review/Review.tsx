@@ -95,28 +95,30 @@ export const ReviewModal = () => {
         <ModalTitle>Review the {actionType}</ModalTitle>
 
         <Stack gap={2} px='1.6rem' width='100%'>
-          {actionType === EventType.WITHDRAWAL && selectedPoolInfo?.isStableAsset && (
-            <GasTokenDropSection>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <InfoIcon />
-                  <Box>
-                    <Typography variant='body1' fontWeight={600}>
-                      Send Gas With Your Withdrawal
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      Get ETH for gas fees (1 swap + 1 transfer)
-                    </Typography>
+          {actionType === EventType.WITHDRAWAL &&
+            selectedPoolInfo?.isStableAsset &&
+            selectedPoolInfo?.asset !== 'FRXUSD' && (
+              <GasTokenDropSection>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <InfoIcon />
+                    <Box>
+                      <Typography variant='body1' fontWeight={600}>
+                        Send Gas With Your Withdrawal
+                      </Typography>
+                      <Typography variant='body2' color='text.secondary'>
+                        Get ETH for gas fees (1 swap + 1 transfer)
+                      </Typography>
+                    </Box>
                   </Box>
+                  <GreenSwitch
+                    checked={quoteState.extraGas}
+                    onChange={(e) => setExtraGas(e.target.checked)}
+                    disabled={isQuoteLoading}
+                  />
                 </Box>
-                <GreenSwitch
-                  checked={quoteState.extraGas}
-                  onChange={(e) => setExtraGas(e.target.checked)}
-                  disabled={isQuoteLoading}
-                />
-              </Box>
-            </GasTokenDropSection>
-          )}
+              </GasTokenDropSection>
+            )}
 
           <DataSection />
         </Stack>
