@@ -1,6 +1,7 @@
 import { Address, parseEther, parseUnits } from 'viem';
 import { Chain, mainnet, sepolia } from 'viem/chains';
 import { getEnv } from '~/config/env';
+import { sUSDSAbi } from '~/config/sUSDSAbi';
 import daiIcon from '~/assets/icons/dai.svg';
 import frxusdIcon from '~/assets/icons/frxusd.svg';
 import mainnetIcon from '~/assets/icons/mainnet_color.svg';
@@ -34,6 +35,16 @@ export type ChainAssets =
   | 'USD1'
   | 'FRXUSD';
 
+export interface AlternativeTokenConfig {
+  tokenAddress: Address;
+  tokenSymbol: string;
+  tokenIcon?: string;
+  stakingContract: Address;
+  stakingMethod: 'deposit' | 'stake' | 'mint'; // Different protocols use different method names
+  previewMethod: 'previewDeposit' | 'previewStake' | 'previewMint';
+  stakingAbi: readonly unknown[];
+}
+
 export interface PoolInfo {
   chainId: number;
   address: Address;
@@ -46,6 +57,11 @@ export interface PoolInfo {
   assetDecimals?: number;
   icon?: string;
   isStableAsset?: boolean; // Includes stablecoins and yield-bearing stablecoins
+  alternativeTokens?: AlternativeTokenConfig[]; // Allow depositing alternative tokens that get converted
+  yield?: {
+    apy: number; // Annual percentage yield (e.g., 5.2 for 5.2%)
+    source: string; // Description of yield source (e.g., "Savings USDS staking rewards")
+  };
 }
 
 export interface ChainData {
@@ -117,6 +133,21 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: susdsIcon.src,
         isStableAsset: true,
+        yield: {
+          apy: 5.2, // Current sUSDS APY
+          source: 'USDS Savings Rate staking rewards',
+        },
+        alternativeTokens: [
+          {
+            tokenAddress: '0xdC035D45d973E3EC169d2276DDab16f1e407384F', // USDS token address
+            tokenSymbol: 'USDS',
+            tokenIcon: usdsIcon.src,
+            stakingContract: '0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD', // sUSDS contract
+            stakingMethod: 'deposit',
+            previewMethod: 'previewDeposit',
+            stakingAbi: sUSDSAbi,
+          },
+        ],
       },
       {
         chainId: mainnet.id,

@@ -3,7 +3,7 @@
 import { createContext, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Address, createPublicClient, getAddress, Hex, http } from 'viem';
-import { whitelistedChains } from '~/config';
+import { whitelistedChains, AlternativeTokenConfig } from '~/config';
 import { useChainContext } from '~/hooks';
 import {
   CommitmentProof,
@@ -29,6 +29,10 @@ type ContextType = {
   poolAccount: PoolAccount | undefined;
   setPoolAccount: (val?: PoolAccount) => void;
   resetInputs: () => void;
+
+  // Alternative token selection
+  selectedAlternativeToken: AlternativeTokenConfig | null;
+  setSelectedAlternativeToken: (val: AlternativeTokenConfig | null) => void;
 
   // Details modal
   selectedHistoryData?: HistoryData[number];
@@ -72,6 +76,7 @@ export const PoolAccountsProvider = ({ children }: Props) => {
   const [amount, setAmount] = useState<string>('');
   const [target, setTarget] = useState<Address | ''>('');
   const [poolAccount, setPoolAccount] = useState<PoolAccount>();
+  const [selectedAlternativeToken, setSelectedAlternativeToken] = useState<AlternativeTokenConfig | null>(null);
 
   const [proof, setProof] = useState<ContextType['proof']>(null);
   const [withdrawal, setWithdrawal] = useState<Withdrawal | null>(null);
@@ -85,6 +90,7 @@ export const PoolAccountsProvider = ({ children }: Props) => {
     setAmount('');
     setTarget('');
     setPoolAccount(undefined);
+    setSelectedAlternativeToken(null);
   };
 
   const resetTransactionState = () => {
@@ -102,6 +108,7 @@ export const PoolAccountsProvider = ({ children }: Props) => {
     setAmount('');
     setTarget('');
     setPoolAccount(undefined);
+    setSelectedAlternativeToken(null);
   }, [selectedPoolInfo.assetAddress, selectedPoolInfo.chainId]);
 
   const { data: assetConfigs, isLoading: isAssetConfigLoading } = useQuery({
@@ -140,6 +147,8 @@ export const PoolAccountsProvider = ({ children }: Props) => {
         poolAccount,
         setPoolAccount,
         resetInputs,
+        selectedAlternativeToken,
+        setSelectedAlternativeToken,
         selectedHistoryData,
         setSelectedHistoryData,
         proof,

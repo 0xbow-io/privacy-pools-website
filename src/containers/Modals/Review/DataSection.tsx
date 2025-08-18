@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import { Stack, styled, Typography, IconButton, Collapse, Avatar } from '@mui/material';
+import { Stack, styled, Typography, IconButton, Collapse, Avatar, Alert } from '@mui/material';
 import { formatUnits, parseUnits, isAddress } from 'viem';
-import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { useAccount, useEnsName, useEnsAvatar, usePublicClient } from 'wagmi';
 import { ExtendedTooltip as Tooltip } from '~/components';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import {
@@ -15,6 +15,7 @@ import {
 } from '~/hooks';
 import { EventType } from '~/types';
 import { getUsdBalance, truncateAddress } from '~/utils';
+import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
 import { FeeBreakdown, formatFeeDisplay } from './FeeBreakdown';
 
 const getMaxDisplayPrecision = (isStableAsset: boolean): number => {
@@ -30,6 +31,7 @@ export const DataSection = () => {
   const { address } = useAccount();
   const [isFeeBreakdownOpen, setIsFeeBreakdownOpen] = useState(false);
   const { quoteState } = useQuoteContext();
+  const publicClient = usePublicClient();
   const {
     balanceBN: { symbol, decimals },
     price,
@@ -46,10 +48,31 @@ export const DataSection = () => {
     feeBPSForWithdraw,
     setFeeCommitment,
     setFeeBPSForWithdraw,
+    selectedAlternativeToken,
   } = usePoolAccountsContext();
   const { addNotification } = useNotifications();
   const isDeposit = actionType === EventType.DEPOSIT;
   const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
+
+  // Calculate sUSDS amount if using alternative token
+  const [sUSDSPreview, setSUSDSPreview] = useState<bigint | null>(null);
+
+  useEffect(() => {
+    const fetchPreview = async () => {
+      if (selectedAlternativeToken && publicClient && amount) {
+        try {
+          const amountBN = parseUnits(amount, decimals);
+          const preview = await getStakedTokenPreview(selectedAlternativeToken, amountBN, publicClient);
+          setSUSDSPreview(preview);
+        } catch (error) {
+          console.error('Error fetching sUSDS preview:', error);
+        }
+      } else {
+        setSUSDSPreview(null);
+      }
+    };
+    fetchPreview();
+  }, [selectedAlternativeToken, amount, decimals, publicClient]);
 
   // Add quote timer for withdrawals
   const amountBN = parseUnits(amount, decimals);
@@ -138,14 +161,17 @@ export const DataSection = () => {
     : currentSelectedRelayerData?.relayerAddress;
   const feesCollector = `OxBow (${truncateAddress(feesCollectorAddress)})`;
 
+  // Use alternative token symbol if selected
+  const displaySymbol = selectedAlternativeToken && isDeposit ? selectedAlternativeToken.tokenSymbol : symbol;
+
   const amountUSD = getUsdBalance(price, amount, decimals);
 
   // Value is now the actual amount being withdrawn (amount minus fees)
   const amountWithFeeBN = parseUnits(amount, decimals) - fees;
   const amountWithFee = formatUnits(amountWithFeeBN, decimals);
   const amountWithFeeUSD = getUsdBalance(price, amountWithFee, decimals);
-  const valueText = `${parseFloat(amountWithFee).toString()} ${symbol} (~$${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)} USD)`;
-  const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${symbol}`;
+  const valueText = `${parseFloat(amountWithFee).toString()} ${displaySymbol} (~$${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)} USD)`;
+  const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${displaySymbol}`;
 
   // Net Fee calculation (includes extra gas amount if enabled)
   let netFeeAmount = fees;
@@ -166,14 +192,33 @@ export const DataSection = () => {
   const netFeeNumeric = parseFloat(netFeeFormatted);
   const netFeeDisplayValue = parseFloat(netFeeNumeric.toFixed(netFeePrecision)).toString();
 
-  const netFeeText = `${netFeeDisplayValue} ${symbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`;
-  const netFeeTooltip = `${formatFullPrecision(netFeeAmount, decimals)} ${symbol}`;
+  const netFeeText = `${netFeeDisplayValue} ${displaySymbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`;
+  const netFeeTooltip = `${formatFullPrecision(netFeeAmount, decimals)} ${displaySymbol}`;
 
   const totalAmountBN = parseUnits(amount, decimals);
-  const totalTooltip = `${formatFullPrecision(totalAmountBN, decimals)} ${symbol}`;
+  const totalTooltip = `${formatFullPrecision(totalAmountBN, decimals)} ${displaySymbol}`;
 
   return (
     <Container>
+      {selectedAlternativeToken && isDeposit && (
+        <Alert severity='info' sx={{ mb: 2, fontSize: '1.4rem' }}>
+          <Stack gap={1}>
+            <Typography variant='body2'>
+              <strong>Staking Flow:</strong> Your {selectedAlternativeToken.tokenSymbol} will be staked to{' '}
+              {selectedPoolInfo?.asset}
+            </Typography>
+            {sUSDSPreview && (
+              <Typography variant='body2'>
+                <strong>You will receive:</strong> {formatUnits(sUSDSPreview, decimals)} {selectedPoolInfo?.asset}
+              </Typography>
+            )}
+            <Typography variant='caption' color='text.secondary'>
+              This will be done in a single batched transaction
+            </Typography>
+          </Stack>
+        </Alert>
+      )}
+
       <Stack>
         {actionType !== EventType.EXIT && (
           <Row>

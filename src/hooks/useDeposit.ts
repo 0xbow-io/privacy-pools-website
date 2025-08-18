@@ -16,6 +16,11 @@ import { useChainContext, useAccountContext, useNotifications, usePoolAccountsCo
 import { Hash, ModalType, Secret } from '~/types';
 import { depositEventAbi, decodeEventsFromReceipt, createDepositSecrets, entrypointAbi } from '~/utils';
 import {
+  createAlternativeTokenDepositBatch,
+  checkAlternativeTokenBalance,
+  getStakedTokenPreview,
+} from '~/utils/alternativeTokenDeposit';
+import {
   supportsEIP7702Batching,
   sendBatchTransaction,
   createApprovalDepositBatch,
@@ -39,7 +44,7 @@ export const useDeposit = () => {
   const { addNotification, getDefaultErrorMessage } = useNotifications();
   const { switchChainAsync } = useSwitchChain();
   const { setModalOpen, setIsClosable } = useModal();
-  const { amount, setTransactionHash, vettingFeeBPS } = usePoolAccountsContext();
+  const { amount, setTransactionHash, vettingFeeBPS, selectedAlternativeToken } = usePoolAccountsContext();
   const [isLoading, setIsLoading] = useState(false);
   const { accountService, poolAccounts, addPoolAccount } = useAccountContext();
   const { data: walletClient } = useWalletClient({ chainId });
@@ -130,120 +135,274 @@ export const useDeposit = () => {
           const supportsEIP7702 = await supportsEIP7702Batching(address, chainId);
 
           // Safe App batching path - prioritize Safe Apps SDK over legacy detection
-          if (isSafeApp && assetAllowance < value) {
-            addNotification('info', 'Using Safe App - batching approval + deposit...');
+          if (isSafeApp && (assetAllowance < value || selectedAlternativeToken)) {
+            if (selectedAlternativeToken) {
+              addNotification('info', 'Using Safe App - batching USDS staking + sUSDS deposit...');
 
-            // Create the deposit call data
-            const depositCallData = encodeFunctionData({
-              abi: entrypointAbi,
-              functionName: 'deposit',
-              args: [selectedPoolInfo.assetAddress, value, precommitmentHash],
-            });
+              // Check if user has enough USDS
+              const hasEnoughBalance = await checkAlternativeTokenBalance(
+                selectedAlternativeToken.tokenAddress,
+                address,
+                value,
+                publicClient!,
+              );
 
-            // Create Safe batch transaction using React SDK hook
-            const safeTxs = createSafeBatchTransaction(
-              selectedPoolInfo.assetAddress,
-              selectedPoolInfo.entryPointAddress,
-              value,
-              BigInt(vettingFeeBPS),
-              getAddress(selectedPoolInfo.entryPointAddress),
-              depositCallData,
-            );
+              if (!hasEnoughBalance) {
+                throw new Error('Insufficient USDS balance');
+              }
 
-            // Send through Safe Apps SDK
-            const safeTxResponse = await sendSafeBatchTransaction(safeTxs);
+              // Get preview of sUSDS shares
+              await getStakedTokenPreview(selectedAlternativeToken, value, publicClient!);
 
-            // Ensure we have a string hash
-            const safeTxHash = typeof safeTxResponse === 'string' ? safeTxResponse : String(safeTxResponse);
+              // Create alternative token deposit batch (approve USDS, stake, approve sUSDS)
+              const { calls: alternativeBatch, expectedStakedAmount } = await createAlternativeTokenDepositBatch(
+                selectedAlternativeToken,
+                value,
+                address,
+                selectedPoolInfo.entryPointAddress,
+                precommitmentHash,
+                publicClient!,
+              );
 
-            // For Safe, show immediate notification about proposal
-            addNotification('info', 'Safe transaction proposed! Waiting for execution...');
+              // Create the final deposit call data with slightly less than expected sUSDS amount
+              // to account for rounding differences in the staking process
+              const safeDepositAmount = (expectedStakedAmount * 9999n) / 10000n; // 99.99% of expected
+              const depositCallData = encodeFunctionData({
+                abi: entrypointAbi,
+                functionName: 'deposit',
+                args: [selectedPoolInfo.assetAddress, safeDepositAmount, precommitmentHash],
+              });
 
-            // Immediately show processing modal with Safe tx hash
-            setTransactionHash(safeTxHash as ViemHash);
-            setModalOpen(ModalType.PROCESSING);
+              // Combine all transactions for Safe
+              const safeTxs = [
+                ...alternativeBatch.map((call) => ({
+                  to: call.to,
+                  value: '0',
+                  data: call.data,
+                })),
+                {
+                  to: getAddress(selectedPoolInfo.entryPointAddress),
+                  value: '0',
+                  data: depositCallData,
+                },
+              ];
 
-            // Wait for the Safe transaction to be executed and get the actual transaction hash
-            const actualTxHash = await waitForSafeTransaction(safeTxHash);
+              // Note: createSafeBatchTransaction expects specific format, we'll send raw
+              const safeTxResponse = await sendSafeBatchTransaction(safeTxs);
+              const safeTxHash = typeof safeTxResponse === 'string' ? safeTxResponse : String(safeTxResponse);
 
-            if (!actualTxHash) {
-              throw new Error('Safe transaction was not executed within the timeout period');
+              addNotification('info', 'Safe transaction proposed with staking! Waiting for execution...');
+              setTransactionHash(safeTxHash as ViemHash);
+              setModalOpen(ModalType.PROCESSING);
+
+              const actualTxHash = await waitForSafeTransaction(safeTxHash);
+              if (!actualTxHash) {
+                throw new Error('Safe transaction was not executed within the timeout period');
+              }
+
+              hash = actualTxHash as ViemHash;
+              setTransactionHash(hash);
+            } else {
+              addNotification('info', 'Using Safe App - batching approval + deposit...');
+
+              // Create the deposit call data
+              const depositCallData = encodeFunctionData({
+                abi: entrypointAbi,
+                functionName: 'deposit',
+                args: [selectedPoolInfo.assetAddress, value, precommitmentHash],
+              });
+
+              // Create Safe batch transaction using React SDK hook
+              const safeTxs = createSafeBatchTransaction(
+                selectedPoolInfo.assetAddress,
+                selectedPoolInfo.entryPointAddress,
+                value,
+                BigInt(vettingFeeBPS),
+                getAddress(selectedPoolInfo.entryPointAddress),
+                depositCallData,
+              );
+
+              // Send through Safe Apps SDK
+              const safeTxResponse = await sendSafeBatchTransaction(safeTxs);
+
+              // Ensure we have a string hash
+              const safeTxHash = typeof safeTxResponse === 'string' ? safeTxResponse : String(safeTxResponse);
+
+              // For Safe, show immediate notification about proposal
+              addNotification('info', 'Safe transaction proposed! Waiting for execution...');
+
+              // Immediately show processing modal with Safe tx hash
+              setTransactionHash(safeTxHash as ViemHash);
+              setModalOpen(ModalType.PROCESSING);
+
+              // Wait for the Safe transaction to be executed and get the actual transaction hash
+              const actualTxHash = await waitForSafeTransaction(safeTxHash);
+
+              if (!actualTxHash) {
+                throw new Error('Safe transaction was not executed within the timeout period');
+              }
+
+              // Update with the actual on-chain transaction hash
+              hash = actualTxHash as ViemHash;
+              setTransactionHash(hash);
             }
-
-            // Update with the actual on-chain transaction hash
-            hash = actualTxHash as ViemHash;
-            setTransactionHash(hash);
           }
           // MetaMask Smart Account batching path
-          else if (supportsEIP7702 && assetAllowance < value) {
-            // True single-transaction batching using MetaMask Smart Account wallet_sendCalls API
-            addNotification('info', 'Using Smart Account - batching approval + deposit in single transaction...');
+          else if (supportsEIP7702 && (assetAllowance < value || selectedAlternativeToken)) {
+            if (selectedAlternativeToken) {
+              // Alternative token staking flow
+              addNotification(
+                'info',
+                'Using Smart Account - batching USDS staking + sUSDS deposit in single transaction...',
+              );
 
-            // Create the deposit call data directly without simulation
-            // (simulation would fail because allowance isn't approved yet)
+              // Check if user has enough USDS
+              const hasEnoughBalance = await checkAlternativeTokenBalance(
+                selectedAlternativeToken.tokenAddress,
+                address,
+                value,
+                publicClient!,
+              );
 
-            const depositCallData = encodeFunctionData({
-              abi: entrypointAbi,
-              functionName: 'deposit',
-              args: [selectedPoolInfo.assetAddress, value, precommitmentHash],
-            });
+              if (!hasEnoughBalance) {
+                throw new Error('Insufficient USDS balance');
+              }
 
-            // Create the batch calls
-            const batchCalls = createApprovalDepositBatch(
-              selectedPoolInfo.assetAddress,
-              selectedPoolInfo.entryPointAddress,
-              value,
-              BigInt(vettingFeeBPS),
-              getAddress(selectedPoolInfo.entryPointAddress),
-              depositCallData,
-            );
+              // Get preview of sUSDS shares
+              await getStakedTokenPreview(selectedAlternativeToken, value, publicClient!);
 
-            // Send batch transaction using MetaMask Smart Account API
-            const batchId = await sendBatchTransaction(batchCalls, address, chainId);
+              // Create alternative token deposit batch (approve USDS, stake, approve sUSDS)
+              const { calls: alternativeBatch, expectedStakedAmount } = await createAlternativeTokenDepositBatch(
+                selectedAlternativeToken,
+                value,
+                address,
+                selectedPoolInfo.entryPointAddress,
+                precommitmentHash,
+                publicClient!,
+              );
 
-            addNotification('info', 'Batch transaction submitted, waiting for confirmation...');
+              // Create the final deposit call data with slightly less than expected sUSDS amount
+              // to account for rounding differences in the staking process
+              const safeDepositAmount = (expectedStakedAmount * 9999n) / 10000n; // 99.99% of expected
+              const depositCallData = encodeFunctionData({
+                abi: entrypointAbi,
+                functionName: 'deposit',
+                args: [selectedPoolInfo.assetAddress, safeDepositAmount, precommitmentHash],
+              });
 
-            // Poll for batch status
-            let batchStatus;
-            let attempts = 0;
-            const maxAttempts = 60; // 5 minutes with 5-second intervals
+              // Combine all calls for EIP-7702 batching
+              const batchCalls = [
+                ...alternativeBatch,
+                {
+                  to: getAddress(selectedPoolInfo.entryPointAddress),
+                  data: depositCallData,
+                },
+              ];
 
-            do {
-              await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
-              batchStatus = await getBatchStatus(batchId);
-              attempts++;
-            } while (batchStatus.status === 100 && attempts < maxAttempts); // 100 = PENDING
+              // Send batch transaction using MetaMask Smart Account API
+              const batchId = await sendBatchTransaction(batchCalls, address, chainId);
 
-            if (batchStatus.status >= 400) {
-              throw new Error(`Batch transaction failed with status: ${batchStatus.status}`);
-            }
+              addNotification('info', 'Batch transaction with staking submitted, waiting for confirmation...');
 
-            if (batchStatus.status === 100) {
-              throw new Error('Batch transaction timed out');
-            }
+              // Poll for batch status
+              let batchStatus;
+              let attempts = 0;
+              const maxAttempts = 60; // 5 minutes with 5-second intervals
 
-            // Debug the receipt structure
+              do {
+                await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
+                batchStatus = await getBatchStatus(batchId);
+                attempts++;
+              } while (batchStatus.status === 100 && attempts < maxAttempts); // 100 = PENDING
 
-            // Extract the deposit transaction hash from the batch receipts
-            if (!batchStatus.receipts || batchStatus.receipts.length === 0) {
-              throw new Error(`No receipts found. Status: ${batchStatus.status}`);
-            }
+              if (batchStatus.status >= 400) {
+                throw new Error(`Batch transaction failed with status: ${batchStatus.status}`);
+              }
 
-            // Check if we have 1 or 2 receipts and handle accordingly
-            let depositReceipt;
-            if (batchStatus.receipts.length === 1) {
-              // Single receipt might contain both transactions
-              depositReceipt = batchStatus.receipts[0];
-            } else if (batchStatus.receipts.length === 2) {
-              // Two receipts - deposit is the second one
-              depositReceipt = batchStatus.receipts[1];
+              if (batchStatus.status === 100) {
+                throw new Error('Batch transaction timed out');
+              }
+
+              // Extract the deposit transaction hash from the batch receipts
+              if (!batchStatus.receipts || batchStatus.receipts.length === 0) {
+                throw new Error(`No receipts found. Status: ${batchStatus.status}`);
+              }
+
+              // Get the last receipt (final deposit transaction)
+              const depositReceipt = batchStatus.receipts[batchStatus.receipts.length - 1];
+              hash = depositReceipt.transactionHash as ViemHash;
+
+              addNotification('success', 'Smart Account batch transaction with staking confirmed!');
             } else {
-              throw new Error(`Unexpected number of receipts: ${batchStatus.receipts.length}`);
+              // Standard token approval + deposit
+              addNotification('info', 'Using Smart Account - batching approval + deposit in single transaction...');
+
+              // Create the deposit call data directly without simulation
+              // (simulation would fail because allowance isn't approved yet)
+
+              const depositCallData = encodeFunctionData({
+                abi: entrypointAbi,
+                functionName: 'deposit',
+                args: [selectedPoolInfo.assetAddress, value, precommitmentHash],
+              });
+
+              // Create the batch calls
+              const batchCalls = createApprovalDepositBatch(
+                selectedPoolInfo.assetAddress,
+                selectedPoolInfo.entryPointAddress,
+                value,
+                BigInt(vettingFeeBPS),
+                getAddress(selectedPoolInfo.entryPointAddress),
+                depositCallData,
+              );
+
+              // Send batch transaction using MetaMask Smart Account API
+              const batchId = await sendBatchTransaction(batchCalls, address, chainId);
+
+              addNotification('info', 'Batch transaction submitted, waiting for confirmation...');
+
+              // Poll for batch status
+              let batchStatus;
+              let attempts = 0;
+              const maxAttempts = 60; // 5 minutes with 5-second intervals
+
+              do {
+                await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
+                batchStatus = await getBatchStatus(batchId);
+                attempts++;
+              } while (batchStatus.status === 100 && attempts < maxAttempts); // 100 = PENDING
+
+              if (batchStatus.status >= 400) {
+                throw new Error(`Batch transaction failed with status: ${batchStatus.status}`);
+              }
+
+              if (batchStatus.status === 100) {
+                throw new Error('Batch transaction timed out');
+              }
+
+              // Debug the receipt structure
+
+              // Extract the deposit transaction hash from the batch receipts
+              if (!batchStatus.receipts || batchStatus.receipts.length === 0) {
+                throw new Error(`No receipts found. Status: ${batchStatus.status}`);
+              }
+
+              // Check if we have 1 or 2 receipts and handle accordingly
+              let depositReceipt;
+              if (batchStatus.receipts.length === 1) {
+                // Single receipt might contain both transactions
+                depositReceipt = batchStatus.receipts[0];
+              } else if (batchStatus.receipts.length === 2) {
+                // Two receipts - deposit is the second one
+                depositReceipt = batchStatus.receipts[1];
+              } else {
+                throw new Error(`Unexpected number of receipts: ${batchStatus.receipts.length}`);
+              }
+
+              hash = depositReceipt.transactionHash as ViemHash;
+
+              addNotification('success', 'Smart Account batch transaction confirmed!');
             }
-
-            hash = depositReceipt.transactionHash as ViemHash;
-
-            addNotification('success', 'Smart Account batch transaction confirmed!');
           } else {
             // Standard flow - check allowance and approve if needed
             if (assetAllowance < value) {

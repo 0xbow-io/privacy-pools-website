@@ -8,6 +8,7 @@ export * from './fetchTokenPrice';
 export * from './proof';
 export * from './aspClient';
 export * from './relayerClient';
+export * from './poolUtils';
 export * from './sdk';
 export * from './withdraw';
 export * from './seedPhrase';
