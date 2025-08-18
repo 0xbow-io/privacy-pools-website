@@ -291,8 +291,13 @@ export const useDeposit = () => {
               });
 
               // Combine all calls for EIP-7702 batching
+              // Convert AlternativeDepositBatchCall to BatchCall format (value as string)
               const batchCalls = [
-                ...alternativeBatch,
+                ...alternativeBatch.map((call) => ({
+                  to: call.to,
+                  data: call.data,
+                  value: call.value ? call.value.toString() : undefined,
+                })),
                 {
                   to: getAddress(selectedPoolInfo.entryPointAddress),
                   data: depositCallData,

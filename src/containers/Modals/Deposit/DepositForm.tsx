@@ -262,7 +262,7 @@ export const DepositForm = () => {
   };
 
   // Handle token selection change
-  const handleTokenChange = (event: React.MouseEvent<HTMLElement>, newToken: 'native' | 'alternative' | null) => {
+  const handleTokenChange = (_event: React.MouseEvent<HTMLElement>, newToken: 'native' | 'alternative' | null) => {
     if (newToken !== null) {
       setSelectedToken(newToken);
       if (newToken === 'alternative' && selectedPoolInfo?.alternativeTokens?.[0]) {

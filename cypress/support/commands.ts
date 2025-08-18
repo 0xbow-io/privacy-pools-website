@@ -37,7 +37,7 @@ Cypress.Commands.add('interceptAllRequests', () => {
     statusCode: 200,
     fixture: 'asp/mt-roots.json',
   });
-  cy.intercept('GET', '**/private/mt-leaves', {
+  cy.intercept('GET', '**/public/mt-leaves', {
     statusCode: 200,
     fixture: 'asp/mt-leaves.json',
   });
@@ -45,11 +45,11 @@ Cypress.Commands.add('interceptAllRequests', () => {
     statusCode: 200,
     fixture: 'asp/deposits.json',
   });
-  cy.intercept('GET', '**/private/deposits', {
+  cy.intercept('GET', '**/public/deposits-by-label', {
     statusCode: 200,
     fixture: 'asp/deposits.json',
   });
-  cy.intercept('GET', '**/private/events**', {
+  cy.intercept('GET', '**/public/events**', {
     statusCode: 200,
     fixture: 'asp/events.json',
   });
