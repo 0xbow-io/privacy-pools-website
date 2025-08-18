@@ -26,7 +26,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatUnits, parseUnits, erc20Abi } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import { getConstants } from '~/config/constants';
-import { useChainContext, useModal, usePoolAccountsContext } from '~/hooks';
+import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature } from '~/hooks';
 import { ModalType } from '~/types';
 import { formatDataNumber, getUsdBalance, calculateAspFee, calculateInitialDeposit } from '~/utils';
 import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
@@ -42,6 +42,7 @@ export const DepositForm = () => {
   const [asp, setAsp] = useState(ASP_OPTIONS[0]);
   const { address } = useAccount();
   const publicClient = usePublicClient();
+  const isStakingEnabled = useStakingFeature();
   const {
     balanceBN: { symbol, formatted: balanceFormatted, decimals },
     price: currentPrice,
@@ -71,8 +72,10 @@ export const DepositForm = () => {
     return true;
   });
 
-  // Find yield opportunities for current token
-  const yieldOpportunity = getBestYieldOpportunity(selectedPoolInfo?.asset || 'ETH', chain.poolInfo);
+  // Find yield opportunities for current token (only when staking is enabled)
+  const yieldOpportunity = isStakingEnabled
+    ? getBestYieldOpportunity(selectedPoolInfo?.asset || 'ETH', chain.poolInfo)
+    : null;
 
   // Fetch real-time APY for sUSDS if it's the yield opportunity
   const { data: realTimeAPY } = useQuery({
@@ -92,7 +95,7 @@ export const DepositForm = () => {
   const displayAPY =
     realTimeAPY !== null && realTimeAPY !== undefined ? realTimeAPY : yieldOpportunity?.pool.yield?.apy || 0;
 
-  const shouldShowYieldAlert = yieldOpportunity && showYieldAlert;
+  const shouldShowYieldAlert = isStakingEnabled && yieldOpportunity && showYieldAlert;
 
   // Handle dismissing the alert permanently
   const handleDismissAlert = () => {
@@ -150,7 +153,7 @@ export const DepositForm = () => {
   const feeUSD = getUsdBalance(currentPrice, formatUnits(fee, decimals), decimals);
   const feeText = `Fee ${feeFormatted} ${displaySymbol} ~ ${feeUSD} USD`;
   const stakingNote =
-    selectedAlternativeToken && sUSDSPreview
+    isStakingEnabled && selectedAlternativeToken && sUSDSPreview
       ? ` (Will receive ${formatUnits(sUSDSPreview, decimals)} ${selectedPoolInfo?.asset})`
       : '';
 
@@ -274,7 +277,7 @@ export const DepositForm = () => {
 
   // Auto-select alternative token when switching to a yield pool that has the previous token as alternative
   useEffect(() => {
-    if (selectedPoolInfo?.alternativeTokens?.length) {
+    if (isStakingEnabled && selectedPoolInfo?.alternativeTokens?.length) {
       // Check if this pool has alternative tokens and we should auto-select one
       const hasAlternativeTokens = selectedPoolInfo.alternativeTokens.length > 0;
       if (hasAlternativeTokens && selectedPoolInfo.yield) {
@@ -284,6 +287,7 @@ export const DepositForm = () => {
       }
     }
   }, [
+    isStakingEnabled,
     selectedPoolInfo?.asset,
     selectedPoolInfo?.alternativeTokens,
     selectedPoolInfo?.yield,
@@ -368,8 +372,8 @@ export const DepositForm = () => {
         </Alert>
       )}
 
-      {/* Token Selection Toggle - only show if alternative tokens are available */}
-      {selectedPoolInfo?.alternativeTokens && selectedPoolInfo.alternativeTokens.length > 0 && (
+      {/* Token Selection Toggle - only show if alternative tokens are available and staking is enabled */}
+      {isStakingEnabled && selectedPoolInfo?.alternativeTokens && selectedPoolInfo.alternativeTokens.length > 0 && (
         <Stack gap='1rem' width='100%' alignItems='center'>
           <Typography variant='caption' color='textSecondary'>
             Select deposit token
