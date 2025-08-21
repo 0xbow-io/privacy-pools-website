@@ -23,7 +23,13 @@ export function useAccountManager(
   );
 
   const loadAccount = async (seed: string) => {
-    const _accountService = await sdkLoadAccount(seed);
+    const { accountService: _accountService, errors } = await sdkLoadAccount(seed);
+
+    // Log any errors that occurred during loading
+    if (errors.length > 0) {
+      console.warn('Some pools failed to load during account initialization:', errors);
+    }
+
     accountServiceRef.current = _accountService;
 
     const { poolAccounts, poolAccountsByChainScope } = await getPoolAccountsFromAccount(

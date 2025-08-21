@@ -17,6 +17,7 @@ import {
   AccountCommitment,
   ChainConfig,
   PoolInfo,
+  PoolEventsError,
 } from '@0xbow/privacy-pools-core-sdk';
 import { createPublicClient, Hex } from 'viem';
 import { ChainData, chainData, whitelistedChains } from '~/config';
@@ -145,10 +146,20 @@ export const createAccount = (seed: string) => {
   return accountService;
 };
 
-export const loadAccount = async (seed: string) => {
-  const accountService = new AccountService(dataService, { mnemonic: seed });
-  await accountService.retrieveHistory(pools);
-  return accountService;
+export const loadAccount = async (
+  seed: string,
+): Promise<{ accountService: AccountService; errors: PoolEventsError[] }> => {
+  const result = await AccountService.initializeWithEvents(dataService, { mnemonic: seed }, pools);
+
+  // Log any errors that occurred during event fetching
+  if (result.errors.length > 0) {
+    console.warn('Some pools failed to load:', result.errors);
+  }
+
+  return {
+    accountService: result.account,
+    errors: result.errors,
+  };
 };
 
 export const createDepositSecrets = (accountService: AccountService, scope: Hash, index: bigint) => {
