@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.8.0] - 2025-08-21
+
+### Changed
+
+- Modified ASP requests to work with updated spec
+- Changed the account history retrieval from outdated function
+
 ## [1.7.0] - 2025-08-11
 
 ### Added
