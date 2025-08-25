@@ -57,6 +57,7 @@ export interface PoolInfo {
   assetDecimals?: number;
   icon?: string;
   isStableAsset?: boolean; // Includes stablecoins and yield-bearing stablecoins
+  isNativeToken?: boolean; // True for native tokens (ETH on Ethereum, etc.)
   alternativeTokens?: AlternativeTokenConfig[]; // Allow depositing alternative tokens that get converted
   yield?: {
     apy: number; // Annual percentage yield (e.g., 5.2 for 5.2%)
@@ -107,6 +108,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: mainnetIcon.src,
         isStableAsset: false,
+        isNativeToken: true,
       },
       {
         chainId: mainnet.id,
@@ -120,6 +122,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: usdsIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -133,6 +136,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: susdsIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
         yield: {
           apy: 5.2, // Current sUSDS APY
           source: 'USDS Savings Rate staking rewards',
@@ -161,6 +165,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: daiIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -174,6 +179,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 6,
         icon: usdtIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -187,6 +193,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 6,
         icon: usdcIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -200,6 +207,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: wstethIcon.src,
         isStableAsset: false,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -213,6 +221,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 8,
         icon: wbtcIcon.src,
         isStableAsset: false,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -226,6 +235,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: usdeIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -239,6 +249,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: usd1Icon.src,
         isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: mainnet.id,
@@ -252,6 +263,7 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: frxusdIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
       },
     ],
   },
@@ -285,6 +297,7 @@ const testnetChainData: ChainData = {
         assetDecimals: 18,
         icon: mainnetIcon.src,
         isStableAsset: false,
+        isNativeToken: true,
       },
       {
         chainId: sepolia.id,
@@ -297,6 +310,7 @@ const testnetChainData: ChainData = {
         asset: 'USDT',
         assetDecimals: 6,
         isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: sepolia.id,
@@ -309,6 +323,7 @@ const testnetChainData: ChainData = {
         asset: 'USDC',
         assetDecimals: 6,
         isStableAsset: true,
+        isNativeToken: false,
       },
     ],
   },

@@ -23,12 +23,12 @@ import {
   IconButton,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { formatUnits, parseUnits, erc20Abi } from 'viem';
+import { formatUnits, parseUnits, erc20Abi, encodeFunctionData } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import { getConstants } from '~/config/constants';
 import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature } from '~/hooks';
 import { ModalType } from '~/types';
-import { formatDataNumber, getUsdBalance, calculateAspFee, calculateInitialDeposit } from '~/utils';
+import { formatDataNumber, getUsdBalance, calculateAspFee, calculateInitialDeposit, entrypointAbi } from '~/utils';
 import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
 import { getBestYieldOpportunity, formatAPY } from '~/utils/poolUtils';
 import { fetchSUSDSAPY } from '~/utils/sUSDSYield';
@@ -218,9 +218,90 @@ export const DepositForm = () => {
     setAsp(e.target.value as string);
   };
 
-  const handleUseMax = () => {
-    const maxAllowedAmount = Math.min(Number(formatUnits(BigInt(maxDeposit), decimals)), Number(effectiveBalance));
-    setInputAmount(maxAllowedAmount.toString().slice(0, 6));
+  const handleUseMax = async () => {
+    // For native token deposits, we need to account for gas fees
+    if (selectedPoolInfo?.isNativeToken && !selectedAlternativeToken && publicClient) {
+      try {
+        // Estimate gas for a deposit transaction
+        // Using a dummy precommitment hash for estimation
+        const dummyPrecommitment = BigInt('0x' + '1'.repeat(64));
+
+        // Get current gas price
+        const gasPrice = await publicClient.getGasPrice();
+
+        // Estimate gas for ETH deposit
+        let gasEstimate: bigint;
+        try {
+          // Encode the deposit function call
+          const depositCallData = encodeFunctionData({
+            abi: entrypointAbi,
+            functionName: 'deposit',
+            args: [dummyPrecommitment],
+          });
+
+          gasEstimate = await publicClient.estimateGas({
+            account: address,
+            to: selectedPoolInfo.entryPointAddress as `0x${string}`,
+            value: parseUnits('0.001', decimals), // Use small amount for estimation
+            data: depositCallData,
+          });
+        } catch {
+          // Fallback gas estimate if estimation fails
+          gasEstimate = 150000n; // Conservative estimate for deposit
+        }
+
+        // Add 50% buffer to gas estimate for safety (more conservative)
+        const gasWithBuffer = (gasEstimate * 150n) / 100n;
+        const totalGasCost = gasWithBuffer * gasPrice;
+
+        // Add additional dust buffer (0.001 ETH) to prevent MetaMask rejection
+        const dustBuffer = parseUnits('0.001', decimals);
+        const totalBuffer = totalGasCost + dustBuffer;
+
+        // Calculate the maximum balance available after gas and dust buffer
+        const maxBalanceMinusGas = effectiveBalanceBN - totalBuffer;
+        if (maxBalanceMinusGas <= 0n) {
+          setInputAmount('0');
+          return;
+        }
+
+        // The user inputs an amount, and the actual deposit will be calculateInitialDeposit(inputAmount)
+        // calculateInitialDeposit formula: deposit = inputAmount / (1 - feeBPS/10000)
+        // So to reverse it: inputAmount = deposit * (1 - feeBPS/10000)
+        // For balance: inputAmount = (balance - gas) * (1 - feeBPS/10000)
+
+        // Calculate the maximum input amount that would result in a valid deposit
+        // Formula: maxInput = (balance - gas - dust) * (10000 - feeBPS) / 10000
+        const maxInputAmount = (maxBalanceMinusGas * (10000n - vettingFeeBPS)) / 10000n;
+
+        // Apply an additional 0.5% reduction to the final amount for extra safety
+        const safeMaxInputAmount = (maxInputAmount * 989n) / 1000n;
+
+        // Apply the pool's max deposit limit
+        const finalMaxAmount = safeMaxInputAmount > BigInt(maxDeposit) ? BigInt(maxDeposit) : safeMaxInputAmount;
+
+        // Convert to string and limit precision
+        const maxAmountFormatted = formatUnits(finalMaxAmount, decimals);
+        setInputAmount(Number(maxAmountFormatted).toString().slice(0, 6));
+      } catch (error) {
+        console.error('Error calculating max with gas:', error);
+        // Fallback to simple calculation if gas estimation fails
+        // Reserve 0.015 ETH for gas and fees (more conservative)
+        const simpleFallback = effectiveBalanceBN - parseUnits('0.015', decimals);
+        const fallbackAmount = simpleFallback > 0n ? simpleFallback : 0n;
+        // Apply correct fee calculation to the fallback amount
+        const fallbackInputAmount = (fallbackAmount * (10000n - vettingFeeBPS)) / 10000n;
+        const maxAllowedAmount = Math.min(
+          Number(formatUnits(fallbackInputAmount, decimals)),
+          Number(formatUnits(BigInt(maxDeposit), decimals)),
+        );
+        setInputAmount(maxAllowedAmount.toString().slice(0, 6));
+      }
+    } else {
+      // For ERC20 tokens or alternative tokens, gas is paid in ETH so we can use full balance
+      const maxAllowedAmount = Math.min(Number(formatUnits(BigInt(maxDeposit), decimals)), Number(effectiveBalance));
+      setInputAmount(maxAllowedAmount.toString().slice(0, 6));
+    }
   };
 
   const handleDeposit = () => {
