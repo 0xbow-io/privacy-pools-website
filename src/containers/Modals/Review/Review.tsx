@@ -97,7 +97,8 @@ export const ReviewModal = () => {
         <Stack gap={2} px='1.6rem' width='100%'>
           {actionType === EventType.WITHDRAWAL &&
             selectedPoolInfo?.isStableAsset &&
-            selectedPoolInfo?.asset !== 'FRXUSD' && (
+            selectedPoolInfo?.asset !== 'FRXUSD' &&
+            selectedPoolInfo?.asset !== 'WOETH' && (
               <GasTokenDropSection>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
