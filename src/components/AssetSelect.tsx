@@ -13,6 +13,7 @@ export interface Option {
 const ALL_TOKEN_OPTIONS: Option[] = [
   { value: 'ETH', label: 'ETH' },
   { value: 'wstETH', label: 'wstETH' },
+  { value: 'WOETH', label: 'WOETH' },
   { value: 'wBTC', label: 'wBTC' },
   { value: 'USDC', label: 'USDC' },
   { value: 'USDT', label: 'USDT' },

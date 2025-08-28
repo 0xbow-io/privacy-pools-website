@@ -12,6 +12,7 @@ import usdeIcon from '~/assets/icons/usde.svg';
 import usdsIcon from '~/assets/icons/usds.svg';
 import usdtIcon from '~/assets/icons/usdt.svg';
 import wbtcIcon from '~/assets/icons/wbtc.svg';
+import woethIcon from '~/assets/icons/woeth.svg';
 import wstethIcon from '~/assets/icons/wsteth.svg';
 
 const { ALCHEMY_KEY, IS_TESTNET, ASP_ENDPOINT } = getEnv();
@@ -33,7 +34,8 @@ export type ChainAssets =
   | 'wBTC'
   | 'USDe'
   | 'USD1'
-  | 'FRXUSD';
+  | 'FRXUSD'
+  | 'WOETH';
 
 export interface AlternativeTokenConfig {
   tokenAddress: Address;
@@ -263,6 +265,20 @@ const mainnetChainData: ChainData = {
         assetDecimals: 18,
         icon: frxusdIcon.src,
         isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0x7d2959bCFb936a84531518e8391DdBa844e03ebE',
+        assetAddress: '0xDcEe70654261AF21C44c093C300eD3Bb97b78192',
+        scope: 16898919049235900033552063077301976558571004961846668515709160815006981236808n,
+        deploymentBlock: 23239091n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'WOETH',
+        assetDecimals: 18,
+        icon: woethIcon.src,
+        isStableAsset: false,
         isNativeToken: false,
       },
     ],
