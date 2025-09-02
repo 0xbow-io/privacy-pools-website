@@ -4,17 +4,24 @@ import { Fragment } from 'react';
 import Link from 'next/link';
 import { styled } from '@mui/material';
 import { getConfig } from '~/config';
+import { useModal } from '~/hooks';
+import { ModalType } from '~/types';
 
 export const Footer = () => {
   const {
     constants: { FOOTER_LINKS },
     env: { GITHUB_HASH },
   } = getConfig();
+  const { setModalOpen } = useModal();
+
+  const handleNewsletterClick = () => {
+    setModalOpen(ModalType.NEWSLETTER_SUBSCRIPTION);
+  };
 
   return (
     <FooterContainer>
       <Links>
-        {FOOTER_LINKS.map((item, i) => (
+        {FOOTER_LINKS.map((item) => (
           <Fragment key={item.label}>
             <LinkItem>
               <Link href={item.href} target='_blank'>
@@ -26,9 +33,12 @@ export const Footer = () => {
                 )}{' '}
               </Link>
             </LinkItem>
-            {i < FOOTER_LINKS.length - 1 && <VBar>|</VBar>}
+            <VBar>|</VBar>
           </Fragment>
         ))}
+        <LinkItem>
+          <NewsletterLink onClick={handleNewsletterClick}>Newsletter</NewsletterLink>
+        </LinkItem>
       </Links>
     </FooterContainer>
   );
@@ -84,6 +94,18 @@ const LinkHash = styled('span')(({ theme }) => {
       padding: '0.2rem 0.8rem',
       borderRadius: '1rem',
       border: `1px solid ${theme.palette.text.primary}`,
+    },
+  };
+});
+
+const NewsletterLink = styled('span')(({ theme }) => {
+  return {
+    color: theme.palette.text.primary,
+    textDecoration: 'none',
+    fontSize: theme.typography.caption.fontSize,
+    cursor: 'pointer',
+    '&:hover': {
+      fontWeight: 700,
     },
   };
 });

@@ -2,6 +2,7 @@ import { Address, parseEther, parseUnits } from 'viem';
 import { Chain, mainnet, sepolia } from 'viem/chains';
 import { getEnv } from '~/config/env';
 import { sUSDSAbi } from '~/config/sUSDSAbi';
+import { woethAbi } from '~/config/woethAbi';
 import daiIcon from '~/assets/icons/dai.svg';
 import frxusdIcon from '~/assets/icons/frxusd.svg';
 import mainnetIcon from '~/assets/icons/mainnet_color.svg';
@@ -47,6 +48,13 @@ export interface AlternativeTokenConfig {
   stakingAbi: readonly unknown[];
 }
 
+export interface PriceConversionConfig {
+  type: 'wrapped'; // Type of conversion (can be extended later)
+  underlyingAsset: ChainAssets; // The underlying asset to get price from
+  conversionMethod: 'convertToAssets'; // Method to call for conversion
+  conversionAbi: readonly unknown[]; // ABI for the conversion method
+}
+
 export interface PoolInfo {
   chainId: number;
   address: Address;
@@ -65,6 +73,7 @@ export interface PoolInfo {
     apy: number; // Annual percentage yield (e.g., 5.2 for 5.2%)
     source: string; // Description of yield source (e.g., "Savings USDS staking rewards")
   };
+  priceConversion?: PriceConversionConfig; // Custom price conversion config
 }
 
 export interface ChainData {
@@ -280,6 +289,12 @@ const mainnetChainData: ChainData = {
         icon: woethIcon.src,
         isStableAsset: false,
         isNativeToken: false,
+        priceConversion: {
+          type: 'wrapped',
+          underlyingAsset: 'ETH',
+          conversionMethod: 'convertToAssets',
+          conversionAbi: woethAbi,
+        },
       },
     ],
   },
