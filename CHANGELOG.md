@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Newsletter subscription modal
 - WOETH pool support
+- Custom token pricing support
 
 ### Changed
 
