@@ -15,4 +15,5 @@ export * from './StatusChip';
 export * from './Logo';
 export * from './ExtendedTooltip';
 export * from './AssetSelect';
+export * from './NewsletterSubscriptionModal';
 export * from './SafeApp';
