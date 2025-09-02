@@ -3,7 +3,7 @@
 import { createContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { parseEther } from 'viem';
-import { useAccount, useBalance } from 'wagmi';
+import { useAccount, useBalance, usePublicClient } from 'wagmi';
 import { ChainData, chainData, ChainAssets, whitelistedChains, PoolInfo, getConfig } from '~/config';
 import { useNotifications } from '~/hooks';
 import { fetchTokenPrice, relayerClient } from '~/utils';
@@ -52,6 +52,7 @@ export const ChainContext = createContext({} as ContextType);
 
 export const ChainProvider = ({ children }: Props) => {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const [chainId, setChainId] = useState(whitelistedChains[0].id);
   const { addNotification } = useNotifications();
   const [balanceInPoolBN, setBalanceInPool] = useState<string>(parseEther('100').toString());
@@ -105,8 +106,8 @@ export const ChainProvider = ({ children }: Props) => {
   }, [userBalance, selectedAsset]);
 
   useEffect(() => {
-    if (chain) {
-      fetchTokenPrice(selectedAsset)
+    if (chain && selectedPoolInfo) {
+      fetchTokenPrice(selectedAsset, selectedPoolInfo, publicClient)
         .then((data) => {
           setPrice(data);
         })
@@ -115,7 +116,7 @@ export const ChainProvider = ({ children }: Props) => {
           addNotification('error', `Error fetching ${selectedAsset} price`);
         });
     }
-  }, [addNotification, chain, selectedAsset]);
+  }, [addNotification, chain, selectedAsset, selectedPoolInfo, publicClient]);
 
   const feesQueries = useQueries({
     queries: chain.relayers.map((relayer) => ({
