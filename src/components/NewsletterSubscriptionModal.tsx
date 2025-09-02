@@ -157,8 +157,6 @@ export const NewsletterSubscriptionModal: React.FC<NewsletterSubscriptionModalPr
                 onSuccess={handleTurnstileSuccess}
                 onError={handleTurnstileError}
                 onExpire={() => setState((prev) => ({ ...prev, turnstileToken: null }))}
-                theme='dark'
-                size='normal'
               />
             </TurnstileContainer>
           )}
