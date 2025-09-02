@@ -44,16 +44,24 @@ const verifyTurnstile = async (token: string): Promise<boolean> => {
   }
 
   try {
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v3/siteverify', {
+    // Turnstile API expects form data, not JSON
+    const formData = new URLSearchParams();
+    formData.append('secret', TURNSTILE_SECRET_KEY);
+    formData.append('response', token);
+
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret: TURNSTILE_SECRET_KEY,
-        response: token,
-      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData,
     });
 
+    if (!response.ok) {
+      console.error('Turnstile API response not OK:', response.status, response.statusText);
+      return false;
+    }
+
     const data: TurnstileResponse = await response.json();
+    console.log('Turnstile verification response:', data);
     return data.success;
   } catch (error) {
     console.error('Turnstile verification failed:', error);
@@ -67,11 +75,15 @@ const subscribeToMailerLite = async (email: string): Promise<MailerLiteResponse>
     throw new Error('MailerLite API key is not configured');
   }
 
+  // Format date as Y-m-d H:i:s (PHP format expected by MailerLite)
+  const now = new Date();
+  const subscribedAt = now.toISOString().slice(0, 19).replace('T', ' ');
+
   const subscriber: MailerLiteSubscriber = {
     email,
     status: 'active',
     groups: [MAILERLITE_GROUP_ID],
-    subscribed_at: new Date().toISOString(),
+    subscribed_at: subscribedAt,
   };
 
   const response = await fetch('https://connect.mailerlite.com/api/subscribers', {
@@ -170,6 +182,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
+    console.log(turnstileToken);
     // Verify Turnstile captcha
     const isCaptchaValid = await verifyTurnstile(turnstileToken);
     if (!isCaptchaValid) {
