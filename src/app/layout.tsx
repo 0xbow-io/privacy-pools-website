@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Metadata } from 'next';
 import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <InitColorSchemeScript attribute='class' />
 
           <Providers>
-            <FeatureFlagInitializer />
+            <Suspense fallback={null}>
+              <FeatureFlagInitializer />
+            </Suspense>
             <PageWrapper>
               <NoScriptMessage>
                 <p>This website requires JavaScript to function properly.</p>
