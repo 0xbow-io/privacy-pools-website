@@ -17,3 +17,4 @@ export * from './ExtendedTooltip';
 export * from './AssetSelect';
 export * from './NewsletterSubscriptionModal';
 export * from './SafeApp';
+export * from './FeatureFlagInitializer';
