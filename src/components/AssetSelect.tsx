@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useMemo } from 'react';
 import Image from 'next/image';
-import { FormControl, MenuItem, Select, styled, SelectChangeEvent } from '@mui/material';
+import { Autocomplete, TextField, styled } from '@mui/material';
 import { ChainAssets } from '~/config';
 import { useChainContext } from '~/hooks/context/useChainContext';
 
@@ -13,70 +12,97 @@ export interface Option {
 
 const ALL_TOKEN_OPTIONS: Option[] = [
   { value: 'ETH', label: 'ETH' },
+  { value: 'wstETH', label: 'wstETH' },
+  { value: 'WOETH', label: 'WOETH' },
+  { value: 'wBTC', label: 'wBTC' },
+  { value: 'USDC', label: 'USDC' },
+  { value: 'USDT', label: 'USDT' },
   { value: 'USDS', label: 'USDS' },
+  { value: 'sUSDS', label: 'sUSDS' },
+  { value: 'USDe', label: 'USDe' },
+  { value: 'USD1', label: 'USD1' },
+  { value: 'FRXUSD', label: 'FRXUSD' },
+  { value: 'DAI', label: 'DAI' },
 ];
-
-const MENU_STYLING = {
-  MenuListProps: {
-    sx: {
-      '& .MuiMenuItem-root': {
-        padding: '1.2rem 0rem',
-      },
-    },
-  },
-};
 
 export const AssetSelect: React.FC = () => {
   const { selectedAsset, setSelectedAsset, chain } = useChainContext();
+  const supportedAssets_new = [...new Set(chain.poolInfo.map((pool) => pool.asset))];
 
-  const supportedAssets = useMemo(() => {
-    return [...new Set(chain.poolInfo.map((pool) => pool.asset))];
-  }, [chain.poolInfo]);
+  const filteredTokenOptions_new = ALL_TOKEN_OPTIONS.filter((option) => supportedAssets_new.includes(option.value));
 
-  const filteredTokenOptions = useMemo(() => {
-    return ALL_TOKEN_OPTIONS.filter((option) => supportedAssets.includes(option.value));
-  }, [supportedAssets]);
-
-  const getAssetIcon = (asset: ChainAssets) => {
+  const getAssetIcon_new = (asset: ChainAssets) => {
     const poolWithAsset = chain.poolInfo.find((pool) => pool.asset === asset);
     return poolWithAsset?.icon ? (
       <Image src={poolWithAsset.icon} alt={asset} width={20} height={20} style={{ width: '100%', height: '100%' }} />
     ) : null;
   };
 
-  const tokenOptions = filteredTokenOptions;
-
-  const handleChange = (event: SelectChangeEvent<unknown>) => {
-    setSelectedAsset(event.target.value as ChainAssets);
+  const handleChange_new = (_event: React.SyntheticEvent, newValue: Option | null) => {
+    if (newValue) {
+      setSelectedAsset(newValue.value);
+    }
   };
+  const selectedOption_new = filteredTokenOptions_new.find((option) => option.value === selectedAsset) || undefined;
 
   return (
-    <FormControl fullWidth>
-      <StyledSelect value={selectedAsset} onChange={handleChange} variant='outlined' MenuProps={MENU_STYLING}>
-        {tokenOptions?.map((option) => {
-          const icon = getAssetIcon(option.value);
-          return (
-            <MenuItem key={option.value} value={option.value}>
-              <MenuItemContent>
-                {icon && <IconWrapper>{icon}</IconWrapper>}
-                <span>{option.label}</span>
-              </MenuItemContent>
-            </MenuItem>
-          );
-        })}
-      </StyledSelect>
-    </FormControl>
+    <StyledAutocomplete
+      fullWidth
+      value={selectedOption_new}
+      onChange={handleChange_new}
+      options={filteredTokenOptions_new}
+      getOptionLabel={(option) => option.label}
+      renderOption={(props, option) => {
+        const icon = getAssetIcon_new(option.value);
+        return (
+          <li {...props} key={option.value}>
+            <MenuItemContent>
+              {icon && <IconWrapper>{icon}</IconWrapper>}
+              <span>{option.label}</span>
+            </MenuItemContent>
+          </li>
+        );
+      }}
+      renderInput={(params) => {
+        const icon = selectedOption_new ? getAssetIcon_new(selectedOption_new.value) : null;
+        return (
+          <TextField
+            {...params}
+            size='small'
+            variant='outlined'
+            InputProps={{
+              ...params.InputProps,
+              startAdornment: icon ? <IconWrapper sx={{ mr: '0.4rem' }}>{icon}</IconWrapper> : null,
+            }}
+          />
+        );
+      }}
+      disableClearable
+    />
   );
 };
-
-const StyledSelect = styled(Select)(() => {
-  return {
-    // FYI: This is the expected height of the Select component extracted from FIGMA, we can change if it is not appropriate
-    height: '3.8rem',
+// We now specify all four generic arguments:
+// 1. Option: The type of each item.
+// 2. false: For the "Multiple" prop (this is a single-select).
+// 3. true: For the "DisableClearable" prop (we want to disable the clear button).
+// 4. false: For the "FreeSolo" prop (users can't type custom values).
+const StyledAutocomplete = styled(Autocomplete<Option, false, true, false>)(() => ({
+  '& .MuiOutlinedInput-root': {
     fontWeight: 500,
-  };
-});
-
+  },
+  '& + .MuiAutocomplete-popper .MuiAutocomplete-option': {
+    padding: '1.2rem 1.6rem',
+  },
+  // Remove border from the down arrow button
+  '& .MuiAutocomplete-popupIndicator': {
+    border: 'none',
+  },
+  '& .MuiAutocomplete-endAdornment': {
+    '& .MuiButtonBase-root': {
+      border: 'none',
+    },
+  },
+}));
 const MenuItemContent = styled('div')(() => ({
   display: 'flex',
   alignItems: 'center',

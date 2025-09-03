@@ -1,8 +1,20 @@
 import { Address, parseEther, parseUnits } from 'viem';
 import { Chain, mainnet, sepolia } from 'viem/chains';
 import { getEnv } from '~/config/env';
+import { sUSDSAbi } from '~/config/sUSDSAbi';
+import { woethAbi } from '~/config/woethAbi';
+import daiIcon from '~/assets/icons/dai.svg';
+import frxusdIcon from '~/assets/icons/frxusd.svg';
 import mainnetIcon from '~/assets/icons/mainnet_color.svg';
+import susdsIcon from '~/assets/icons/susds.svg';
+import usd1Icon from '~/assets/icons/usd1.svg';
+import usdcIcon from '~/assets/icons/usdc.svg';
+import usdeIcon from '~/assets/icons/usde.svg';
 import usdsIcon from '~/assets/icons/usds.svg';
+import usdtIcon from '~/assets/icons/usdt.svg';
+import wbtcIcon from '~/assets/icons/wbtc.svg';
+import woethIcon from '~/assets/icons/woeth.svg';
+import wstethIcon from '~/assets/icons/wsteth.svg';
 
 const { ALCHEMY_KEY, IS_TESTNET, ASP_ENDPOINT } = getEnv();
 
@@ -12,7 +24,36 @@ const testnetChains: readonly [Chain, ...Chain[]] = [sepolia];
 
 export const whitelistedChains = IS_TESTNET ? testnetChains : mainnetChains;
 
-export type ChainAssets = 'ETH' | 'USDS' | 'USDC' | 'USDT';
+export type ChainAssets =
+  | 'ETH'
+  | 'USDS'
+  | 'sUSDS'
+  | 'DAI'
+  | 'USDC'
+  | 'USDT'
+  | 'wstETH'
+  | 'wBTC'
+  | 'USDe'
+  | 'USD1'
+  | 'FRXUSD'
+  | 'WOETH';
+
+export interface AlternativeTokenConfig {
+  tokenAddress: Address;
+  tokenSymbol: string;
+  tokenIcon?: string;
+  stakingContract: Address;
+  stakingMethod: 'deposit' | 'stake' | 'mint'; // Different protocols use different method names
+  previewMethod: 'previewDeposit' | 'previewStake' | 'previewMint';
+  stakingAbi: readonly unknown[];
+}
+
+export interface PriceConversionConfig {
+  type: 'wrapped'; // Type of conversion (can be extended later)
+  underlyingAsset: ChainAssets; // The underlying asset to get price from
+  conversionMethod: 'convertToAssets'; // Method to call for conversion
+  conversionAbi: readonly unknown[]; // ABI for the conversion method
+}
 
 export interface PoolInfo {
   chainId: number;
@@ -25,6 +66,14 @@ export interface PoolInfo {
   asset: ChainAssets;
   assetDecimals?: number;
   icon?: string;
+  isStableAsset?: boolean; // Includes stablecoins and yield-bearing stablecoins
+  isNativeToken?: boolean; // True for native tokens (ETH on Ethereum, etc.)
+  alternativeTokens?: AlternativeTokenConfig[]; // Allow depositing alternative tokens that get converted
+  yield?: {
+    apy: number; // Annual percentage yield (e.g., 5.2 for 5.2%)
+    source: string; // Description of yield source (e.g., "Savings USDS staking rewards")
+  };
+  priceConversion?: PriceConversionConfig; // Custom price conversion config
 }
 
 export interface ChainData {
@@ -69,6 +118,8 @@ const mainnetChainData: ChainData = {
         asset: 'ETH',
         assetDecimals: 18,
         icon: mainnetIcon.src,
+        isStableAsset: false,
+        isNativeToken: true,
       },
       {
         chainId: mainnet.id,
@@ -81,6 +132,169 @@ const mainnetChainData: ChainData = {
         asset: 'USDS',
         assetDecimals: 18,
         icon: usdsIcon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xBBdA2173CDFEA1c3bD7F2908798F1265301d750c',
+        assetAddress: '0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD',
+        scope: 2712591485699559808625639968151776585195565171751537345918418329806863214557n,
+        deploymentBlock: 22941225n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'sUSDS',
+        assetDecimals: 18,
+        icon: susdsIcon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+        yield: {
+          apy: 5.2, // Current sUSDS APY
+          source: 'USDS Savings Rate staking rewards',
+        },
+        alternativeTokens: [
+          {
+            tokenAddress: '0xdC035D45d973E3EC169d2276DDab16f1e407384F', // USDS token address
+            tokenSymbol: 'USDS',
+            tokenIcon: usdsIcon.src,
+            stakingContract: '0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD', // sUSDS contract
+            stakingMethod: 'deposit',
+            previewMethod: 'previewDeposit',
+            stakingAbi: sUSDSAbi,
+          },
+        ],
+      },
+      {
+        chainId: mainnet.id,
+        address: '0x1c31C03B8CB2EE674D0F11De77135536db828257',
+        assetAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+        scope: 15036211945525489305347805074288289358577232744970551616130812771908439733411n,
+        deploymentBlock: 22946646n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'DAI',
+        assetDecimals: 18,
+        icon: daiIcon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xe859C0bD25f260BaEE534Fb52e307D3b64D24572',
+        assetAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+        scope: 15021418340692283880916004685565940332387258944710606800522765380598358159605n,
+        deploymentBlock: 22988421n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 6),
+        asset: 'USDT',
+        assetDecimals: 6,
+        icon: usdtIcon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xb419c2867aB3CBc78921660cB95150d95A94ce86',
+        assetAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+        scope: 16452108168275993030962142353354044100680963945240756716593099151407051066232n,
+        deploymentBlock: 22988431n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 6),
+        asset: 'USDC',
+        assetDecimals: 6,
+        icon: usdcIcon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0x1A604E9DFa0EFDC7FFda378AF16Cb81243b61633',
+        assetAddress: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
+        scope: 472674026048933344947929992064610492276304547390666782210980269768303717449n,
+        deploymentBlock: 23039970n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('100000', 18),
+        asset: 'wstETH',
+        assetDecimals: 18,
+        icon: wstethIcon.src,
+        isStableAsset: false,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xF973f4B180A568157Cd7A0E6006449139E6Bfc32',
+        assetAddress: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+        scope: 9583811136054309663087994285053104517603064138421869930481915957893514499997n,
+        deploymentBlock: 23039980n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('100', 8),
+        asset: 'wBTC',
+        assetDecimals: 8,
+        icon: wbtcIcon.src,
+        isStableAsset: false,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xe6D36B33b00A7C0cB0C2a8d39D07e7dB0c526Abc',
+        assetAddress: '0x4c9EDD5852cd905f086C759E8383e09bff1E68B3',
+        scope: 14948241600724488898497604617894553378727680542246736212613234875544074387056n,
+        deploymentBlock: 23090290n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'USDe',
+        assetDecimals: 18,
+        icon: usdeIcon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xc0A8Bc0F4F982b4d4f1fFae8F4FCCb58c9B29c98',
+        assetAddress: '0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d',
+        scope: 2226641097145324517602489545296816163847340455393839014355318716099039951794n,
+        deploymentBlock: 23090298n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'USD1',
+        assetDecimals: 18,
+        icon: usd1Icon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0xC6C769fac7AABEadd31a03fAe5Ca0Ec5B4C50f84',
+        assetAddress: '0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29',
+        scope: 6204545812131907406091007816562088763876564430686560668923081212690640630114n,
+        deploymentBlock: 23090335n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'FRXUSD',
+        assetDecimals: 18,
+        icon: frxusdIcon.src,
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: mainnet.id,
+        address: '0x7d2959bCFb936a84531518e8391DdBa844e03ebE',
+        assetAddress: '0xDcEe70654261AF21C44c093C300eD3Bb97b78192',
+        scope: 16898919049235900033552063077301976558571004961846668515709160815006981236808n,
+        deploymentBlock: 23239091n,
+        entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
+        maxDeposit: parseUnits('1000000', 18),
+        asset: 'WOETH',
+        assetDecimals: 18,
+        icon: woethIcon.src,
+        isStableAsset: false,
+        isNativeToken: false,
+        priceConversion: {
+          type: 'wrapped',
+          underlyingAsset: 'ETH',
+          conversionMethod: 'convertToAssets',
+          conversionAbi: woethAbi,
+        },
       },
     ],
   },
@@ -113,6 +327,8 @@ const testnetChainData: ChainData = {
         asset: 'ETH',
         assetDecimals: 18,
         icon: mainnetIcon.src,
+        isStableAsset: false,
+        isNativeToken: true,
       },
       {
         chainId: sepolia.id,
@@ -124,6 +340,8 @@ const testnetChainData: ChainData = {
         maxDeposit: parseUnits('100', 6),
         asset: 'USDT',
         assetDecimals: 6,
+        isStableAsset: true,
+        isNativeToken: false,
       },
       {
         chainId: sepolia.id,
@@ -135,6 +353,8 @@ const testnetChainData: ChainData = {
         maxDeposit: parseUnits('100', 6),
         asset: 'USDC',
         assetDecimals: 6,
+        isStableAsset: true,
+        isNativeToken: false,
       },
     ],
   },
