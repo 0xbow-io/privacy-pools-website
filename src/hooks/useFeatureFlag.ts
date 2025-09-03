@@ -7,7 +7,17 @@ const FEATURE_FLAG_PREFIX = 'feature_flag_';
 
 export const useFeatureFlag = (flagName: string): boolean => {
   const searchParams = useSearchParams();
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(() => {
+    // Initialize with localStorage value on client side only
+    if (typeof window === 'undefined') return false;
+
+    try {
+      const storageKey = `${FEATURE_FLAG_PREFIX}${flagName}`;
+      return localStorage.getItem(storageKey) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
