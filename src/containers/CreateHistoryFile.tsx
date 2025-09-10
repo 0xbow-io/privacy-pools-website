@@ -5,7 +5,15 @@ import { Button, Checkbox, FormControlLabel, Link, Stack, styled, Typography } f
 import { BackButton } from '~/components';
 import { getConstants } from '~/config/constants';
 import { SeedPhraseForm } from '~/containers';
-import { useModal, usePoolAccountsContext, useAuthContext, useGoTo, useAccountContext, useChainContext } from '~/hooks';
+import {
+  useNotifications,
+  useModal,
+  usePoolAccountsContext,
+  useAuthContext,
+  useGoTo,
+  useAccountContext,
+  useChainContext,
+} from '~/hooks';
 import { EventType, ModalType } from '~/types';
 import { generateSeedPhrase, ROUTER } from '~/utils';
 
@@ -23,11 +31,20 @@ export const CreateHistoryFile = () => {
   const [isHistoryFileCreated, setIsHistoryFileCreated] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [skippedVerify, setSkippedVerify] = useState(false);
+  const { addNotification } = useNotifications();
 
   const isDepositDisabled = !BigInt(maxDeposit);
 
   const handleCreateHistoryFile = () => {
     if (!isConfirmed || !isVerified) return;
+
+    if (skippedVerify) {
+      addNotification(
+        'warning',
+        'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds.',
+      );
+    }
 
     createAccount(seedPhrase);
     setIsHistoryFileCreated(true);
@@ -51,8 +68,9 @@ export const CreateHistoryFile = () => {
     if (e.key === 'Enter') handleCreateHistoryFile();
   };
 
-  const handleVerificationComplete = (verified: boolean) => {
+  const handleVerificationComplete = (verified: boolean, skipped?: boolean) => {
     setIsVerified(verified);
+    setSkippedVerify(Boolean(skipped));
   };
 
   useEffect(() => {

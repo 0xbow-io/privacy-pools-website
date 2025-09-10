@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { english, generateMnemonic } from 'viem/accounts';
 import { useClipboard } from '~/utils';
+import { generateMnemonicFromPasskey } from '~/utils/passkeySeed';
 
 const arrOfKeys = generateMnemonic(english).split(' '); // 12 words
 
@@ -31,7 +32,7 @@ export const SeedPhraseForm = ({
   setSeedPhrase: (seedPhrase: string) => void;
   type: 'create' | 'load';
   onEnterKey: (e: React.KeyboardEvent<HTMLElement>) => void;
-  onVerificationComplete?: (isVerified: boolean) => void;
+  onVerificationComplete?: (isVerified: boolean, skipped?: boolean) => void;
 }) => {
   const [isHidden, setIsHidden] = useState(true);
   const [splitSeedPhrase, setSplitSeedPhrase] = useState<string[]>([]);
@@ -43,6 +44,9 @@ export const SeedPhraseForm = ({
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { copied: isCopied, copyToClipboard: copyToClipboardUtil, readFromClipboard } = useClipboard({ timeout: 3000 });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [usedPasskey, setUsedPasskey] = useState(false);
+  const [setupMode, setSetupMode] = useState<'initial' | 'manual' | 'passkey'>('initial');
 
   const copyToClipboard = () => {
     copyToClipboardUtil(seedPhrase);
@@ -130,7 +134,8 @@ export const SeedPhraseForm = ({
 
     if (isCorrect) {
       setVerificationError(false);
-      onVerificationComplete?.(true);
+      onVerificationComplete?.(true, false);
+      setUsedPasskey(false);
     } else {
       setVerificationError(true);
     }
@@ -145,6 +150,26 @@ export const SeedPhraseForm = ({
   const handleProceedToVerification = () => {
     generateVerificationWords();
     setShowVerification(true);
+  };
+
+  const handleGenerateWithPasskey = async () => {
+    try {
+      setIsGenerating(true);
+      const { mnemonic } = await generateMnemonicFromPasskey();
+      setSplitSeedPhrase(mnemonic.split(' '));
+      // Mask by default on Load; reveal on Create
+      setIsHidden(type === 'create' ? false : true);
+      setUsedPasskey(true);
+      setSetupMode('passkey');
+      // When using passkey, allow skipping manual verification
+      onVerificationComplete?.(true, true);
+      setShowVerification(false);
+    } catch (err) {
+      console.error(err);
+      // no-op; users can still use manual phrase
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   useEffect(() => {
@@ -162,10 +187,10 @@ export const SeedPhraseForm = ({
   }, [seedPhrase]);
 
   useEffect(() => {
-    if (type === 'load') {
+    if (type === 'load' && setupMode === 'manual') {
       setIsHidden(false);
     }
-  }, [type]);
+  }, [type, setupMode]);
 
   // Verification Step
   if (showVerification && type === 'create') {
@@ -237,6 +262,26 @@ export const SeedPhraseForm = ({
     );
   }
 
+  // Initial setup screen for both Create & Load: show only passkey or manual options.
+  if (setupMode === 'initial') {
+    return (
+      <Stack alignItems='center' gap={2}>
+        <Button variant='contained' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
+          {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey (recommended)'}
+        </Button>
+        <Button variant='text' onClick={() => setSetupMode('manual')}>
+          Manual Setup
+        </Button>
+      </Stack>
+    );
+  }
+
+  // If passkey flow selected on Create, hide inputs (auto-verified).
+  // For Load, show the 12 words prefilled to allow saving/verification by the user.
+  if (setupMode === 'passkey' && type === 'create') {
+    return <></>;
+  }
+
   return (
     <>
       <Stack
@@ -267,12 +312,27 @@ export const SeedPhraseForm = ({
 
       {type === 'create' && (
         <Stack alignItems='center' gap={2}>
+          <Button variant='outlined' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
+            {isGenerating ? 'Waiting for Passkey…' : 'Generate with Passkey (recommended)'}
+          </Button>
           <Button onClick={copyToClipboard} startIcon={isCopied ? <Checkmark /> : <Copy />}>
             {isCopied ? 'Copied!' : 'Copy Recovery Phrase'}
           </Button>
-          <Button variant='contained' onClick={handleProceedToVerification} disabled={!seedPhrase}>
-            Continue to Verification
-          </Button>
+          {!usedPasskey && (
+            <Button variant='contained' onClick={handleProceedToVerification} disabled={!seedPhrase}>
+              Continue to Verification
+            </Button>
+          )}
+          {usedPasskey && (
+            <Stack alignItems='center' gap={1}>
+              <Typography variant='caption' color='text.secondary'>
+                Verification skipped (generated from passkey).
+              </Typography>
+              <Button size='small' variant='text' onClick={handleProceedToVerification}>
+                Verify Manually
+              </Button>
+            </Stack>
+          )}
         </Stack>
       )}
 

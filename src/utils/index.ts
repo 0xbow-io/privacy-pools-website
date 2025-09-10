@@ -12,5 +12,6 @@ export * from './poolUtils';
 export * from './sdk';
 export * from './withdraw';
 export * from './seedPhrase';
+export * from './passkeySeed';
 export * from './clipboard';
 export * from './eip7702';
