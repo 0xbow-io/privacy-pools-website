@@ -1,14 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { MOCK_MT_ROOTS, MOCK_POOL, MOCK_ALL_EVENTS } from '~/__tests__/__mocks__';
-import { chainData, whitelistedChains } from '~/config';
 import { getConstants } from '~/config/constants';
 import { getEnv } from '~/config/env';
-import { aspClient } from '~/utils';
+import { aspClient } from '~/utils/aspClient';
 
 const { ITEMS_PER_PAGE } = getConstants();
 const { ASP_ENDPOINT } = getEnv();
-const chainId = whitelistedChains[0].id;
-const scope = chainData[chainId].poolInfo[0].scope.toString();
+const chainId = 1;
+const scope = '1';
 
 global.fetch = jest.fn() as unknown as typeof fetch;
 

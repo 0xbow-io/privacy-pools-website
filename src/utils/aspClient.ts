@@ -1,9 +1,7 @@
-import { getConfig } from '~/config';
+import { getConstants } from '~/config/constants';
 import { MtRootResponse, PoolResponse, MtLeavesResponse, DepositsByLabelResponse, AllEventsResponse } from '~/types';
 
-const {
-  constants: { ITEMS_PER_PAGE },
-} = getConfig();
+const { ITEMS_PER_PAGE } = getConstants();
 
 const fetchWithHeaders = async <T>(url: string, headers?: Record<string, string>): Promise<T> => {
   const response = await fetch(url, {

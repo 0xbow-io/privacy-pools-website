@@ -18,14 +18,37 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 async function sha256(data: ArrayBuffer): Promise<Uint8Array> {
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return new Uint8Array(digest);
+  const g = globalThis as unknown as { crypto?: Crypto };
+  const subtle: SubtleCrypto | undefined = g.crypto?.subtle;
+  if (subtle) {
+    const digest = await subtle.digest('SHA-256', data);
+    return new Uint8Array(digest);
+  }
+  try {
+    const nodeCrypto = (await import('crypto')) as typeof import('crypto');
+    const hash = nodeCrypto.createHash('sha256');
+    hash.update(Buffer.from(data));
+    return new Uint8Array(hash.digest());
+  } catch {
+    throw new Error('SHA-256 not available');
+  }
 }
 
 async function hkdf(ikm: ArrayBuffer, salt: ArrayBuffer, info: ArrayBuffer, length = 32): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, length * 8);
-  return new Uint8Array(bits);
+  const g = globalThis as unknown as { crypto?: Crypto };
+  const subtle: SubtleCrypto | undefined = g.crypto?.subtle;
+  if (subtle) {
+    const key = await subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+    const bits = await subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, length * 8);
+    return new Uint8Array(bits);
+  }
+  try {
+    const nodeCrypto = (await import('crypto')) as typeof import('crypto');
+    const out = nodeCrypto.hkdfSync('sha256', Buffer.from(ikm), Buffer.from(salt), Buffer.from(info), length);
+    return new Uint8Array(out);
+  } catch {
+    throw new Error('HKDF not available');
+  }
 }
 
 export async function deriveMnemonicFromWalletSignature(

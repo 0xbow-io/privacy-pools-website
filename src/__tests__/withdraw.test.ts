@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { Address } from 'viem';
 import { MOCK_RELAYER, MOCK_WITHDRAWAL_REQUEST } from '~/__tests__/__mocks__';
-import { prepareWithdrawRequest } from '~/utils';
+import { prepareWithdrawRequest } from '~/utils/proof';
 
 describe('should prepare the withdraw request', () => {
   const validRecipient = '0x1234567890123456789012345678901234567890';

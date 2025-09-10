@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { truncateAddress } from '~/utils';
+import { truncateAddress } from '~/utils/format';
 
 describe('truncateAddress', () => {
   it('should correctly truncate a long wallet address', () => {

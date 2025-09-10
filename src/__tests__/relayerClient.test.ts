@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { MOCK_RELAYER } from '~/__tests__/__mocks__';
-import { chainData, whitelistedChains } from '~/config';
+import { chainData, whitelistedChains } from '~/config/chainData';
 import { FeesResponse, RelayerResponse } from '~/types';
-import { relayerClient } from '~/utils';
+import { relayerClient } from '~/utils/relayerClient';
 
 const chainId = whitelistedChains[0].id;
 const relayerUrl = chainData[chainId].relayers[0].url;
