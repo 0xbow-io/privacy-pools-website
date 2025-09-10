@@ -16,7 +16,10 @@ import {
   useTheme,
 } from '@mui/material';
 import { english, generateMnemonic } from 'viem/accounts';
-import { useClipboard } from '~/utils';
+import { useAccount, useSignTypedData, useChainId } from 'wagmi';
+import { useModal } from '~/hooks';
+import { ModalType } from '~/types';
+import { useClipboard, deriveMnemonicFromWalletSignature } from '~/utils';
 import { generateMnemonicFromPasskey } from '~/utils/passkeySeed';
 
 const arrOfKeys = generateMnemonic(english).split(' '); // 12 words
@@ -45,8 +48,12 @@ export const SeedPhraseForm = ({
   const mobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { copied: isCopied, copyToClipboard: copyToClipboardUtil, readFromClipboard } = useClipboard({ timeout: 3000 });
   const [isGenerating, setIsGenerating] = useState(false);
-  const [usedPasskey, setUsedPasskey] = useState(false);
+  const [skippedVerification, setSkippedVerification] = useState(false);
   const [setupMode, setSetupMode] = useState<'initial' | 'manual' | 'passkey'>('initial');
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const { signTypedDataAsync } = useSignTypedData();
+  const { setModalOpen } = useModal();
 
   const copyToClipboard = () => {
     copyToClipboardUtil(seedPhrase);
@@ -135,7 +142,7 @@ export const SeedPhraseForm = ({
     if (isCorrect) {
       setVerificationError(false);
       onVerificationComplete?.(true, false);
-      setUsedPasskey(false);
+      setSkippedVerification(false);
     } else {
       setVerificationError(true);
     }
@@ -159,7 +166,7 @@ export const SeedPhraseForm = ({
       setSplitSeedPhrase(mnemonic.split(' '));
       // Mask by default on Load; reveal on Create
       setIsHidden(type === 'create' ? false : true);
-      setUsedPasskey(true);
+      setSkippedVerification(true);
       setSetupMode('passkey');
       // When using passkey, allow skipping manual verification
       onVerificationComplete?.(true, true);
@@ -167,6 +174,40 @@ export const SeedPhraseForm = ({
     } catch (err) {
       console.error(err);
       // no-op; users can still use manual phrase
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateWithWallet = async () => {
+    try {
+      if (!address) {
+        setModalOpen(ModalType.CONNECT);
+        return;
+      }
+      setIsGenerating(true);
+      const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
+      const types = {
+        DeriveSeed: [
+          { name: 'action', type: 'string' },
+          { name: 'context', type: 'string' },
+        ],
+      } as const;
+      const message = { action: 'Derive Account Seed', context: 'privacy-pools/wallet-seed:v1' } as const;
+      const signature = await signTypedDataAsync({ domain, types, primaryType: 'DeriveSeed', message });
+
+      const mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
+      setSplitSeedPhrase(mnemonic.split(' '));
+      setIsHidden(type === 'create' ? false : true);
+      setSkippedVerification(false);
+      setSetupMode('manual');
+      // For create flow, allow skipping verification as requested
+      if (type === 'create') {
+        setSkippedVerification(true);
+        onVerificationComplete?.(true, true);
+      }
+    } catch (err) {
+      console.error(err);
     } finally {
       setIsGenerating(false);
     }
@@ -269,6 +310,9 @@ export const SeedPhraseForm = ({
         <Button variant='contained' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
           {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey (recommended)'}
         </Button>
+        <Button variant='outlined' onClick={handleGenerateWithWallet} disabled={isGenerating}>
+          Continue with Wallet
+        </Button>
         <Button variant='text' onClick={() => setSetupMode('manual')}>
           Manual Setup
         </Button>
@@ -318,15 +362,15 @@ export const SeedPhraseForm = ({
           <Button onClick={copyToClipboard} startIcon={isCopied ? <Checkmark /> : <Copy />}>
             {isCopied ? 'Copied!' : 'Copy Recovery Phrase'}
           </Button>
-          {!usedPasskey && (
+          {!skippedVerification && (
             <Button variant='contained' onClick={handleProceedToVerification} disabled={!seedPhrase}>
               Continue to Verification
             </Button>
           )}
-          {usedPasskey && (
+          {skippedVerification && (
             <Stack alignItems='center' gap={1}>
               <Typography variant='caption' color='text.secondary'>
-                Verification skipped (generated from passkey).
+                Verification skipped (auto-generated).
               </Typography>
               <Button size='small' variant='text' onClick={handleProceedToVerification}>
                 Verify Manually

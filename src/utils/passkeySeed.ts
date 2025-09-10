@@ -45,7 +45,7 @@ async function hkdf(ikm: ArrayBuffer, salt: ArrayBuffer, info: ArrayBuffer, leng
 }
 
 // Minimal BIP39 entropy -> mnemonic (English) implementation
-async function entropyToMnemonicAsync(entropy: Uint8Array): Promise<string> {
+export async function mnemonicFromEntropy(entropy: Uint8Array): Promise<string> {
   const ENT = entropy.length * 8;
   const CS = ENT / 32;
   const hash = await sha256(entropy.buffer);
@@ -186,6 +186,6 @@ export async function generateMnemonicFromPasskey(): Promise<{
   }
 
   const entropy = await deriveEntropyFromKeyMaterial(credentialId!, publicKeyDer);
-  const mnemonic = await entropyToMnemonicAsync(entropy);
+  const mnemonic = await mnemonicFromEntropy(entropy);
   return { mnemonic, created };
 }
