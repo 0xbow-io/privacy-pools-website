@@ -5,6 +5,7 @@ import { Checkmark, Copy, Paste, View, ViewOff } from '@carbon/icons-react';
 import {
   Box,
   Button,
+  Divider,
   FormControl,
   Grid2,
   InputAdornment,
@@ -164,8 +165,8 @@ export const SeedPhraseForm = ({
       setIsGenerating(true);
       const { mnemonic } = await generateMnemonicFromPasskey();
       setSplitSeedPhrase(mnemonic.split(' '));
-      // Mask by default on Load; reveal on Create
-      setIsHidden(type === 'create' ? false : true);
+      // Mask by default on both Create & Load
+      setIsHidden(true);
       setSkippedVerification(true);
       setSetupMode('passkey');
       // When using passkey, allow skipping manual verification
@@ -198,7 +199,8 @@ export const SeedPhraseForm = ({
 
       const mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
       setSplitSeedPhrase(mnemonic.split(' '));
-      setIsHidden(type === 'create' ? false : true);
+      // Mask by default on both Create & Load
+      setIsHidden(true);
       setSkippedVerification(false);
       setSetupMode('manual');
       // For create flow, allow skipping verification as requested
@@ -303,16 +305,27 @@ export const SeedPhraseForm = ({
     );
   }
 
-  // Initial setup screen for both Create & Load: show only passkey or manual options.
+  // Initial setup screen for both Create & Load: offer wallet first, then passkey or manual.
   if (setupMode === 'initial') {
     return (
-      <Stack alignItems='center' gap={2}>
-        <Button variant='contained' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
-          {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey (recommended)'}
-        </Button>
-        <Button variant='outlined' onClick={handleGenerateWithWallet} disabled={isGenerating}>
+      <Stack alignItems='center' gap={2} sx={{ width: '100%' }}>
+        <Button variant='contained' color='primary' onClick={handleGenerateWithWallet} disabled={isGenerating}>
           Continue with Wallet
         </Button>
+        <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
+        <Button
+          variant='contained'
+          onClick={handleGenerateWithPasskey}
+          disabled={isGenerating}
+          sx={{
+            backgroundColor: '#fff',
+            color: '#000',
+            '&:hover': { backgroundColor: '#f5f5f5' },
+          }}
+        >
+          {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey'}
+        </Button>
+        <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
         <Button variant='text' onClick={() => setSetupMode('manual')}>
           Manual Setup
         </Button>
@@ -320,11 +333,7 @@ export const SeedPhraseForm = ({
     );
   }
 
-  // If passkey flow selected on Create, hide inputs (auto-verified).
-  // For Load, show the 12 words prefilled to allow saving/verification by the user.
-  if (setupMode === 'passkey' && type === 'create') {
-    return <></>;
-  }
+  // For passkey on Create, now show inputs masked (same as Load) so user can save/verify.
 
   return (
     <>
@@ -357,7 +366,7 @@ export const SeedPhraseForm = ({
       {type === 'create' && (
         <Stack alignItems='center' gap={2}>
           <Button variant='outlined' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
-            {isGenerating ? 'Waiting for Passkey…' : 'Generate with Passkey (recommended)'}
+            {isGenerating ? 'Waiting for Passkey…' : 'Generate with Passkey'}
           </Button>
           <Button onClick={copyToClipboard} startIcon={isCopied ? <Checkmark /> : <Copy />}>
             {isCopied ? 'Copied!' : 'Copy Recovery Phrase'}
