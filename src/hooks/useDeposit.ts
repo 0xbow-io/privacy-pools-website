@@ -131,7 +131,7 @@ export const useDeposit = () => {
             });
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { account: _account, ...restRequest } = request;
-          hash = await wc.writeContract(restRequest);
+          hash = await wc!.writeContract(restRequest);
         } else {
           // ERC-20 token deposits - check for EIP-7702 batching support
           if (!selectedPoolInfo.assetAddress) throw new Error('Asset address missing for token deposit');
@@ -421,7 +421,7 @@ export const useDeposit = () => {
             // Standard flow - check allowance and approve if needed
             if (assetAllowance < value) {
               addNotification('info', 'Allowance insufficient. Requesting approval...');
-              const approveHash = await wc.writeContract({
+              const approveHash = await wc!.writeContract({
                 address: selectedPoolInfo.assetAddress,
                 abi: erc20Abi,
                 functionName: 'approve',
@@ -452,7 +452,7 @@ export const useDeposit = () => {
               });
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { account: _account, ...restRequest } = request;
-            hash = await wc.writeContract(restRequest);
+            hash = await wc!.writeContract(restRequest);
           }
         }
 

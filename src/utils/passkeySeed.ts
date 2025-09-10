@@ -98,7 +98,7 @@ async function createPasskey(): Promise<{ credentialId: Uint8Array; publicKeyDer
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const rpId = getRpId();
 
-  const pubKey: PublicKeyCredentialCreationOptions['publicKey'] = {
+  const pubKey: PublicKeyCredentialCreationOptions = {
     challenge,
     rp: { id: rpId, name: 'Privacy Pools' },
     user: {
