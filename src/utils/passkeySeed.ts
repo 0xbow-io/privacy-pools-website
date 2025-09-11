@@ -22,16 +22,7 @@ function toBase64Url(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function fromBase64Url(input: string): Uint8Array {
-  const base64 = input
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-    .padEnd(Math.ceil(input.length / 4) * 4, '=');
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
+// Removed fromBase64Url - no longer needed
 
 async function sha256(data: ArrayBuffer): Promise<Uint8Array> {
   const digest = await crypto.subtle.digest('SHA-256', data);
@@ -67,12 +58,13 @@ function bytesToBits(bytes: Uint8Array): string {
   return bits;
 }
 
-function getOrCreateUserId(): Uint8Array {
-  const existing = localStorage.getItem(STORAGE_KEYS.userId);
-  if (existing) return fromBase64Url(existing);
-  const id = crypto.getRandomValues(new Uint8Array(32));
-  localStorage.setItem(STORAGE_KEYS.userId, toBase64Url(id.buffer));
-  return id;
+async function getDeterministicUserId(): Promise<Uint8Array> {
+  // Create a deterministic user ID based on the domain
+  // This ensures the same user ID across all sessions without localStorage
+  const domain = getRpId();
+  const userIdSource = `privacy-pools-user-${domain}`;
+  const hash = await sha256(textEncoder.encode(userIdSource).buffer);
+  return hash;
 }
 
 function getRpId(): string {
@@ -84,27 +76,23 @@ function getRpId(): string {
   }
 }
 
-function getStoredKeyMaterial(): { credentialId?: Uint8Array; publicKeyDer?: Uint8Array } {
-  const cid = localStorage.getItem(STORAGE_KEYS.credentialId);
-  const pub = localStorage.getItem(STORAGE_KEYS.publicKey);
-  return {
-    credentialId: cid ? fromBase64Url(cid) : undefined,
-    publicKeyDer: pub ? fromBase64Url(pub) : undefined,
-  };
-}
+// Removed getStoredKeyMaterial - no longer needed with new approach
 
 async function createPasskey(): Promise<{ credentialId: Uint8Array; publicKeyDer?: Uint8Array }> {
-  const userId = getOrCreateUserId();
+  const userId = await getDeterministicUserId();
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const rpId = getRpId();
+
+  const username = 'privacy-pools-user';
+  const displayName = 'Privacy Pools User';
 
   const pubKey: PublicKeyCredentialCreationOptions = {
     challenge,
     rp: { id: rpId, name: 'Privacy Pools' },
     user: {
       id: userId,
-      name: 'privacy-pools-user',
-      displayName: 'Privacy Pools User',
+      name: username,
+      displayName: displayName,
     },
     pubKeyCredParams: [
       { type: 'public-key', alg: -7 }, // ES256
@@ -139,20 +127,7 @@ async function createPasskey(): Promise<{ credentialId: Uint8Array; publicKeyDer
   return { credentialId: credId, publicKeyDer };
 }
 
-async function assertPasskey(credentialId: Uint8Array): Promise<void> {
-  const challenge = crypto.getRandomValues(new Uint8Array(32));
-  const rpId = getRpId();
-  const allowCredentials = [{ id: credentialId, type: 'public-key' as const }];
-  await navigator.credentials.get({
-    publicKey: {
-      challenge,
-      rpId,
-      allowCredentials,
-      userVerification: 'preferred',
-      timeout: 60_000,
-    },
-  });
-}
+// Removed assertPasskey - no longer needed with new approach
 
 async function deriveEntropyFromKeyMaterial(credentialId: Uint8Array, publicKeyDer?: Uint8Array): Promise<Uint8Array> {
   // Use publicKey DER if available; otherwise fall back to credentialId.
@@ -172,20 +147,47 @@ export async function generateMnemonicFromPasskey(): Promise<{
   if (typeof window === 'undefined') throw new Error('Must be run in browser');
   if (!('credentials' in navigator)) throw new Error('WebAuthn is not supported on this browser');
 
-  let { credentialId, publicKeyDer } = getStoredKeyMaterial();
   let created = false;
+  let credentialId: Uint8Array | undefined;
+  let publicKeyDer: Uint8Array | undefined;
 
-  if (!credentialId) {
+  try {
+    // First, try to use an existing passkey (including cloud-synced ones)
+    // This will show ALL available passkeys for this RP
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const rpId = getRpId();
+
+    const assertion = (await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        rpId,
+        userVerification: 'preferred',
+        timeout: 60_000,
+        // Don't specify allowCredentials - let the browser show all available passkeys
+      },
+    })) as PublicKeyCredential;
+
+    if (assertion) {
+      credentialId = new Uint8Array(assertion.rawId);
+      // Store for future use
+      localStorage.setItem(STORAGE_KEYS.credentialId, toBase64Url(credentialId.buffer));
+      console.log('Using existing passkey (possibly cloud-synced)');
+    }
+  } catch {
+    console.log('No existing passkey found, creating new one...');
+    // No existing passkey, create a new one
     const createdCred = await createPasskey();
     credentialId = createdCred.credentialId;
-    publicKeyDer = createdCred.publicKeyDer ?? publicKeyDer;
+    publicKeyDer = createdCred.publicKeyDer;
     created = true;
-  } else {
-    // Prompt a quick assertion to ensure user presence before deriving
-    await assertPasskey(credentialId);
   }
 
-  const entropy = await deriveEntropyFromKeyMaterial(credentialId!, publicKeyDer);
+  if (!credentialId) {
+    throw new Error('Failed to obtain passkey');
+  }
+
+  const entropy = await deriveEntropyFromKeyMaterial(credentialId, publicKeyDer);
   const mnemonic = await mnemonicFromEntropy(entropy);
+  console.log('Generated mnemonic from passkey, created:', created);
   return { mnemonic, created };
 }

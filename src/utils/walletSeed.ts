@@ -56,10 +56,40 @@ export async function deriveMnemonicFromWalletSignature(
   address: string,
   chainId: number,
 ): Promise<string> {
+  console.log('Deriving mnemonic from wallet signature:');
+  console.log('- Signature:', signatureHex);
+  console.log('- Address:', address);
+  console.log('- ChainId:', chainId);
+
   const sigBytes = hexToBytes(signatureHex);
   const ikm = await sha256(sigBytes.buffer);
   const salt = await sha256(textEncoder.encode(`pp:wallet-seed|${chainId}|${address.toLowerCase()}`).buffer);
   const info = textEncoder.encode('privacy-pools/wallet-seed:v1');
   const entropy = await hkdf(ikm.buffer, salt.buffer, info.buffer, 16);
-  return await mnemonicFromEntropy(entropy);
+
+  console.log(
+    '- IKM hash:',
+    Array.from(ikm)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 16) + '...',
+  );
+  console.log(
+    '- Salt hash:',
+    Array.from(salt)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 16) + '...',
+  );
+  console.log(
+    '- Entropy:',
+    Array.from(entropy)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join(''),
+  );
+
+  const mnemonic = await mnemonicFromEntropy(entropy);
+  console.log('- First 3 words:', mnemonic.split(' ').slice(0, 3).join(' '));
+
+  return mnemonic;
 }

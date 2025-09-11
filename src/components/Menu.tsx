@@ -105,13 +105,13 @@ export const Menu = () => {
         // Require wallet signature to download seedphrase
         const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
         const types = {
-          DownloadSeed: [
+          DeriveSeed: [
             { name: 'action', type: 'string' },
             { name: 'context', type: 'string' },
           ],
         } as const;
-        const message = { action: 'Download Recovery Phrase', context: 'privacy-pools/download-seed:v1' } as const;
-        const signature = await signTypedDataAsync({ domain, types, primaryType: 'DownloadSeed', message });
+        const message = { action: 'Derive Account Seed', context: 'privacy-pools/wallet-seed:v1' } as const;
+        const signature = await signTypedDataAsync({ domain, types, primaryType: 'DeriveSeed', message });
 
         mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
       } else if (signupMethod === 'passkey') {

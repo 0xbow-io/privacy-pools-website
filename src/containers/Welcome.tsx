@@ -88,6 +88,7 @@ export const Welcome = () => {
 
       // Track signup method for security purposes
       localStorage.setItem('signupMethod', 'passkey');
+      // The passkey credentials are already stored by generateMnemonicFromPasskey
 
       if (!notificationSent) {
         addNotification(
