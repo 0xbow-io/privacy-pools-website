@@ -1,23 +1,103 @@
 'use client';
 
-import { Button, Stack, styled, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Button, Stack, styled, Typography, Divider, Link } from '@mui/material';
+import { captureException } from '@sentry/nextjs';
+import { useAccount, useSignTypedData, useChainId } from 'wagmi';
 import { CloseButton } from '~/components';
-import { useGoTo } from '~/hooks';
-import { ROUTER } from '~/utils';
+import { useGoTo, useModal, useAccountContext, useAuthContext, useNotifications } from '~/hooks';
+import { ModalType } from '~/types';
+import { ROUTER, deriveMnemonicFromWalletSignature } from '~/utils';
+import { generateMnemonicFromPasskey } from '~/utils/passkeySeed';
 
 export const Welcome = () => {
   const goTo = useGoTo();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [notificationSent, setNotificationSent] = useState(false);
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const { signTypedDataAsync } = useSignTypedData();
+  const { setModalOpen } = useModal();
+  const { createAccount, setSeed } = useAccountContext();
+  const { login } = useAuthContext();
+  const { addNotification } = useNotifications();
 
-  const handleCreate = () => {
+  const handleManualCreate = () => {
     goTo(ROUTER.account.children.create);
   };
 
-  const handleImport = () => {
+  const handleManualLoad = () => {
     goTo(ROUTER.account.children.load);
   };
 
   const back = () => {
     goTo(ROUTER.home.base);
+  };
+
+  const handleGenerateWithWallet = async () => {
+    try {
+      if (!address) {
+        setModalOpen(ModalType.CONNECT);
+        return;
+      }
+      setIsGenerating(true);
+      const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
+      const types = {
+        DeriveSeed: [
+          { name: 'action', type: 'string' },
+          { name: 'context', type: 'string' },
+        ],
+      } as const;
+      const message = { action: 'Derive Account Seed', context: 'privacy-pools/wallet-seed:v1' } as const;
+      const signature = await signTypedDataAsync({ domain, types, primaryType: 'DeriveSeed', message });
+
+      const mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
+
+      // Create account and login
+      createAccount(mnemonic);
+      setSeed(mnemonic);
+
+      if (!notificationSent) {
+        addNotification(
+          'warning',
+          'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
+        );
+        setNotificationSent(true);
+      }
+
+      login(mnemonic);
+    } catch (err) {
+      console.error(err);
+      captureException(err, { tags: { stage: 'generate_mnemonic_wallet' } });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateWithPasskey = async () => {
+    try {
+      setIsGenerating(true);
+      const { mnemonic } = await generateMnemonicFromPasskey();
+
+      // Create account and login
+      createAccount(mnemonic);
+      setSeed(mnemonic);
+
+      if (!notificationSent) {
+        addNotification(
+          'warning',
+          'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
+        );
+        setNotificationSent(true);
+      }
+
+      login(mnemonic);
+    } catch (err) {
+      console.error(err);
+      captureException(err, { tags: { stage: 'generate_mnemonic_passkey' } });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -28,28 +108,62 @@ export const Welcome = () => {
         <Typography variant='h4' fontWeight='bold' align='center' data-testid='welcome-message'>
           Welcome to Privacy Pools
         </Typography>
-        <Stack gap={2}>
-          <Typography variant='body1' align='center'>
-            If you are here for the first time, proceed to: <br />
-          </Typography>
-
-          <Typography variant='body1' align='center'>
-            <b>Create your Account</b>
-          </Typography>
-
-          <Typography variant='body1' align='center'>
-            If you already have one: <br />
-            <b>Load your Account.</b>
-          </Typography>
-        </Stack>
       </Stack>
-      <Stack gap={2} flexDirection={['column', 'row']}>
-        <Button onClick={handleCreate} data-testid='create-account'>
-          Create Account
+
+      <Stack alignItems='center' gap={2} sx={{ width: '100%' }}>
+        <Button
+          variant='contained'
+          color='primary'
+          onClick={handleGenerateWithWallet}
+          disabled={isGenerating}
+          fullWidth
+          sx={{ maxWidth: '32rem' }}
+        >
+          Continue with Wallet
         </Button>
-        <Button onClick={handleImport} data-testid='import-account'>
-          Load Account
+        <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
+        <Button
+          variant='contained'
+          onClick={handleGenerateWithPasskey}
+          disabled={isGenerating}
+          fullWidth
+          sx={{
+            maxWidth: '32rem',
+            backgroundColor: '#fff',
+            color: '#000',
+            '&:hover': { backgroundColor: '#f5f5f5' },
+          }}
+        >
+          {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey'}
         </Button>
+        <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
+
+        <Stack direction='row' gap={2} sx={{ width: '100%', maxWidth: '32rem' }}>
+          <Link
+            component='button'
+            onClick={handleManualCreate}
+            variant='body2'
+            sx={{
+              textDecoration: 'underline',
+              flex: 1,
+              textAlign: 'center',
+            }}
+          >
+            Manually setup a new account
+          </Link>
+          <Link
+            component='button'
+            onClick={handleManualLoad}
+            variant='body2'
+            sx={{
+              textDecoration: 'underline',
+              flex: 1,
+              textAlign: 'center',
+            }}
+          >
+            Manually load an account
+          </Link>
+        </Stack>
       </Stack>
     </WelcomeContainer>
   );

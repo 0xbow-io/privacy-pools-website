@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button, Checkbox, FormControlLabel, Link, Stack, styled, Typography } from '@mui/material';
 import { useAccount } from 'wagmi';
 import { BackButton } from '~/components';
@@ -35,24 +35,26 @@ export const CreateHistoryFile = () => {
   const [skippedVerify, setSkippedVerify] = useState(false);
   const [showSeedPhraseInputs, setShowSeedPhraseInputs] = useState(false);
   const [authMethod, setAuthMethod] = useState<'wallet' | 'passkey' | 'manual'>('manual');
+  const [notificationSent, setNotificationSent] = useState(false);
   const { addNotification } = useNotifications();
 
   const isDepositDisabled = !BigInt(maxDeposit);
 
-  const handleCreateHistoryFile = () => {
+  const handleCreateHistoryFile = useCallback(() => {
     if (!isVerified) return;
     if (authMethod === 'manual' && !isConfirmed) return;
 
-    if (skippedVerify) {
+    if (skippedVerify && !notificationSent) {
       addNotification(
         'warning',
-        'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds.',
+        'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
       );
+      setNotificationSent(true);
     }
 
     createAccount(seedPhrase);
     setIsHistoryFileCreated(true);
-  };
+  }, [seedPhrase, skippedVerify, notificationSent, createAccount, addNotification]);
 
   const goToHome = () => {
     login();
@@ -83,6 +85,13 @@ export const CreateHistoryFile = () => {
       setShowSeedPhraseInputs(false);
     }
   };
+
+  // Auto-create account when wallet or passkey generates a seed phrase
+  useEffect(() => {
+    if ((authMethod === 'wallet' || authMethod === 'passkey') && isVerified && seedPhrase) {
+      handleCreateHistoryFile();
+    }
+  }, [authMethod, isVerified, seedPhrase, handleCreateHistoryFile]);
 
   const handleShowSeedPhrase = () => {
     setShowSeedPhraseInputs(true);

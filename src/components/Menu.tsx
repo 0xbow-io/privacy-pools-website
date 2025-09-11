@@ -1,7 +1,7 @@
 'use client';
 
 import { MouseEvent, useRef, useState } from 'react';
-import { Checkmark, Copy, Logout, Menu as MenuIcon, Wallet } from '@carbon/icons-react';
+import { Checkmark, Copy, Download, Logout, Menu as MenuIcon, Wallet } from '@carbon/icons-react';
 import {
   ListItemIcon,
   Menu as MuiMenu,
@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { formatUnits } from 'viem';
 import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
-import { useGoTo, useChainContext, useAuthContext } from '~/hooks';
+import { useGoTo, useChainContext, useAuthContext, useAccountContext } from '~/hooks';
 import { formatDataNumber, getUsdBalance, ROUTER, truncateAddress, zIndex, useClipboard } from '~/utils';
 
 export const Menu = () => {
@@ -36,6 +36,7 @@ export const Menu = () => {
     balanceBN: { value, symbol, decimals },
   } = useChainContext();
   const { logout } = useAuthContext();
+  const { seed } = useAccountContext();
   const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
   const theme = useTheme();
 
@@ -76,6 +77,20 @@ export const Menu = () => {
     }
   };
 
+  const handleDownloadSeedPhrase = () => {
+    if (seed && address) {
+      const content = `Privacy Pools Recovery Phrase\n\nWallet Address: ${address}\n\nRecovery Phrase:\n${seed}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `privacy-pools-recovery-${address}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    handleClose();
+  };
+
   return (
     <>
       <SIconButton ref={buttonRef} open={open} onClick={handleToggle} data-testid='account-menu-button'>
@@ -110,6 +125,15 @@ export const Menu = () => {
             <Copy size={16} color={theme.palette.text.disabled} />
           )}
         </SMenuItem>
+
+        {seed && (
+          <SMenuItem onClick={handleDownloadSeedPhrase}>
+            <ListItemIcon>
+              <Download size={16} />
+            </ListItemIcon>
+            Download Recovery Phrase
+          </SMenuItem>
+        )}
 
         <SMenuItem onClick={handleLogout}>
           <ListItemIcon>
