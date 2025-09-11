@@ -16,6 +16,7 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
+import { captureException } from '@sentry/nextjs';
 import { english, generateMnemonic } from 'viem/accounts';
 import { useAccount, useSignTypedData, useChainId } from 'wagmi';
 import { useModal } from '~/hooks';
@@ -31,12 +32,18 @@ export const SeedPhraseForm = ({
   type,
   onEnterKey,
   onVerificationComplete,
+  showInputs = false,
+  hideActions = false,
+  onMethodChange,
 }: {
   seedPhrase: string;
   setSeedPhrase: (seedPhrase: string) => void;
   type: 'create' | 'load';
   onEnterKey: (e: React.KeyboardEvent<HTMLElement>) => void;
   onVerificationComplete?: (isVerified: boolean, skipped?: boolean) => void;
+  showInputs?: boolean;
+  hideActions?: boolean;
+  onMethodChange?: (method: 'wallet' | 'passkey' | 'manual') => void;
 }) => {
   const [isHidden, setIsHidden] = useState(true);
   const [splitSeedPhrase, setSplitSeedPhrase] = useState<string[]>([]);
@@ -51,6 +58,7 @@ export const SeedPhraseForm = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [skippedVerification, setSkippedVerification] = useState(false);
   const [setupMode, setSetupMode] = useState<'initial' | 'manual' | 'passkey'>('initial');
+  const [walletSelected, setWalletSelected] = useState(false);
   const { address } = useAccount();
   const chainId = useChainId();
   const { signTypedDataAsync } = useSignTypedData();
@@ -168,12 +176,14 @@ export const SeedPhraseForm = ({
       // Mask by default on both Create & Load
       setIsHidden(true);
       setSkippedVerification(true);
+      onMethodChange?.('passkey');
       setSetupMode('passkey');
       // When using passkey, allow skipping manual verification
       onVerificationComplete?.(true, true);
       setShowVerification(false);
     } catch (err) {
       console.error(err);
+      captureException(err, { tags: { stage: 'generate_mnemonic_passkey' } });
       // no-op; users can still use manual phrase
     } finally {
       setIsGenerating(false);
@@ -202,14 +212,17 @@ export const SeedPhraseForm = ({
       // Mask by default on both Create & Load
       setIsHidden(true);
       setSkippedVerification(false);
+      setWalletSelected(true);
       setSetupMode('manual');
       // For create flow, allow skipping verification as requested
       if (type === 'create') {
         setSkippedVerification(true);
         onVerificationComplete?.(true, true);
       }
+      onMethodChange?.('wallet');
     } catch (err) {
       console.error(err);
+      captureException(err, { tags: { stage: 'generate_mnemonic_wallet' } });
     } finally {
       setIsGenerating(false);
     }
@@ -326,7 +339,13 @@ export const SeedPhraseForm = ({
           {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey'}
         </Button>
         <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
-        <Button variant='text' onClick={() => setSetupMode('manual')}>
+        <Button
+          variant='text'
+          onClick={() => {
+            setSetupMode('manual');
+            onMethodChange?.('manual');
+          }}
+        >
           Manual Setup
         </Button>
       </Stack>
@@ -337,44 +356,48 @@ export const SeedPhraseForm = ({
 
   return (
     <>
-      <Stack
-        gap={3}
-        onKeyDown={onEnterKey}
-        onMouseEnter={() => setIsHidden(false)}
-        onMouseLeave={() => setIsHidden(true)}
-      >
-        <Box position='relative'>
-          <Grid2 container spacing={2}>
-            {arrOfKeys.map((key, index) => (
-              <Grid2 size={{ xs: 6, md: 4 }} key={key + index}>
-                <FormControl variant='outlined' fullWidth>
-                  <OutlinedInput
-                    type={isHidden ? 'password' : 'text'}
-                    value={splitSeedPhrase[index] ?? ''}
-                    onChange={(e) => changeSeedPhraseWord(e.target.value, index)}
-                    onKeyDown={handleKeyDown}
-                    startAdornment={<InputAdornment position='start'>{index + 1}.</InputAdornment>}
-                  />
-                </FormControl>
-              </Grid2>
-            ))}
-          </Grid2>
-          {(type === 'create' || isHidden) && <CoverSeedPhrase isHidden={isHidden} setIsHidden={setIsHidden} />}
-        </Box>
-      </Stack>
+      {(showInputs || (!walletSelected && setupMode === 'manual')) && (
+        <Stack
+          gap={3}
+          onKeyDown={onEnterKey}
+          onMouseEnter={() => setIsHidden(false)}
+          onMouseLeave={() => setIsHidden(true)}
+        >
+          <Box position='relative'>
+            <Grid2 container spacing={2}>
+              {arrOfKeys.map((key, index) => (
+                <Grid2 size={{ xs: 6, md: 4 }} key={key + index}>
+                  <FormControl variant='outlined' fullWidth>
+                    <OutlinedInput
+                      type={isHidden ? 'password' : 'text'}
+                      value={splitSeedPhrase[index] ?? ''}
+                      onChange={(e) => changeSeedPhraseWord(e.target.value, index)}
+                      onKeyDown={handleKeyDown}
+                      startAdornment={<InputAdornment position='start'>{index + 1}.</InputAdornment>}
+                    />
+                  </FormControl>
+                </Grid2>
+              ))}
+            </Grid2>
+            {(type === 'create' || isHidden) && <CoverSeedPhrase isHidden={isHidden} setIsHidden={setIsHidden} />}
+          </Box>
+        </Stack>
+      )}
 
-      {type === 'create' && (
+      {type === 'create' && !hideActions && !walletSelected && (
         <Stack alignItems='center' gap={2}>
-          <Button variant='outlined' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
-            {isGenerating ? 'Waiting for Passkey…' : 'Generate with Passkey'}
-          </Button>
-          <Button onClick={copyToClipboard} startIcon={isCopied ? <Checkmark /> : <Copy />}>
-            {isCopied ? 'Copied!' : 'Copy Recovery Phrase'}
-          </Button>
           {!skippedVerification && (
-            <Button variant='contained' onClick={handleProceedToVerification} disabled={!seedPhrase}>
-              Continue to Verification
-            </Button>
+            <>
+              <Button variant='outlined' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
+                {isGenerating ? 'Waiting for Passkey…' : 'Generate with Passkey'}
+              </Button>
+              <Button onClick={copyToClipboard} startIcon={isCopied ? <Checkmark /> : <Copy />}>
+                {isCopied ? 'Copied!' : 'Copy Recovery Phrase'}
+              </Button>
+              <Button variant='contained' onClick={handleProceedToVerification} disabled={!seedPhrase}>
+                Continue to Verification
+              </Button>
+            </>
           )}
           {skippedVerification && (
             <Stack alignItems='center' gap={1}>
@@ -389,7 +412,7 @@ export const SeedPhraseForm = ({
         </Stack>
       )}
 
-      {type === 'load' && !mobile && (
+      {type === 'load' && !mobile && !hideActions && (
         <Stack alignItems='center'>
           <Button onClick={pasteFromClipboard} startIcon={<Paste />}>
             Paste Recovery Phrase

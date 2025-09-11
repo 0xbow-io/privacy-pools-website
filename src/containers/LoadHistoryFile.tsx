@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Button, Stack, styled, Typography } from '@mui/material';
 import { BackButton } from '~/components';
 import { SeedPhraseForm } from '~/containers/SeedPhraseForm';
@@ -12,6 +12,7 @@ export const LoadHistoryFile = () => {
   const [seedPhrase, setSeedPhrase] = useState('');
   const { addNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'wallet' | 'passkey' | 'manual'>('manual');
   const { loadAccount, setSeed } = useAccountContext();
   const { login } = useAuthContext();
 
@@ -63,6 +64,17 @@ export const LoadHistoryFile = () => {
     [handleLoad],
   );
 
+  const handleMethodChange = (method: 'wallet' | 'passkey' | 'manual') => {
+    setAuthMethod(method);
+  };
+
+  // Auto-load when wallet or passkey generates a seed phrase
+  useEffect(() => {
+    if ((authMethod === 'wallet' || authMethod === 'passkey') && seedPhrase) {
+      handleLoad();
+    }
+  }, [authMethod, seedPhrase, handleLoad]);
+
   if (isLoading) {
     return (
       <Container>
@@ -87,9 +99,6 @@ export const LoadHistoryFile = () => {
         <Typography variant='h5' fontWeight='bold' align='center'>
           Load your Account
         </Typography>
-        <Typography variant='body1' align='center'>
-          Enter your Recovery Phrase to load your account. You can paste it from your clipboard.
-        </Typography>
       </Stack>
 
       <SeedPhraseForm
@@ -97,11 +106,15 @@ export const LoadHistoryFile = () => {
         seedPhrase={seedPhrase}
         setSeedPhrase={handleSetSeedPhrase}
         onEnterKey={handleEnterKey}
+        hideActions={authMethod === 'wallet' || authMethod === 'passkey'}
+        onMethodChange={handleMethodChange}
       />
 
-      <Button onClick={handleLoad} disabled={!seedPhrase} data-testid='load-account-button' fullWidth>
-        Load Account
-      </Button>
+      {authMethod === 'manual' && seedPhrase && (
+        <Button onClick={handleLoad} disabled={!seedPhrase} data-testid='load-account-button' fullWidth>
+          Load Account
+        </Button>
+      )}
     </LoadHistoryFileContainer>
   );
 };
