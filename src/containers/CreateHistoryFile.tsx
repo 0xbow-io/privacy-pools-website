@@ -197,7 +197,7 @@ export const CreateHistoryFile = () => {
             data-testid='create-account-button'
             fullWidth
           >
-            Create
+            {authMethod === 'manual' ? 'Create' : 'Enter'}
           </Button>
           {(authMethod === 'wallet' || authMethod === 'passkey') && !showSeedPhraseInputs && (
             <Link
