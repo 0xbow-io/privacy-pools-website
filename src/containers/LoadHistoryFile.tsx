@@ -41,6 +41,9 @@ export const LoadHistoryFile = () => {
 
     loadAccount(seedPhrase)
       .then(() => {
+        // Track signup method for security purposes
+        localStorage.setItem('signupMethod', 'manual');
+
         setIsLoading(false);
         login(seedPhrase);
       })

@@ -57,6 +57,9 @@ export const Welcome = () => {
       createAccount(mnemonic);
       setSeed(mnemonic);
 
+      // Track signup method for security purposes
+      localStorage.setItem('signupMethod', 'wallet');
+
       if (!notificationSent) {
         addNotification(
           'warning',
@@ -82,6 +85,9 @@ export const Welcome = () => {
       // Create account and login
       createAccount(mnemonic);
       setSeed(mnemonic);
+
+      // Track signup method for security purposes
+      localStorage.setItem('signupMethod', 'passkey');
 
       if (!notificationSent) {
         addNotification(

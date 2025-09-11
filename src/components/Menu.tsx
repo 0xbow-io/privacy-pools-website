@@ -13,10 +13,20 @@ import {
   useTheme,
   Avatar,
 } from '@mui/material';
+import { captureException } from '@sentry/nextjs';
 import { formatUnits } from 'viem';
-import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { useSignTypedData, useChainId, useAccount, useEnsName, useEnsAvatar } from 'wagmi';
 import { useGoTo, useChainContext, useAuthContext, useAccountContext } from '~/hooks';
-import { formatDataNumber, getUsdBalance, ROUTER, truncateAddress, zIndex, useClipboard } from '~/utils';
+import {
+  deriveMnemonicFromWalletSignature,
+  formatDataNumber,
+  getUsdBalance,
+  ROUTER,
+  truncateAddress,
+  zIndex,
+  useClipboard,
+} from '~/utils';
+import { generateMnemonicFromPasskey } from '~/utils/passkeySeed';
 
 export const Menu = () => {
   const { address } = useAccount();
@@ -38,7 +48,14 @@ export const Menu = () => {
   const { logout } = useAuthContext();
   const { seed } = useAccountContext();
   const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { signTypedDataAsync } = useSignTypedData();
+  const chainId = useChainId();
   const theme = useTheme();
+
+  // Get signup method from localStorage
+  const signupMethod = typeof window !== 'undefined' ? localStorage.getItem('signupMethod') : null;
+  const canDownloadSeedphrase = signupMethod === 'wallet' || signupMethod === 'passkey';
 
   const ethBalanceBN = value.toString() ?? '0';
   const balance = formatDataNumber(ethBalanceBN, decimals, 2, false, false, false);
@@ -77,9 +94,34 @@ export const Menu = () => {
     }
   };
 
-  const handleDownloadSeedPhrase = () => {
-    if (seed && address) {
-      const content = `Privacy Pools Recovery Phrase\n\nWallet Address: ${address}\n\nRecovery Phrase:\n${seed}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
+  const handleDownloadSeedPhrase = async () => {
+    if (!seed || !address) return;
+
+    try {
+      setIsDownloading(true);
+      let mnemonic = '';
+
+      if (signupMethod === 'wallet') {
+        // Require wallet signature to download seedphrase
+        const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
+        const types = {
+          DownloadSeed: [
+            { name: 'action', type: 'string' },
+            { name: 'context', type: 'string' },
+          ],
+        } as const;
+        const message = { action: 'Download Recovery Phrase', context: 'privacy-pools/download-seed:v1' } as const;
+        const signature = await signTypedDataAsync({ domain, types, primaryType: 'DownloadSeed', message });
+
+        mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
+      } else if (signupMethod === 'passkey') {
+        // Require passkey authentication to download seedphrase
+        const result = await generateMnemonicFromPasskey();
+        mnemonic = result.mnemonic;
+      }
+
+      // Download the seedphrase
+      const content = `Privacy Pools Recovery Phrase\n\nWallet Address: ${address}\n\nRecovery Phrase:\n${mnemonic}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
       const blob = new Blob([content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -87,7 +129,13 @@ export const Menu = () => {
       a.download = `privacy-pools-recovery-${address}.txt`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      captureException(err, { tags: { stage: 'download_seedphrase' } });
+    } finally {
+      setIsDownloading(false);
     }
+
     handleClose();
   };
 
@@ -126,12 +174,12 @@ export const Menu = () => {
           )}
         </SMenuItem>
 
-        {seed && (
-          <SMenuItem onClick={handleDownloadSeedPhrase}>
+        {seed && canDownloadSeedphrase && (
+          <SMenuItem onClick={handleDownloadSeedPhrase} disabled={isDownloading}>
             <ListItemIcon>
               <Download size={16} />
             </ListItemIcon>
-            Download Recovery Phrase
+            {isDownloading ? 'Authenticating...' : 'Download Recovery Phrase'}
           </SMenuItem>
         )}
 

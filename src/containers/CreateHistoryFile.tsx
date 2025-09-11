@@ -53,6 +53,12 @@ export const CreateHistoryFile = () => {
     }
 
     createAccount(seedPhrase);
+
+    // Track signup method for security purposes
+    if (authMethod === 'manual') {
+      localStorage.setItem('signupMethod', 'manual');
+    }
+
     setIsHistoryFileCreated(true);
   }, [seedPhrase, skippedVerify, notificationSent, createAccount, addNotification]);
 
