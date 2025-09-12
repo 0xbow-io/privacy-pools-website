@@ -18,11 +18,10 @@ import {
 } from '@mui/material';
 import { captureException } from '@sentry/nextjs';
 import { english, generateMnemonic } from 'viem/accounts';
-import { useAccount, useSignTypedData, useChainId } from 'wagmi';
+import { useAccount, useSignTypedData } from 'wagmi';
 import { useModal } from '~/hooks';
 import { ModalType } from '~/types';
 import { useClipboard, deriveMnemonicFromWalletSignature } from '~/utils';
-import { generateMnemonicFromPasskey } from '~/utils/passkeySeed';
 
 const arrOfKeys = generateMnemonic(english).split(' '); // 12 words
 
@@ -43,7 +42,7 @@ export const SeedPhraseForm = ({
   onVerificationComplete?: (isVerified: boolean, skipped?: boolean) => void;
   showInputs?: boolean;
   hideActions?: boolean;
-  onMethodChange?: (method: 'wallet' | 'passkey' | 'manual') => void;
+  onMethodChange?: (method: 'wallet' | 'manual') => void;
 }) => {
   const [isHidden, setIsHidden] = useState(true);
   const [splitSeedPhrase, setSplitSeedPhrase] = useState<string[]>([]);
@@ -57,10 +56,9 @@ export const SeedPhraseForm = ({
   const { copied: isCopied, copyToClipboard: copyToClipboardUtil, readFromClipboard } = useClipboard({ timeout: 3000 });
   const [isGenerating, setIsGenerating] = useState(false);
   const [skippedVerification, setSkippedVerification] = useState(false);
-  const [setupMode, setSetupMode] = useState<'initial' | 'manual' | 'passkey'>('initial');
+  const [setupMode, setSetupMode] = useState<'initial' | 'manual'>('initial');
   const [walletSelected, setWalletSelected] = useState(false);
   const { address } = useAccount();
-  const chainId = useChainId();
   const { signTypedDataAsync } = useSignTypedData();
   const { setModalOpen } = useModal();
 
@@ -168,28 +166,6 @@ export const SeedPhraseForm = ({
     setShowVerification(true);
   };
 
-  const handleGenerateWithPasskey = async () => {
-    try {
-      setIsGenerating(true);
-      const { mnemonic } = await generateMnemonicFromPasskey();
-      setSplitSeedPhrase(mnemonic.split(' '));
-      // Mask by default on both Create & Load
-      setIsHidden(true);
-      setSkippedVerification(true);
-      onMethodChange?.('passkey');
-      setSetupMode('passkey');
-      // When using passkey, allow skipping manual verification
-      onVerificationComplete?.(true, true);
-      setShowVerification(false);
-    } catch (err) {
-      console.error(err);
-      captureException(err, { tags: { stage: 'generate_mnemonic_passkey' } });
-      // no-op; users can still use manual phrase
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   const handleGenerateWithWallet = async () => {
     try {
       if (!address) {
@@ -197,7 +173,7 @@ export const SeedPhraseForm = ({
         return;
       }
       setIsGenerating(true);
-      const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
+      const domain = { name: 'Privacy Pools', version: '1' } as const;
       const types = {
         DeriveSeed: [
           { name: 'action', type: 'string' },
@@ -207,7 +183,7 @@ export const SeedPhraseForm = ({
       const message = { action: 'Derive Account Seed', context: 'privacy-pools/wallet-seed:v1' } as const;
       const signature = await signTypedDataAsync({ domain, types, primaryType: 'DeriveSeed', message });
 
-      const mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
+      const mnemonic = await deriveMnemonicFromWalletSignature(signature, address);
       setSplitSeedPhrase(mnemonic.split(' '));
       // Mask by default on both Create & Load
       setIsHidden(true);
@@ -327,19 +303,6 @@ export const SeedPhraseForm = ({
         </Button>
         <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
         <Button
-          variant='contained'
-          onClick={handleGenerateWithPasskey}
-          disabled={isGenerating}
-          sx={{
-            backgroundColor: '#fff',
-            color: '#000',
-            '&:hover': { backgroundColor: '#f5f5f5' },
-          }}
-        >
-          {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey'}
-        </Button>
-        <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
-        <Button
           variant='text'
           onClick={() => {
             setSetupMode('manual');
@@ -351,8 +314,6 @@ export const SeedPhraseForm = ({
       </Stack>
     );
   }
-
-  // For passkey on Create, now show inputs masked (same as Load) so user can save/verify.
 
   return (
     <>
@@ -388,9 +349,6 @@ export const SeedPhraseForm = ({
         <Stack alignItems='center' gap={2}>
           {!skippedVerification && (
             <>
-              <Button variant='outlined' onClick={handleGenerateWithPasskey} disabled={isGenerating}>
-                {isGenerating ? 'Waiting for Passkey…' : 'Generate with Passkey'}
-              </Button>
               <Button onClick={copyToClipboard} startIcon={isCopied ? <Checkmark /> : <Copy />}>
                 {isCopied ? 'Copied!' : 'Copy Recovery Phrase'}
               </Button>

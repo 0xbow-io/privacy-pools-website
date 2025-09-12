@@ -5,7 +5,7 @@
 // - Uses HKDF-SHA256 over the signature to derive 16 bytes of entropy
 // - Converts entropy to a BIP39 mnemonic (English)
 
-import { mnemonicFromEntropy } from './passkeySeed';
+import { english } from 'viem/accounts';
 
 const textEncoder = new TextEncoder();
 
@@ -51,19 +51,37 @@ async function hkdf(ikm: ArrayBuffer, salt: ArrayBuffer, info: ArrayBuffer, leng
   }
 }
 
-export async function deriveMnemonicFromWalletSignature(
-  signatureHex: string,
-  address: string,
-  chainId: number,
-): Promise<string> {
+// Minimal BIP39 entropy -> mnemonic (English) implementation
+async function mnemonicFromEntropy(entropy: Uint8Array): Promise<string> {
+  const ENT = entropy.length * 8;
+  const CS = ENT / 32;
+  const hash = await sha256(entropy.buffer);
+  // Build bitstring of entropy + checksum
+  const bits = bytesToBits(entropy) + bytesToBits(hash).slice(0, CS);
+  const words: string[] = [];
+  for (let i = 0; i < bits.length; i += 11) {
+    const chunk = bits.slice(i, i + 11);
+    if (chunk.length < 11) break;
+    const idx = parseInt(chunk, 2);
+    words.push(english[idx]);
+  }
+  return words.join(' ');
+}
+
+function bytesToBits(bytes: Uint8Array): string {
+  let bits = '';
+  for (const b of bytes) bits += b.toString(2).padStart(8, '0');
+  return bits;
+}
+
+export async function deriveMnemonicFromWalletSignature(signatureHex: string, address: string): Promise<string> {
   console.log('Deriving mnemonic from wallet signature:');
   console.log('- Signature:', signatureHex);
   console.log('- Address:', address);
-  console.log('- ChainId:', chainId);
 
   const sigBytes = hexToBytes(signatureHex);
   const ikm = await sha256(sigBytes.buffer);
-  const salt = await sha256(textEncoder.encode(`pp:wallet-seed|${chainId}|${address.toLowerCase()}`).buffer);
+  const salt = await sha256(textEncoder.encode(`pp:wallet-seed|${address.toLowerCase()}`).buffer);
   const info = textEncoder.encode('privacy-pools/wallet-seed:v1');
   const entropy = await hkdf(ikm.buffer, salt.buffer, info.buffer, 16);
 

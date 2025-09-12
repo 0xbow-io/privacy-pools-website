@@ -45,9 +45,11 @@ export const CreateHistoryFile = () => {
     if (authMethod === 'manual' && !isConfirmed) return;
 
     if (skippedVerify && !notificationSent) {
+      // DEBUG: Show seedphrase in notification for testing
+      const firstWords = seedPhrase.split(' ').slice(0, 3).join(' ');
       addNotification(
         'warning',
-        'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
+        `DEBUG - Seedphrase starts with: "${firstWords}..." | Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.`,
       );
       setNotificationSent(true);
     }
@@ -60,7 +62,16 @@ export const CreateHistoryFile = () => {
     }
 
     setIsHistoryFileCreated(true);
-  }, [seedPhrase, skippedVerify, notificationSent, createAccount, addNotification]);
+  }, [
+    seedPhrase,
+    skippedVerify,
+    notificationSent,
+    createAccount,
+    addNotification,
+    authMethod,
+    isConfirmed,
+    isVerified,
+  ]);
 
   const goToHome = () => {
     login();

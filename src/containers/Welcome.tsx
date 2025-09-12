@@ -3,19 +3,17 @@
 import { useState } from 'react';
 import { Button, Stack, styled, Typography, Divider, Link } from '@mui/material';
 import { captureException } from '@sentry/nextjs';
-import { useAccount, useSignTypedData, useChainId } from 'wagmi';
+import { useAccount, useSignTypedData } from 'wagmi';
 import { CloseButton } from '~/components';
 import { useGoTo, useModal, useAccountContext, useAuthContext, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
 import { ROUTER, deriveMnemonicFromWalletSignature } from '~/utils';
-import { generateMnemonicFromPasskey } from '~/utils/passkeySeed';
 
 export const Welcome = () => {
   const goTo = useGoTo();
   const [isGenerating, setIsGenerating] = useState(false);
   const [notificationSent, setNotificationSent] = useState(false);
   const { address } = useAccount();
-  const chainId = useChainId();
   const { signTypedDataAsync } = useSignTypedData();
   const { setModalOpen } = useModal();
   const { createAccount, setSeed } = useAccountContext();
@@ -41,7 +39,9 @@ export const Welcome = () => {
         return;
       }
       setIsGenerating(true);
-      const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
+
+      // Use EIP-712 typed data signature for all wallets
+      const domain = { name: 'Privacy Pools', version: '1' } as const;
       const types = {
         DeriveSeed: [
           { name: 'action', type: 'string' },
@@ -51,7 +51,13 @@ export const Welcome = () => {
       const message = { action: 'Derive Account Seed', context: 'privacy-pools/wallet-seed:v1' } as const;
       const signature = await signTypedDataAsync({ domain, types, primaryType: 'DeriveSeed', message });
 
-      const mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
+      // Debug: Log signature details
+      console.log('Wallet signature debug:');
+      console.log('- Wallet address:', address);
+      console.log('- Signature length:', signature.length);
+      console.log('- Signature:', signature);
+
+      const mnemonic = await deriveMnemonicFromWalletSignature(signature, address);
 
       // Create account and login
       createAccount(mnemonic);
@@ -61,9 +67,11 @@ export const Welcome = () => {
       localStorage.setItem('signupMethod', 'wallet');
 
       if (!notificationSent) {
+        // DEBUG: Show seedphrase in notification for testing
+        const firstWords = mnemonic.split(' ').slice(0, 3).join(' ');
         addNotification(
           'warning',
-          'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
+          `DEBUG - Seedphrase starts with: "${firstWords}..." | Important: If you lose this device and your wallet is not backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.`,
         );
         setNotificationSent(true);
       }
@@ -72,36 +80,6 @@ export const Welcome = () => {
     } catch (err) {
       console.error(err);
       captureException(err, { tags: { stage: 'generate_mnemonic_wallet' } });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleGenerateWithPasskey = async () => {
-    try {
-      setIsGenerating(true);
-      const { mnemonic } = await generateMnemonicFromPasskey();
-
-      // Create account and login
-      createAccount(mnemonic);
-      setSeed(mnemonic);
-
-      // Track signup method for security purposes
-      localStorage.setItem('signupMethod', 'passkey');
-      // The passkey credentials are already stored by generateMnemonicFromPasskey
-
-      if (!notificationSent) {
-        addNotification(
-          'warning',
-          'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
-        );
-        setNotificationSent(true);
-      }
-
-      login(mnemonic);
-    } catch (err) {
-      console.error(err);
-      captureException(err, { tags: { stage: 'generate_mnemonic_passkey' } });
     } finally {
       setIsGenerating(false);
     }
@@ -127,21 +105,6 @@ export const Welcome = () => {
           sx={{ maxWidth: '32rem' }}
         >
           Continue with Wallet
-        </Button>
-        <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
-        <Button
-          variant='contained'
-          onClick={handleGenerateWithPasskey}
-          disabled={isGenerating}
-          fullWidth
-          sx={{
-            maxWidth: '32rem',
-            backgroundColor: '#fff',
-            color: '#000',
-            '&:hover': { backgroundColor: '#f5f5f5' },
-          }}
-        >
-          {isGenerating ? 'Waiting for Passkey…' : 'Continue with Passkey'}
         </Button>
         <Divider sx={{ width: '100%', maxWidth: '32rem' }}>Or</Divider>
 

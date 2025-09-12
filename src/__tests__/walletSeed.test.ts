@@ -9,12 +9,11 @@ describe('wallet-derived mnemonic determinism', () => {
       expect(true).toBe(true);
       return;
     }
-    const chainId = 1;
     // 32-byte test private key (DO NOT USE IN PRODUCTION)
     const privateKey = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const account = privateKeyToAccount(privateKey);
 
-    const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
+    const domain = { name: 'Privacy Pools', version: '1' } as const;
     const types = {
       DeriveSeed: [
         { name: 'action', type: 'string' },
@@ -38,7 +37,7 @@ describe('wallet-derived mnemonic determinism', () => {
         primaryType: 'DeriveSeed',
         message,
       });
-      const mnemonic = await deriveMnemonicFromWalletSignature(signature, account.address, chainId);
+      const mnemonic = await deriveMnemonicFromWalletSignature(signature, account.address);
       mnemonics.push(mnemonic);
     }
 

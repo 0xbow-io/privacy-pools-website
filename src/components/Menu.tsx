@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { captureException } from '@sentry/nextjs';
 import { formatUnits } from 'viem';
-import { useSignTypedData, useChainId, useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { useSignTypedData, useAccount, useEnsName, useEnsAvatar } from 'wagmi';
 import { useGoTo, useChainContext, useAuthContext, useAccountContext } from '~/hooks';
 import {
   deriveMnemonicFromWalletSignature,
@@ -26,7 +26,6 @@ import {
   zIndex,
   useClipboard,
 } from '~/utils';
-import { generateMnemonicFromPasskey } from '~/utils/passkeySeed';
 
 export const Menu = () => {
   const { address } = useAccount();
@@ -50,12 +49,11 @@ export const Menu = () => {
   const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
   const [isDownloading, setIsDownloading] = useState(false);
   const { signTypedDataAsync } = useSignTypedData();
-  const chainId = useChainId();
   const theme = useTheme();
 
   // Get signup method from localStorage
   const signupMethod = typeof window !== 'undefined' ? localStorage.getItem('signupMethod') : null;
-  const canDownloadSeedphrase = signupMethod === 'wallet' || signupMethod === 'passkey';
+  const canDownloadSeedphrase = signupMethod === 'wallet';
 
   const ethBalanceBN = value.toString() ?? '0';
   const balance = formatDataNumber(ethBalanceBN, decimals, 2, false, false, false);
@@ -102,8 +100,8 @@ export const Menu = () => {
       let mnemonic = '';
 
       if (signupMethod === 'wallet') {
-        // Require wallet signature to download seedphrase
-        const domain = { name: 'Privacy Pools', version: '1', chainId } as const;
+        // Use EIP-712 typed data signature for all wallets
+        const domain = { name: 'Privacy Pools', version: '1' } as const;
         const types = {
           DeriveSeed: [
             { name: 'action', type: 'string' },
@@ -113,11 +111,13 @@ export const Menu = () => {
         const message = { action: 'Derive Account Seed', context: 'privacy-pools/wallet-seed:v1' } as const;
         const signature = await signTypedDataAsync({ domain, types, primaryType: 'DeriveSeed', message });
 
-        mnemonic = await deriveMnemonicFromWalletSignature(signature, address, chainId);
-      } else if (signupMethod === 'passkey') {
-        // Require passkey authentication to download seedphrase
-        const result = await generateMnemonicFromPasskey();
-        mnemonic = result.mnemonic;
+        // Debug: Log signature details
+        console.log('Download signature debug:');
+        console.log('- Wallet address:', address);
+        console.log('- Signature length:', signature.length);
+        console.log('- Signature:', signature);
+
+        mnemonic = await deriveMnemonicFromWalletSignature(signature, address!);
       }
 
       // Download the seedphrase
