@@ -16,7 +16,9 @@ export const GlobalPool = () => {
 
   const decimals = assetDecimals ?? balanceDecimals ?? 18;
 
-  const poolBalance = Number(formatUnits(BigInt(poolsData?.totalInPoolValue || 0), decimals)).toFixed(2);
+  const poolBalance = Number(
+    formatUnits(BigInt(Math.floor(Number(poolsData?.totalInPoolValue || 0))), decimals),
+  ).toFixed(2);
 
   return (
     <HomeSection>
