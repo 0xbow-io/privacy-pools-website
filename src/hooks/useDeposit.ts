@@ -67,9 +67,10 @@ export const useDeposit = () => {
       setIsClosable(false);
       setIsLoading(true);
 
-      // Only switch chain if not already on the correct chain and not using Safe
+      // Always switch to the target chain to ensure wallet is on correct network
+      // This fixes issues where wallet reports wrong chain ID even when showing correct network
       let wc = walletClient;
-      if (!isSafeApp && wc?.chain?.id !== chainId) {
+      if (!isSafeApp) {
         await switchChainAsync({ chainId });
         // After switching chain, refetch wallet client so it is available on first attempt
         const refreshed = await refetchWalletClient();

@@ -171,8 +171,9 @@ export const useExit = () => {
         setIsClosable(false);
         setIsLoading(true);
 
-        // Only switch chain if not already on the correct chain and not using Safe
-        if (!isSafeApp && walletClient?.chain?.id !== chainId) {
+        // Always switch to the target chain to ensure wallet is on correct network
+        // This fixes issues where wallet reports wrong chain ID even when showing correct network
+        if (!isSafeApp) {
           await switchChainAsync({ chainId });
         }
 
