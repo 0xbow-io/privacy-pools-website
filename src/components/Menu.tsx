@@ -104,11 +104,13 @@ export const Menu = () => {
         const { domain, types, primaryType, message } = buildSeedDerivationTypedData(address);
         const signature = await signTypedDataAsync({ domain, types, primaryType, message });
 
-        // Debug: Log signature details
-        console.log('Download signature debug:');
-        console.log('- Wallet address:', address);
-        console.log('- Signature length:', signature.length);
-        console.log('- Signature:', signature);
+        // Debug: Log signature details (only in development with debug flag)
+        if (process.env.NEXT_PUBLIC_SHOW_SEED_DEBUG === 'true') {
+          console.log('Download signature debug:');
+          console.log('- Wallet address:', address);
+          console.log('- Signature length:', signature.length);
+          console.log('- Signature:', signature);
+        }
 
         mnemonic = await deriveMnemonicFromWalletSignature(signature, address!);
       }

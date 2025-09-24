@@ -44,11 +44,13 @@ export const Welcome = () => {
       const { domain, types, primaryType, message } = buildSeedDerivationTypedData(address);
       const signature = await signTypedDataAsync({ domain, types, primaryType, message });
 
-      // Debug: Log signature details
-      console.log('Wallet signature debug:');
-      console.log('- Wallet address:', address);
-      console.log('- Signature length:', signature.length);
-      console.log('- Signature:', signature);
+      // Debug: Log signature details (only in development with debug flag)
+      if (process.env.NEXT_PUBLIC_SHOW_SEED_DEBUG === 'true') {
+        console.log('Wallet signature debug:');
+        console.log('- Wallet address:', address);
+        console.log('- Signature length:', signature.length);
+        console.log('- Signature:', signature);
+      }
 
       const mnemonic = await deriveMnemonicFromWalletSignature(signature, address);
 
@@ -62,10 +64,17 @@ export const Welcome = () => {
       if (!notificationSent) {
         // DEBUG: Show seedphrase in notification for testing
         const firstWords = mnemonic.split(' ').slice(0, 3).join(' ');
-        addNotification(
-          'warning',
-          `DEBUG - Seedphrase starts with: "${firstWords}..." | Important: If you lose this device and your wallet is not backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.`,
-        );
+        if (process.env.NEXT_PUBLIC_SHOW_SEED_DEBUG === 'true') {
+          addNotification(
+            'warning',
+            `DEBUG - Seedphrase starts with: "${firstWords}..." | Important: If you lose this device and your wallet is not backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.`,
+          );
+        } else {
+          addNotification(
+            'warning',
+            'Important: If you lose this device and your wallet is not backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
+          );
+        }
         setNotificationSent(true);
       }
 
