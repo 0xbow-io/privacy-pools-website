@@ -48,7 +48,7 @@ importers:
         specifier: 6.1.6
         version: 6.1.6(@emotion/cache@11.13.1)(@emotion/react@11.14.0(@types/react@19.0.2)(react@19.0.0))(@emotion/server@11.11.0)(@types/react@19.0.2)(next@15.2.3(@babel/core@7.27.1)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react@19.0.0)
       '@noble/hashes':
-        specifier: ^2.0.1
+        specifier: 2.0.1
         version: 2.0.1
       '@rainbow-me/rainbowkit':
         specifier: 2.2.8
