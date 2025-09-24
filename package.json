@@ -40,6 +40,7 @@
     "@mui/icons-material": "6.1.6",
     "@mui/material": "6.1.6",
     "@mui/material-nextjs": "6.1.6",
+    "@noble/hashes": "2.0.1",
     "@rainbow-me/rainbowkit": "2.2.8",
     "@safe-global/safe-apps-react-sdk": "^4.7.2",
     "@safe-global/safe-apps-sdk": "^9.1.0",
