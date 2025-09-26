@@ -211,8 +211,22 @@ export const DepositForm = () => {
   ]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const normalizedInput = e.target.value.replace(/[^0-9.]+/g, '').replace(/(\..*)\..*/g, '$1');
-    setInputAmount(normalizedInput.slice(0, 6));
+    // Allow only digits and a single decimal point
+    let normalizedInput = e.target.value.replace(/[^0-9.]+/g, '').replace(/(\..*)\..*/g, '$1');
+
+    // Enforce max 5 digits after the decimal point
+    if (normalizedInput.includes('.')) {
+      const [intPart, decPartRaw] = normalizedInput.split('.');
+      const decPart = (decPartRaw || '').slice(0, 5);
+      // Preserve trailing dot while typing (e.g., "22.")
+      if (decPartRaw !== undefined && decPartRaw.length === 0) {
+        normalizedInput = `${intPart}.`;
+      } else {
+        normalizedInput = decPart ? `${intPart}.${decPart}` : intPart;
+      }
+    }
+
+    setInputAmount(normalizedInput);
   };
 
   const handleAspChange = (e: SelectChangeEvent<unknown>) => {
@@ -281,9 +295,11 @@ export const DepositForm = () => {
         // Apply the pool's max deposit limit
         const finalMaxAmount = safeMaxInputAmount > BigInt(maxDeposit) ? BigInt(maxDeposit) : safeMaxInputAmount;
 
-        // Convert to string and limit precision
+        // Convert to string and limit to 5 decimal places
         const maxAmountFormatted = formatUnits(finalMaxAmount, decimals);
-        setInputAmount(Number(maxAmountFormatted).toString().slice(0, 6));
+        const [i, d = ''] = maxAmountFormatted.split('.');
+        const limited = d ? `${i}.${d.slice(0, 5)}` : i;
+        setInputAmount(limited);
       } catch (error) {
         console.error('Error calculating max with gas:', error);
         // Fallback to simple calculation if gas estimation fails
@@ -292,16 +308,20 @@ export const DepositForm = () => {
         const fallbackAmount = simpleFallback > 0n ? simpleFallback : 0n;
         // Apply correct fee calculation to the fallback amount
         const fallbackInputAmount = (fallbackAmount * (10000n - vettingFeeBPS)) / 10000n;
-        const maxAllowedAmount = Math.min(
-          Number(formatUnits(fallbackInputAmount, decimals)),
-          Number(formatUnits(BigInt(maxDeposit), decimals)),
-        );
-        setInputAmount(maxAllowedAmount.toString().slice(0, 6));
+        const maxAllowedAmount = fallbackInputAmount > BigInt(maxDeposit) ? BigInt(maxDeposit) : fallbackInputAmount;
+        const maxAmountFormatted = formatUnits(maxAllowedAmount, decimals);
+        const [i, d = ''] = maxAmountFormatted.split('.');
+        const limited = d ? `${i}.${d.slice(0, 5)}` : i;
+        setInputAmount(limited);
       }
     } else {
       // For ERC20 tokens or alternative tokens, gas is paid in ETH so we can use full balance
-      const maxAllowedAmount = Math.min(Number(formatUnits(BigInt(maxDeposit), decimals)), Number(effectiveBalance));
-      setInputAmount(maxAllowedAmount.toString().slice(0, 6));
+      const balanceAsBN = parseUnits(effectiveBalance, decimals);
+      const maxAllowedBN = balanceAsBN > BigInt(maxDeposit) ? BigInt(maxDeposit) : balanceAsBN;
+      const maxAmountFormatted = formatUnits(maxAllowedBN, decimals);
+      const [i, d = ''] = maxAmountFormatted.split('.');
+      const limited = d ? `${i}.${d.slice(0, 5)}` : i;
+      setInputAmount(limited);
     }
   };
 
