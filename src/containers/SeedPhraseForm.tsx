@@ -56,6 +56,7 @@ export const SeedPhraseForm = ({
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { copied: isCopied, copyToClipboard: copyToClipboardUtil, readFromClipboard } = useClipboard({ timeout: 3000 });
+  const [clipboardCleared, setClipboardCleared] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [skippedVerification, setSkippedVerification] = useState(false);
   const [setupMode, setSetupMode] = useState<'initial' | 'manual'>(initialSetupMode);
@@ -77,6 +78,17 @@ export const SeedPhraseForm = ({
       setIsHidden(true);
     }
   }, [seedPhrase, setSeedPhrase, readFromClipboard]);
+
+  const clearClipboard = useCallback(async () => {
+    try {
+      await copyToClipboardUtil('');
+      setClipboardCleared(true);
+      setTimeout(() => setClipboardCleared(false), 2000);
+    } catch (err) {
+      // swallow clipboard permission errors; nothing else to do here
+      console.warn('Unable to clear clipboard', err);
+    }
+  }, [copyToClipboardUtil]);
 
   const changeSeedPhraseWord = (text: string, index: number) => {
     text = text.trim().replace(/\s+/g, ' ');
@@ -366,10 +378,20 @@ export const SeedPhraseForm = ({
       )}
 
       {type === 'load' && !mobile && !hideActions && (
-        <Stack alignItems='center'>
+        <Stack alignItems='center' gap={1}>
           <Button onClick={pasteFromClipboard} startIcon={<Paste />}>
             Paste Recovery Phrase
           </Button>
+          {!!seedPhrase && (
+            <Button
+              size='small'
+              variant='text'
+              onClick={clearClipboard}
+              startIcon={clipboardCleared ? <Checkmark /> : undefined}
+            >
+              {clipboardCleared ? 'Clipboard cleared' : 'Clear Clipboard'}
+            </Button>
+          )}
         </Stack>
       )}
     </>
