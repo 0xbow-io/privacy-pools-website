@@ -121,7 +121,13 @@ export const ActivityTable = ({
                   {/* Status */}
                   <StatusCell sx={{ paddingRight: 0 }}>
                     <Tooltip
-                      title={getStatus(row) === ReviewStatus.PENDING ? PENDING_STATUS_MESSAGE : getStatus(row)}
+                      title={
+                        getStatus(row) === ReviewStatus.PENDING
+                          ? PENDING_STATUS_MESSAGE
+                          : getStatus(row) === ReviewStatus.POI_REQUIRED
+                            ? 'Proof of Association needed'
+                            : getStatus(row)
+                      }
                       disableInteractive
                       placement='top'
                     >

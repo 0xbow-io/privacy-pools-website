@@ -160,7 +160,13 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
 
                   <STableCell sx={{ paddingRight: mobile ? 0 : '1rem', textAlign: 'left' }}>
                     <Tooltip
-                      title={getRowReviewStatus(row) === ReviewStatus.PENDING ? statusMessage : ''}
+                      title={
+                        getRowReviewStatus(row) === ReviewStatus.PENDING
+                          ? statusMessage
+                          : getRowReviewStatus(row) === ReviewStatus.POI_REQUIRED
+                            ? 'Proof of Association required. Visit poi.0xbow.io to continue.'
+                            : ''
+                      }
                       placement='top'
                       disableInteractive
                     >

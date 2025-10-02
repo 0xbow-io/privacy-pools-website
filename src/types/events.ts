@@ -10,6 +10,7 @@ export enum ReviewStatus {
   DECLINED = 'declined',
   EXITED = 'exited',
   SPENT = 'spent',
+  POI_REQUIRED = 'poi_required',
 }
 
 export type Event = {
