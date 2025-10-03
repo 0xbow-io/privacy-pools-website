@@ -164,7 +164,7 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
                         getRowReviewStatus(row) === ReviewStatus.PENDING
                           ? statusMessage
                           : getRowReviewStatus(row) === ReviewStatus.POI_REQUIRED
-                            ? 'Proof of Association required. Visit poi.0xbow.io to continue.'
+                            ? 'Proof of Association required. Visit poa.0xbow.io to continue.'
                             : ''
                       }
                       placement='top'

@@ -1,25 +1,52 @@
 import { withSentryConfig } from '@sentry/nextjs';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
+  // Skip ESLint during builds (run in pre-commit hooks instead)
+  // ESLint is also part of pnpm run build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // Turbopack configuration
+  turbopack: {
+    rules: {
+      // Handle .wasm files as assets
+      '*.wasm': {
+        loaders: ['file-loader'],
+        as: '*.wasm',
+      },
+      // Handle .zkey files as assets
+      '*.zkey': {
+        loaders: ['file-loader'],
+        as: '*.zkey',
+      },
+    },
+  },
+  // Server-side external packages (replaces webpack externals)
+  serverExternalPackages: ['pino-pretty', 'encoding'],
+  // Webpack fallback for development (when not using Turbopack)
+  webpack: (config, { isServer }) => {
     config.resolve.fallback = {
       fs: false,
+    };
+
+    // Optimize cache for large strings (ABIs)
+    config.cache = {
+      ...config.cache,
+      compression: 'gzip',
+      maxMemoryGenerations: 1,
     };
 
     // Add loader for .wasm files
     config.module.rules.push({
       test: /\.wasm$/,
-      type: 'asset/resource', // Use 'asset/resource' for Webpack 5
+      type: 'asset/resource',
     });
 
-    // Add loader for .zkey files (binary files)
+    // Add loader for .zkey files
     config.module.rules.push({
       test: /\.zkey$/,
-      type: 'asset/resource', // Handle binary files like .zkey as assets
+      type: 'asset/resource',
     });
-
-    // Solve "Module not found: Can't resolve 'pino-pretty'" warning
-    config.externals.push('pino-pretty', 'encoding');
 
     return config;
   },
