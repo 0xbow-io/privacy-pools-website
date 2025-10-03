@@ -46,15 +46,39 @@ cp .env.example .env
 
 #### Required Environment Variables
 
-| Variable                      | Description                       | Example                   |
-| ----------------------------- | --------------------------------- | ------------------------- |
-| `NEXT_PUBLIC_PROJECT_ID`      | ProjectID from WalletConnect      | `abc123def456`            |
-| `NEXT_PUBLIC_ALCHEMY_KEY`     | API key from Alchemy              | `AbC123dEf456gHi789`      |
-| `NEXT_PUBLIC_ASP_ENDPOINT`    | ASP service endpoint URL          | `https://aspendpoint.com` |
-| `ASP_JWT_SECRET`              | JWT secret for ASP authentication | `your-jwt-secret`         |
-| `NEXT_PUBLIC_SHOW_DISCLAIMER` | Display legal disclaimer          | `true`                    |
-| `NEXT_PUBLIC_TEST_MODE`       | Enable/disable test mode          | `false`                   |
-| `NEXT_PUBLIC_IS_TESTNET`      | Enable/disable testnet mode       | `false`                   |
+**Core Configuration**
+
+| Variable                           | Description                                    | Example                   |
+| ---------------------------------- | ---------------------------------------------- | ------------------------- |
+| `NEXT_PUBLIC_PROJECT_ID`           | ProjectID from [WalletConnect](https://cloud.walletconnect.com) | `abc123def456` |
+| `NEXT_PUBLIC_ALCHEMY_KEY`          | API key from [Alchemy](https://www.alchemy.com) | `AbC123dEf456gHi789` |
+| `NEXT_PUBLIC_ASP_ENDPOINT`         | ASP service endpoint URL                       | `https://aspendpoint.com` |
+| `ASP_JWT_SECRET`                   | JWT secret for ASP authentication              | `your-jwt-secret`         |
+| `HYPERSYNC_KEY`                    | API key from Hypersync                         | `your-hypersync-key`      |
+
+**Application Settings**
+
+| Variable                           | Description                                    | Example                   |
+| ---------------------------------- | ---------------------------------------------- | ------------------------- |
+| `NEXT_PUBLIC_SHOW_DISCLAIMER`      | Display legal disclaimer                       | `true`                    |
+| `NEXT_PUBLIC_TEST_MODE`            | Enable/disable test mode                       | `false`                   |
+| `NEXT_PUBLIC_IS_TESTNET`           | Enable/disable testnet mode                    | `false`                   |
+| `NEXT_PUBLIC_GITHUB_HASH`          | Git commit hash for version tracking           | `4fdc156`                 |
+
+**Error Tracking (Sentry)**
+
+| Variable                           | Description                                    | Example                   |
+| ---------------------------------- | ---------------------------------------------- | ------------------------- |
+| `SENTRY_AUTH_TOKEN`                | Sentry authentication token                    | `your-sentry-auth-token`  |
+| `NEXT_PUBLIC_SENTRY_DSN`           | Sentry DSN for error tracking                  | `https://xxx@sentry.io`   |
+
+**Newsletter & Security**
+
+| Variable                           | Description                                    | Example                   |
+| ---------------------------------- | ---------------------------------------------- | ------------------------- |
+| `MAILERLITE_API_KEY`               | [MailerLite](https://developers.mailerlite.com/docs/authentication) API key for newsletter | `your-mailerlite-key` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`   | [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/get-started/) site key (public) | `0x4AAA...` |
+| `TURNSTILE_SECRET_KEY`             | Cloudflare Turnstile secret key (private)      | `0x4BBB...`               |
 
 ### Running Locally
 
