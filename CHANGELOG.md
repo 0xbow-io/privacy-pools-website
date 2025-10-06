@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.0.0] - 2025-10-04
+
+### Added
+
+- New seed derival method 
+- New deposit status support
+
+### Changed
+
+- Optimized build process
+
+### Fixed
+
+- Footer styling for mobile devices
+- Switching to default network before ragequit
+- Fixed failing tx when user pays gas from non-native tokens
+
 ## [1.9.1] - 2025-09-04
 
 ### Fixed
