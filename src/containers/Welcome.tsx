@@ -15,6 +15,8 @@ export const Welcome = () => {
   const [notificationSent, setNotificationSent] = useState(false);
   const [generatedMnemonic, setGeneratedMnemonic] = useState<string | null>(null);
   const [hasMnemonicDownloaded, setHasMnemonicDownloaded] = useState(false);
+  const [acknowledgedRisks, setAcknowledgedRisks] = useState(false);
+  const [isProceeding, setIsProceeding] = useState(false);
   const { address, connector } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
   const { setModalOpen } = useModal();
@@ -127,8 +129,9 @@ export const Welcome = () => {
   };
 
   const handleProceedAfterDownload = async () => {
-    if (!generatedMnemonic || !hasMnemonicDownloaded) return;
+    if (!generatedMnemonic || !(hasMnemonicDownloaded || acknowledgedRisks)) return;
 
+    setIsProceeding(true);
     try {
       // Load account (which will also create if new) to ensure existing pool accounts are loaded
       await loadAccount(generatedMnemonic);
@@ -150,14 +153,21 @@ export const Welcome = () => {
       console.error(err);
       captureException(err, { tags: { stage: 'load_generated_mnemonic' } });
       addNotification('error', 'Failed to load account. Please try again.');
+      setIsProceeding(false);
     }
   };
 
   // Show download screen if mnemonic has been generated
   if (generatedMnemonic) {
+    const handleCancel = () => {
+      setGeneratedMnemonic(null);
+      setHasMnemonicDownloaded(false);
+      setAcknowledgedRisks(false);
+    };
+
     return (
       <WelcomeContainer>
-        <CloseButton back={() => setGeneratedMnemonic(null)} />
+        <CloseButton back={handleCancel} />
 
         <Stack gap={3} maxWidth='32rem' alignItems='center'>
           <Typography variant='h4' fontWeight='bold' align='center'>
@@ -199,17 +209,36 @@ export const Welcome = () => {
               {hasMnemonicDownloaded ? 'Seedphrase Downloaded ✓' : 'Download Seedphrase'}
             </Button>
 
+            <Divider sx={{ my: 1 }}>Or</Divider>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={acknowledgedRisks}
+                  onChange={(e) => setAcknowledgedRisks(e.target.checked)}
+                  disabled={hasMnemonicDownloaded}
+                />
+              }
+              label={
+                <Typography variant='body2' sx={{ fontSize: '0.875rem' }}>
+                  I understand the risks and will download my seedphrase later from the account menu (not recommended)
+                  or I have already downloaded my seedphrase before
+                </Typography>
+              }
+            />
+
             <Button
               variant='contained'
               color='success'
               onClick={handleProceedAfterDownload}
-              disabled={!hasMnemonicDownloaded}
+              disabled={(!hasMnemonicDownloaded && !acknowledgedRisks) || isProceeding}
               fullWidth
+              sx={{ py: 3 }}
             >
-              I Have Saved My Seedphrase - Continue
+              {isProceeding ? 'Loading Account...' : 'I Have Saved My Seedphrase - Continue'}
             </Button>
 
-            <Button variant='outlined' onClick={() => setGeneratedMnemonic(null)} fullWidth>
+            <Button variant='outlined' onClick={handleCancel} fullWidth>
               Cancel
             </Button>
           </Stack>
