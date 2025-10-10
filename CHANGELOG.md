@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-10-10
+
+### Added
+
+- Upgraded to 24-word mnemonics with 256-bit entropy for enhanced security
+- Legacy wallet sign-in option for 12-word backward compatibility
+- Toggle for switching between 12-word and 24-word seedphrase input modes
+- Version tracking in localStorage for consistent seedphrase regeneration
+
+### Changed
+
+- Default wallet-based generation now uses v2 (24-word) for new accounts
+- Seedphrase validation now accepts both 12 and 24-word recovery phrases
+
+### Fixed
+
+- Critical bug where menu download would regenerate different seedphrase than sign-in
+- Seedphrase download now respects the version used during account creation
+
 ## [2.1.0] - 2025-10-10
 
 ### Added
