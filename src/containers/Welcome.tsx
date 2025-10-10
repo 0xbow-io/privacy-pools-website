@@ -14,6 +14,7 @@ export const Welcome = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [notificationSent, setNotificationSent] = useState(false);
   const [generatedMnemonic, setGeneratedMnemonic] = useState<string | null>(null);
+  const [generatedVersion, setGeneratedVersion] = useState<'v1' | 'v2'>('v2');
   const [hasMnemonicDownloaded, setHasMnemonicDownloaded] = useState(false);
   const [acknowledgedRisks, setAcknowledgedRisks] = useState(false);
   const [isProceeding, setIsProceeding] = useState(false);
@@ -67,7 +68,7 @@ export const Welcome = () => {
       setIsGenerating(true);
 
       // Use standardized EIP-712 payload that commits to addressHash
-      const { domain, types, primaryType, message } = buildSeedDerivationTypedData(address);
+      const { domain, types, primaryType, message } = buildSeedDerivationTypedData(address, version);
 
       // SECURITY: Verify signature determinism by signing twice
       addNotification('info', 'Verifying wallet signature determinism (1/2)...');
@@ -95,10 +96,11 @@ export const Welcome = () => {
         console.log('- Determinism verified: ✓');
       }
 
-      const mnemonic = await deriveMnemonicFromWalletSignature(signature1, address);
+      const mnemonic = await deriveMnemonicFromWalletSignature(signature1, address, version);
 
-      // Store generated mnemonic and show download screen
+      // Store generated mnemonic and version, then show download screen
       setGeneratedMnemonic(mnemonic);
+      setGeneratedVersion(version);
       setIsGenerating(false);
 
       // Do NOT proceed until user downloads the seedphrase
@@ -137,8 +139,9 @@ export const Welcome = () => {
       await loadAccount(generatedMnemonic);
       setSeed(generatedMnemonic);
 
-      // Track signup method for security purposes
+      // Track signup method and version for security purposes
       localStorage.setItem('signupMethod', 'wallet');
+      localStorage.setItem('walletSeedVersion', generatedVersion);
 
       if (!notificationSent) {
         addNotification(
@@ -161,6 +164,7 @@ export const Welcome = () => {
   if (generatedMnemonic) {
     const handleCancel = () => {
       setGeneratedMnemonic(null);
+      setGeneratedVersion('v2');
       setHasMnemonicDownloaded(false);
       setAcknowledgedRisks(false);
     };
@@ -260,14 +264,18 @@ export const Welcome = () => {
       <Stack alignItems='center' gap={2} sx={{ width: '100%' }}>
         {/* Warning about wallet dependency risks */}
         {address && !isWalletSigningDisabled && (
-          <Alert severity='warning' sx={{ width: '100%', maxWidth: '32rem' }}>
+          <Alert severity='info' sx={{ width: '100%', maxWidth: '32rem' }}>
             <Typography variant='body2' fontWeight='bold' gutterBottom>
-              Wallet-Based Key Generation
+              Wallet-Based Key Generation (24-word seedphrase)
             </Typography>
             <Typography variant='body2'>
-              This convenience feature generates your account from your wallet signature. However, if your wallet
-              provider updates their signing method in the future, you may lose access. You will be required to download
-              a backup seedphrase before proceeding.
+              This convenience feature generates a secure 24-word seedphrase from your wallet signature with 256-bit
+              entropy. However, if your wallet provider updates their signing method in the future, you may lose access.
+              You will be required to download a backup seedphrase before proceeding.
+            </Typography>
+            <Typography variant='body2' sx={{ mt: 1, fontSize: '0.85rem', fontStyle: 'italic' }}>
+              Note: If you have an existing account created with the legacy 12-word method, use &quot;Legacy wallet
+              sign-in&quot; below.
             </Typography>
           </Alert>
         )}
@@ -294,7 +302,7 @@ export const Welcome = () => {
         </Button>
         <Divider sx={{ width: '100%', maxWidth: '42rem' }}>Or</Divider>
 
-        <Stack direction='row' gap={2} sx={{ width: '100%', maxWidth: '42rem', flexWrap: 'wrap' }}>
+        <Stack direction='row' gap={2} sx={{ width: '100%', maxWidth: '32rem', flexWrap: 'wrap' }}>
           <Link
             component='button'
             onClick={handleManualCreate}

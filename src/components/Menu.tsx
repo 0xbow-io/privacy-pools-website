@@ -1,7 +1,7 @@
 'use client';
 
 import { MouseEvent, useRef, useState } from 'react';
-import { Checkmark, Copy, Logout, Menu as MenuIcon, Wallet } from '@carbon/icons-react';
+import { Checkmark, Copy, Download, Logout, Menu as MenuIcon, Wallet } from '@carbon/icons-react';
 import {
   ListItemIcon,
   Menu as MuiMenu,
@@ -11,21 +11,52 @@ import {
   Typography,
   IconButton,
   useTheme,
+  Avatar,
 } from '@mui/material';
+import { captureException } from '@sentry/nextjs';
 import { formatUnits } from 'viem';
-import { useAccount } from 'wagmi';
-import { useGoTo, useChainContext, useAuthContext } from '~/hooks';
-import { formatDataNumber, getUsdBalance, ROUTER, truncateAddress, zIndex, useClipboard } from '~/utils';
+import { useSignTypedData, useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { useGoTo, useChainContext, useAuthContext, useAccountContext } from '~/hooks';
+import {
+  deriveMnemonicFromWalletSignature,
+  buildSeedDerivationTypedData,
+  formatDataNumber,
+  getUsdBalance,
+  ROUTER,
+  truncateAddress,
+  zIndex,
+  useClipboard,
+} from '~/utils';
 
 export const Menu = () => {
   const { address } = useAccount();
+
+  // ENS hooks for the connected user
+  const { data: ensName } = useEnsName({
+    address: address,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  const { data: ensAvatar } = useEnsAvatar({
+    name: ensName || undefined,
+    chainId: 1, // Always use mainnet for ENS
+  });
   const {
     price,
     balanceBN: { value, symbol, decimals },
   } = useChainContext();
   const { logout } = useAuthContext();
+  const { seed } = useAccountContext();
   const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { signTypedDataAsync } = useSignTypedData();
   const theme = useTheme();
+
+  // Get signup method and version from localStorage
+  const signupMethod = typeof window !== 'undefined' ? localStorage.getItem('signupMethod') : null;
+  const walletSeedVersion =
+    typeof window !== 'undefined' ? (localStorage.getItem('walletSeedVersion') as 'v1' | 'v2' | null) : null;
+  const canDownloadSeedphrase = signupMethod === 'wallet';
 
   const ethBalanceBN = value.toString() ?? '0';
   const balance = formatDataNumber(ethBalanceBN, decimals, 2, false, false, false);
@@ -64,6 +95,50 @@ export const Menu = () => {
     }
   };
 
+  const handleDownloadSeedPhrase = async () => {
+    if (!seed || !address) return;
+
+    try {
+      setIsDownloading(true);
+      let mnemonic = '';
+
+      if (signupMethod === 'wallet') {
+        // Use stored version, or default to v1 for backward compatibility with users who signed in before version tracking
+        const version: 'v1' | 'v2' = walletSeedVersion || 'v1';
+
+        const { domain, types, primaryType, message } = buildSeedDerivationTypedData(address, version);
+        const signature = await signTypedDataAsync({ domain, types, primaryType, message });
+
+        // Debug: Log signature details (only in development with debug flag)
+        if (process.env.NEXT_PUBLIC_SHOW_SEED_DEBUG === 'true') {
+          console.log('Download signature debug:');
+          console.log('- Wallet address:', address);
+          console.log('- Signature length:', signature.length);
+          console.log('- Signature:', signature);
+        }
+
+        mnemonic = await deriveMnemonicFromWalletSignature(signature, address!, version);
+      }
+
+      // Download the seedphrase
+      const content = `Privacy Pools Recovery Phrase\n\nWallet Address: ${address}\n\nRecovery Phrase:\n${mnemonic}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `privacy-pools-recovery-${address}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      captureException(err, { tags: { stage: 'download_seedphrase' } });
+    } finally {
+      setIsDownloading(false);
+    }
+
+    handleClose();
+  };
+
   return (
     <>
       <SIconButton ref={buttonRef} open={open} onClick={handleToggle} data-testid='account-menu-button'>
@@ -88,9 +163,9 @@ export const Menu = () => {
 
         <SMenuItem onClick={handleCopyAddress}>
           <ListItemIcon>
-            <Wallet size={16} />
+            {ensAvatar ? <Avatar src={ensAvatar} sx={{ width: 16, height: 16 }} /> : <Wallet size={16} />}
           </ListItemIcon>
-          {truncateAddress(address!)}
+          {ensName || truncateAddress(address!)}
 
           {copied ? (
             <Checkmark size={16} color={theme.palette.text.disabled} />
@@ -98,6 +173,15 @@ export const Menu = () => {
             <Copy size={16} color={theme.palette.text.disabled} />
           )}
         </SMenuItem>
+
+        {seed && canDownloadSeedphrase && (
+          <SMenuItem onClick={handleDownloadSeedPhrase} disabled={isDownloading}>
+            <ListItemIcon>
+              <Download size={16} />
+            </ListItemIcon>
+            {isDownloading ? 'Authenticating...' : 'Download Recovery Phrase'}
+          </SMenuItem>
+        )}
 
         <SMenuItem onClick={handleLogout}>
           <ListItemIcon>
