@@ -6,11 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.0.1] - 2025-10-10
+
+### Added
+
+- Option to bypass seed download
+- Security measures for wallet-based key generation
+
+### Fixed
+
+- Prevented key derivation with Coinbase wallet
+
 ## [2.0.0] - 2025-10-04
 
 ### Added
 
-- New seed derival method 
+- New seed derival method
 - New deposit status support
 
 ### Changed
