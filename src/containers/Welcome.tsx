@@ -173,7 +173,7 @@ export const Welcome = () => {
       <WelcomeContainer>
         <CloseButton back={handleCancel} />
 
-        <Stack gap={3} maxWidth='32rem' alignItems='center'>
+        <Stack gap={3} maxWidth='42rem' alignItems='center'>
           <Typography variant='h4' fontWeight='bold' align='center'>
             Download Your Seedphrase
           </Typography>
@@ -183,7 +183,7 @@ export const Welcome = () => {
               CRITICAL: Read This Carefully
             </Typography>
             <Typography variant='body2' component='div'>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '1.6rem' }}>
                 <li>Your Privacy Pools access is tied to your wallet&apos;s signing method</li>
                 <li>
                   If your wallet provider updates their software, changes security features, or you switch devices, you
@@ -195,7 +195,7 @@ export const Welcome = () => {
             </Typography>
           </Alert>
 
-          <Alert severity='warning' sx={{ width: '100%' }}>
+          <Alert severity='warning' sx={{ width: '100%', fontSize: '1.2rem' }}>
             <Typography variant='body2'>
               <strong>Never share your seedphrase with anyone.</strong> Anyone with access to it can steal your funds.
               Store it securely offline.
@@ -224,7 +224,7 @@ export const Welcome = () => {
                 />
               }
               label={
-                <Typography variant='body2' sx={{ fontSize: '0.875rem' }}>
+                <Typography variant='body2' sx={{ fontSize: '1em' }}>
                   I understand the risks and will download my seedphrase later from the account menu (not recommended)
                   or I have already downloaded my seedphrase before
                 </Typography>
@@ -264,16 +264,16 @@ export const Welcome = () => {
       <Stack alignItems='center' gap={2} sx={{ width: '100%' }}>
         {/* Warning about wallet dependency risks */}
         {address && !isWalletSigningDisabled && (
-          <Alert severity='info' sx={{ width: '100%', maxWidth: '32rem' }}>
+          <Alert severity='info' sx={{ width: '100%', maxWidth: '42rem' }}>
             <Typography variant='body2' fontWeight='bold' gutterBottom>
               Wallet-Based Key Generation (24-word seedphrase)
             </Typography>
-            <Typography variant='body2'>
+            <Typography variant='body2' sx={{ fontSize: '1.5rem' }}>
               This convenience feature generates a secure 24-word seedphrase from your wallet signature with 256-bit
               entropy. However, if your wallet provider updates their signing method in the future, you may lose access.
               You will be required to download a backup seedphrase before proceeding.
             </Typography>
-            <Typography variant='body2' sx={{ mt: 1, fontSize: '0.85rem', fontStyle: 'italic' }}>
+            <Typography variant='body2' sx={{ mt: 1, fontSize: '1.3rem', fontStyle: 'italic' }}>
               Note: If you have an existing account created with the legacy 12-word method, use &quot;Legacy wallet
               sign-in&quot; below.
             </Typography>
@@ -281,7 +281,7 @@ export const Welcome = () => {
         )}
 
         {isWalletSigningDisabled && address && (
-          <Alert severity='warning' sx={{ width: '100%', maxWidth: '32rem' }}>
+          <Alert severity='warning' sx={{ width: '100%', maxWidth: '42rem' }}>
             {isBlockedWalletConnect
               ? 'This wallet connected via WalletConnect is not supported for wallet-based key generation. Please use MetaMask, Rabby, Rainbow, or Family wallet, or use manual seedphrase generation below.'
               : isCoinbaseWallet
@@ -302,7 +302,7 @@ export const Welcome = () => {
         </Button>
         <Divider sx={{ width: '100%', maxWidth: '42rem' }}>Or</Divider>
 
-        <Stack direction='row' gap={2} sx={{ width: '100%', maxWidth: '32rem', flexWrap: 'wrap' }}>
+        <Stack direction='row' gap={2} sx={{ width: '100%', maxWidth: '42rem', flexWrap: 'wrap' }}>
           <Link
             component='button'
             onClick={handleManualCreate}
