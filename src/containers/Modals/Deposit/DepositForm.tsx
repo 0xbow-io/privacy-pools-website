@@ -27,7 +27,7 @@ import { formatUnits, parseUnits, erc20Abi, encodeFunctionData } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import { getConfig } from '~/config';
 import { getConstants } from '~/config/constants';
-import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature } from '~/hooks';
+import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
 import {
   formatDataNumber,
@@ -47,6 +47,7 @@ const { ASP_OPTIONS } = getConstants();
 
 export const DepositForm = () => {
   const { setModalOpen } = useModal();
+  const { addNotification } = useNotifications();
   const [asp, setAsp] = useState(ASP_OPTIONS[0]);
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -249,8 +250,22 @@ export const DepositForm = () => {
   ]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const normalizedInput = e.target.value.replace(/[^0-9.]+/g, '').replace(/(\..*)\..*/g, '$1');
-    setInputAmount(normalizedInput.slice(0, 6));
+    // Allow only digits and a single decimal point
+    let normalizedInput = e.target.value.replace(/[^0-9.]+/g, '').replace(/(\..*)\..*/g, '$1');
+
+    // Enforce max 5 digits after the decimal point
+    if (normalizedInput.includes('.')) {
+      const [intPart, decPartRaw] = normalizedInput.split('.');
+      const decPart = (decPartRaw || '').slice(0, 5);
+      // Preserve trailing dot while typing (e.g., "22.")
+      if (decPartRaw !== undefined && decPartRaw.length === 0) {
+        normalizedInput = `${intPart}.`;
+      } else {
+        normalizedInput = decPart ? `${intPart}.${decPart}` : intPart;
+      }
+    }
+
+    setInputAmount(normalizedInput);
   };
 
   const handleAspChange = (e: SelectChangeEvent<unknown>) => {
@@ -319,9 +334,11 @@ export const DepositForm = () => {
         // Apply the pool's max deposit limit
         const finalMaxAmount = safeMaxInputAmount > BigInt(maxDeposit) ? BigInt(maxDeposit) : safeMaxInputAmount;
 
-        // Convert to string and limit precision
+        // Convert to string and limit to 5 decimal places
         const maxAmountFormatted = formatUnits(finalMaxAmount, decimals);
-        setInputAmount(Number(maxAmountFormatted).toString().slice(0, 6));
+        const [i, d = ''] = maxAmountFormatted.split('.');
+        const limited = d ? `${i}.${d.slice(0, 5)}` : i;
+        setInputAmount(limited);
       } catch (error) {
         console.error('Error calculating max with gas:', error);
         // Fallback to simple calculation if gas estimation fails
@@ -330,20 +347,82 @@ export const DepositForm = () => {
         const fallbackAmount = simpleFallback > 0n ? simpleFallback : 0n;
         // Apply correct fee calculation to the fallback amount
         const fallbackInputAmount = (fallbackAmount * (10000n - vettingFeeBPS)) / 10000n;
-        const maxAllowedAmount = Math.min(
-          Number(formatUnits(fallbackInputAmount, decimals)),
-          Number(formatUnits(BigInt(maxDeposit), decimals)),
-        );
-        setInputAmount(maxAllowedAmount.toString().slice(0, 6));
+        const maxAllowedAmount = fallbackInputAmount > BigInt(maxDeposit) ? BigInt(maxDeposit) : fallbackInputAmount;
+        const maxAmountFormatted = formatUnits(maxAllowedAmount, decimals);
+        const [i, d = ''] = maxAmountFormatted.split('.');
+        const limited = d ? `${i}.${d.slice(0, 5)}` : i;
+        setInputAmount(limited);
       }
     } else {
       // For ERC20 tokens or alternative tokens, gas is paid in ETH so we can use full balance
-      const maxAllowedAmount = Math.min(Number(formatUnits(BigInt(maxDeposit), decimals)), Number(effectiveBalance));
-      setInputAmount(maxAllowedAmount.toString().slice(0, 6));
+      const balanceAsBN = parseUnits(effectiveBalance, decimals);
+      const maxAllowedBN = balanceAsBN > BigInt(maxDeposit) ? BigInt(maxDeposit) : balanceAsBN;
+      const maxAmountFormatted = formatUnits(maxAllowedBN, decimals);
+      const [i, d = ''] = maxAmountFormatted.split('.');
+      const limited = d ? `${i}.${d.slice(0, 5)}` : i;
+      setInputAmount(limited);
     }
   };
 
-  const handleDeposit = () => {
+  const handleDeposit = async () => {
+    // For ERC20 deposits, check if user has enough ETH for gas
+    if (selectedPoolInfo?.asset !== 'ETH' && !selectedPoolInfo?.isNativeToken) {
+      if (publicClient && address) {
+        try {
+          // Get ETH balance
+          const ethBalance = await publicClient.getBalance({ address });
+
+          // Get current gas price
+          const gasPrice = await publicClient.getGasPrice();
+
+          // Estimate gas for ERC20 deposit transactions
+          let gasEstimate: bigint;
+          const value = parseUnits(amount, decimals);
+
+          try {
+            // Estimate gas for approval transaction
+            const approvalGas = await publicClient.estimateGas({
+              account: address,
+              to: selectedPoolInfo.assetAddress as `0x${string}`,
+              data: encodeFunctionData({
+                abi: erc20Abi,
+                functionName: 'approve',
+                args: [selectedPoolInfo.entryPointAddress, value],
+              }),
+            });
+
+            // Estimate gas for deposit transaction
+            const depositGas = await publicClient.estimateGas({
+              account: address,
+              to: selectedPoolInfo.entryPointAddress as `0x${string}`,
+              data: encodeFunctionData({
+                abi: entrypointAbi,
+                functionName: 'deposit',
+                args: [selectedPoolInfo.assetAddress, value, BigInt('0x' + '1'.repeat(64))], // dummy precommitment
+              }),
+            });
+
+            // Total gas for both transactions
+            gasEstimate = approvalGas + depositGas;
+          } catch {
+            // Fallback gas estimate if estimation fails
+            gasEstimate = 200000n; // Conservative estimate for approval + deposit
+          }
+
+          // Add 50% buffer to gas estimate for safety
+          const totalGasCost = ((gasEstimate * 150n) / 100n) * gasPrice;
+
+          if (ethBalance < totalGasCost) {
+            addNotification('error', 'Insufficient ETH balance to pay for gas fees');
+            return null;
+          }
+        } catch (error) {
+          console.error('Error checking ETH balance:', error);
+          // Continue with deposit if check fails
+        }
+      }
+    }
+
     setModalOpen(ModalType.REVIEW);
   };
 

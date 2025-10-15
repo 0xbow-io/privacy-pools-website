@@ -1,11 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button, Checkbox, FormControlLabel, Link, Stack, styled, Typography } from '@mui/material';
+import { useAccount } from 'wagmi';
 import { BackButton } from '~/components';
 import { getConstants } from '~/config/constants';
 import { SeedPhraseForm } from '~/containers';
-import { useModal, usePoolAccountsContext, useAuthContext, useGoTo, useAccountContext, useChainContext } from '~/hooks';
+import {
+  useNotifications,
+  useModal,
+  usePoolAccountsContext,
+  useAuthContext,
+  useGoTo,
+  useAccountContext,
+  useChainContext,
+} from '~/hooks';
 import { EventType, ModalType } from '~/types';
 import { generateSeedPhrase, ROUTER } from '~/utils';
 
@@ -22,13 +31,54 @@ export const CreateHistoryFile = () => {
 
   const [isHistoryFileCreated, setIsHistoryFileCreated] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [skippedVerify, setSkippedVerify] = useState(false);
+  const [showSeedPhraseInputs, setShowSeedPhraseInputs] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'wallet' | 'passkey' | 'manual'>('manual');
+  const [notificationSent, setNotificationSent] = useState(false);
+  const { addNotification } = useNotifications();
 
-  const handleCreateHistoryFile = () => {
-    if (!isConfirmed) return;
+  const isDepositDisabled = !BigInt(maxDeposit);
+
+  const handleCreateHistoryFile = useCallback(() => {
+    if (!isVerified) return;
+    if (authMethod === 'manual' && !isConfirmed) return;
+
+    if (skippedVerify && !notificationSent) {
+      // DEBUG: Show seedphrase in notification for testing
+      const firstWords = seedPhrase.split(' ').slice(0, 3).join(' ');
+      if (process.env.NEXT_PUBLIC_SHOW_SEED_DEBUG === 'true') {
+        addNotification(
+          'warning',
+          `DEBUG - Seedphrase starts with: "${firstWords}..." | Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.`,
+        );
+      } else {
+        addNotification(
+          'warning',
+          'Important: If you lose this device and your passkeys are not synced to a cloud account or backed up safely, you will lose access to your funds. You can download your seedphrase anytime by clicking on your address in the top bar.',
+        );
+      }
+      setNotificationSent(true);
+    }
 
     createAccount(seedPhrase);
+
+    // Track signup method for security purposes
+    if (authMethod === 'manual') {
+      localStorage.setItem('signupMethod', 'manual');
+    }
+
     setIsHistoryFileCreated(true);
-  };
+  }, [
+    seedPhrase,
+    skippedVerify,
+    notificationSent,
+    createAccount,
+    addNotification,
+    authMethod,
+    isConfirmed,
+    isVerified,
+  ]);
 
   const goToHome = () => {
     login();
@@ -46,6 +96,43 @@ export const CreateHistoryFile = () => {
 
   const handleEnterKey = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter') handleCreateHistoryFile();
+  };
+
+  const handleVerificationComplete = (verified: boolean, skipped?: boolean) => {
+    setIsVerified(verified);
+    setSkippedVerify(Boolean(skipped));
+  };
+
+  const handleMethodChange = (method: 'wallet' | 'passkey' | 'manual') => {
+    setAuthMethod(method);
+    if (method === 'wallet' || method === 'passkey') {
+      setShowSeedPhraseInputs(false);
+    }
+  };
+
+  // Auto-create account when wallet or passkey generates a seed phrase
+  useEffect(() => {
+    if ((authMethod === 'wallet' || authMethod === 'passkey') && isVerified && seedPhrase) {
+      handleCreateHistoryFile();
+    }
+  }, [authMethod, isVerified, seedPhrase, handleCreateHistoryFile]);
+
+  const handleShowSeedPhrase = () => {
+    setShowSeedPhraseInputs(true);
+  };
+
+  const { address } = useAccount();
+
+  const handleDownloadRecoveryPhrase = () => {
+    const userAddress = address || 'unknown';
+    const content = `Privacy Pools Recovery Phrase\n\nWallet Address: ${userAddress}\n\nRecovery Phrase:\n${seedPhrase}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose your wallet private key.`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `privacy-pools-recovery-${userAddress}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -87,9 +174,13 @@ export const CreateHistoryFile = () => {
         <Typography variant='h5' fontWeight='bold' align='center'>
           Create an Account
         </Typography>
-        <Typography variant='body1' align='center'>
-          This phrase is the ONLY way to recover your account.
-        </Typography>
+        {showSeedPhraseInputs && (
+          <Typography variant='body1' align='center'>
+            {authMethod === 'wallet'
+              ? 'This phrase is the ONLY way to recover your account if you lose your wallet private key'
+              : 'This phrase is the ONLY way to recover your account if you lose your phone and did not sync your passkey to the cloud'}
+          </Typography>
+        )}
       </Stack>
 
       <Stack gap={2} width='100%' alignItems='center'>
@@ -98,26 +189,62 @@ export const CreateHistoryFile = () => {
           seedPhrase={seedPhrase}
           setSeedPhrase={setSeedPhrase}
           onEnterKey={handleEnterKey}
+          onVerificationComplete={handleVerificationComplete}
+          initialSetupMode='manual'
+          showInputs={showSeedPhraseInputs}
+          hideActions={(authMethod === 'wallet' || authMethod === 'passkey') && !showSeedPhraseInputs}
+          onMethodChange={handleMethodChange}
         />
 
-        <SFormControlLabel
-          control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
-          label="I've saved my Recovery Phrase"
-          data-testid='save-recovery-phrase'
-          sx={{ fontSize: '1rem' }}
-        />
-        <Typography variant='caption' textAlign='center' maxWidth='32rem'>
-          By creating an account, you agree to our{' '}
-          <Link href={TOC_URL} target='_blank'>
-            Privacy Policy & Terms of Use
-          </Link>
-          .
-        </Typography>
+        {isVerified && authMethod === 'manual' && (
+          <>
+            <SFormControlLabel
+              control={<Checkbox checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />}
+              label="I've saved my Recovery Phrase"
+              data-testid='save-recovery-phrase'
+              sx={{ fontSize: '1rem' }}
+            />
+            <Typography variant='caption' textAlign='center' maxWidth='32rem'>
+              By creating an account, you agree to our{' '}
+              <Link href={TOC_URL} target='_blank'>
+                Privacy Policy & Terms of Use
+              </Link>
+              .
+            </Typography>
+          </>
+        )}
+
+        {(authMethod === 'wallet' || authMethod === 'passkey') && showSeedPhraseInputs && (
+          <Stack alignItems='center' gap={2}>
+            <Button onClick={handleDownloadRecoveryPhrase} variant='outlined'>
+              Download Recovery Phrase
+            </Button>
+          </Stack>
+        )}
       </Stack>
 
-      <Button onClick={handleCreateHistoryFile} disabled={!isConfirmed} data-testid='create-account-button' fullWidth>
-        Create
-      </Button>
+      {isVerified && (
+        <Stack gap={2} width='100%' alignItems='center'>
+          <Button
+            onClick={handleCreateHistoryFile}
+            disabled={authMethod === 'manual' && !isConfirmed}
+            data-testid='create-account-button'
+            fullWidth
+          >
+            {authMethod === 'manual' ? 'Create' : 'Enter'}
+          </Button>
+          {(authMethod === 'wallet' || authMethod === 'passkey') && !showSeedPhraseInputs && (
+            <Link
+              component='button'
+              onClick={handleShowSeedPhrase}
+              variant='body2'
+              sx={{ textDecoration: 'underline' }}
+            >
+              Save my seedphrase manually
+            </Link>
+          )}
+        </Stack>
+      )}
     </CreateHistoryFileContainer>
   );
 };

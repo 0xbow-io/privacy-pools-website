@@ -2,32 +2,37 @@
 
 import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Box, Button, CircularProgress, FormControl, SelectChangeEvent, Stack, styled, TextField } from '@mui/material';
-import { Address, formatUnits, getAddress, isAddress, parseUnits } from 'viem';
-import { CoinIcon, ImageContainer, InputContainer, ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
+import { Copy, Checkmark } from '@carbon/icons-react';
 import {
-  useChainContext,
-  useExternalServices,
-  useAccountContext,
-  useModal,
-  usePoolAccountsContext,
-  useNotifications,
-  useRequestQuote,
-} from '~/hooks';
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  SelectChangeEvent,
+  Stack,
+  styled,
+  TextField,
+  Avatar,
+  Tooltip,
+  useTheme,
+} from '@mui/material';
+import { Address, formatUnits, isAddress, parseUnits } from 'viem';
+import { useEnsAddress, useEnsAvatar, useEnsName } from 'wagmi';
+import { CoinIcon, ImageContainer, InputContainer, ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
+import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
-import { getUsdBalance, relayerClient } from '~/utils';
+import { getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
 import { RelayerSelectorSection } from './RelayerSelectorSection';
-
-const BPS_DIVISOR = 10000n;
 
 const minWithdrawCache = new Map<string, string>();
 
 export const WithdrawForm = () => {
   const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
+  const theme = useTheme();
 
   const {
     balanceBN: { symbol, decimals: balanceDecimals },
@@ -40,10 +45,7 @@ export const WithdrawForm = () => {
     setSelectedAsset,
   } = useChainContext();
 
-  const { relayerData } = useExternalServices();
-  const { getQuote, isQuoteLoading: originalIsLoading, quoteError: originalQuoteError } = relayerData;
-  const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount, setFeeCommitment, setFeeBPSForWithdraw } =
-    usePoolAccountsContext();
+  const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const { setExtraGas } = useQuoteContext();
 
@@ -103,8 +105,99 @@ export const WithdrawForm = () => {
   const [targetAddressHasError, setTargetAddressHasError] = useState(false);
   const [receiveGasToken, setReceiveGasToken] = useState(false);
 
+  // ENS-related state
+  const [inputValue, setInputValue] = useState<string>(target);
+  const [ensName, setEnsName] = useState<string | null>(null);
+
+  // Clipboard for copying resolved address
+  const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
+
+  // Handle copying resolved address
+  const handleCopyResolvedAddress = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    copyToClipboard(target);
+  };
+
+  // Resolved address display component
+  const ResolvedAddressDisplay = () => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <span>Resolved to: {truncateAddress(target)}</span>
+      <Tooltip title={`${target} (Click to copy)`}>
+        <Box
+          component='span'
+          onClick={handleCopyResolvedAddress}
+          sx={{
+            ml: 0.5,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+          }}
+        >
+          {copied ? (
+            <Checkmark size={12} color={theme.palette.text.disabled} />
+          ) : (
+            <Copy size={12} color={theme.palette.text.disabled} />
+          )}
+        </Box>
+      </Tooltip>
+    </Box>
+  );
+
   const balanceFormatted = formatUnits(poolAccount?.balance ?? BigInt(0), decimals);
   const balanceUSD = getUsdBalance(currentPrice, balanceFormatted, decimals);
+
+  // ENS hooks
+  const isEnsName = useMemo(() => {
+    // Must have at least one dot followed by 3+ characters
+    const dotIndex = inputValue.lastIndexOf('.');
+    if (dotIndex === -1) return false; // No dot found
+
+    const tld = inputValue.slice(dotIndex + 1);
+    return tld.length >= 3; // At least 3 characters after the dot
+  }, [inputValue]);
+
+  const normalizedName = useMemo(() => {
+    if (!isEnsName) return undefined;
+    // Simple normalization - just lowercase and trim
+    return inputValue.toLowerCase().trim();
+  }, [isEnsName, inputValue]);
+
+  const {
+    data: ensAddress,
+    isLoading: isLoadingEnsAddress,
+    error: ensError,
+  } = useEnsAddress({
+    name: normalizedName,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  const { data: ensAvatar } = useEnsAvatar({
+    name: normalizedName,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  const { data: reverseEnsName } = useEnsName({
+    address: isAddress(target) ? target : undefined,
+    chainId: 1, // Always use mainnet for ENS
+  });
+
+  // Effect to handle ENS resolution
+  useEffect(() => {
+    if (isEnsName && ensAddress) {
+      setTarget(ensAddress as Address);
+      setTargetAddressHasError(false);
+      setEnsName(inputValue);
+      addNotification('success', `ENS name resolved to ${truncateAddress(ensAddress)}`);
+    } else if (isEnsName && !isLoadingEnsAddress && !ensAddress && normalizedName) {
+      if (ensError) {
+        console.error('ENS Resolution Error:', ensError);
+        addNotification('error', `ENS resolution failed: ${ensError.message || 'Unknown error'}`);
+      } else {
+        addNotification('error', `Could not resolve ENS name: ${inputValue}`);
+      }
+      setTargetAddressHasError(true);
+    }
+  }, [ensAddress, isEnsName, isLoadingEnsAddress, inputValue, normalizedName, ensError, setTarget, addNotification]);
 
   const amountBN = useMemo(() => {
     try {
@@ -189,41 +282,13 @@ export const WithdrawForm = () => {
     return isValidAmount && isRecipientAddressValid && !!selectedRelayer?.url && !!selectedPoolInfo?.assetAddress;
   }, [isValidAmount, isRecipientAddressValid, selectedRelayer, selectedPoolInfo?.assetAddress]);
 
-  const { quoteCommitment, feeBPS, isQuoteValid, countdown, isQuoteLoading, quoteError } = useRequestQuote({
-    getQuote,
-    isQuoteLoading: originalIsLoading,
-    quoteError: originalQuoteError,
-    chainId,
-    amountBN,
-    assetAddress: selectedPoolInfo?.assetAddress,
-    recipient: target,
-    isValidAmount,
-    isRecipientAddressValid,
-    isRelayerSelected: !!selectedRelayer?.url,
-    addNotification,
-  });
+  // Quote handling moved to Review screen
 
-  const feeText = useMemo(() => {
-    if (isQuoteLoading && !feeBPS) {
-      return 'Fetching fee quote...';
-    }
-    if (quoteError && !feeBPS) {
-      return 'Error fetching fee';
-    }
-    if (feeBPS === null) {
-      return '';
-    }
-
-    const feeFromQuote = (BigInt(feeBPS) * amountBN) / BPS_DIVISOR;
-    const formatted = formatUnits(feeFromQuote, decimals);
-    const usd = getUsdBalance(currentPrice, formatted, decimals);
-    const text = `Fee ${formatted} ${symbol} ~ ${usd} USD`;
-    return text;
-  }, [isQuoteLoading, quoteError, feeBPS, amountBN, decimals, currentPrice, symbol]);
+  const feeText = 'Fee will be calculated on review screen';
 
   const isWithdrawDisabled = useMemo(() => {
-    return !isFormValid || !isQuoteValid || isQuoteLoading;
-  }, [isFormValid, isQuoteValid, isQuoteLoading]);
+    return !isFormValid;
+  }, [isFormValid]);
 
   const errorMessage = useMemo(() => {
     if (amount && amountBN <= 0n) return 'Withdrawal amount must be greater than 0';
@@ -281,10 +346,28 @@ export const WithdrawForm = () => {
   };
 
   const handleTargetAddressChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setTarget(e.target.value as Address);
-    if (targetAddressHasError) {
-      setTargetAddressHasError(false);
+    const value = e.target.value;
+    setInputValue(value);
+
+    // Clear any previous errors when user is typing
+    setTargetAddressHasError(false);
+
+    // If it's a valid address, set it directly
+    if (isAddress(value)) {
+      setTarget(value as Address);
+      setEnsName(null);
+    } else {
+      // Check if it looks like a complete ENS name (dot + 3+ chars)
+      const dotIndex = value.lastIndexOf('.');
+      const isCompleteEns = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
+
+      if (!isCompleteEns) {
+        // If it's not a complete ENS name and not a valid address, clear the target
+        setTarget('' as Address);
+        setEnsName(null);
+      }
     }
+    // ENS resolution will be handled by the useEffect
   };
 
   const handleTargetAddressBlur: FocusEventHandler<HTMLInputElement> = (e) => {
@@ -293,10 +376,27 @@ export const WithdrawForm = () => {
       setTargetAddressHasError(false);
       return;
     }
-    try {
-      getAddress(value);
+
+    // Check if it's a valid address
+    if (isAddress(value)) {
       setTargetAddressHasError(false);
-    } catch {
+      return;
+    }
+
+    // Check if it's a valid ENS name format
+    const dotIndex = value.lastIndexOf('.');
+    const isValidEnsFormat = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
+
+    if (isValidEnsFormat) {
+      // If ENS is resolved or still loading, don't show error
+      if (ensAddress || isLoadingEnsAddress || ensName === value) {
+        setTargetAddressHasError(false);
+      } else {
+        // Only show error if ENS resolution failed
+        setTargetAddressHasError(!ensAddress && !isLoadingEnsAddress);
+      }
+    } else {
+      // Not a valid address or ENS format
       setTargetAddressHasError(true);
     }
   };
@@ -322,23 +422,9 @@ export const WithdrawForm = () => {
   }, [poolAccount, setAmount, decimals]);
 
   const handleWithdraw = useCallback(() => {
-    if (quoteCommitment && countdown > 0) {
-      setFeeCommitment(quoteCommitment);
-      setFeeBPSForWithdraw(feeBPS ? BigInt(feeBPS) : BigInt(0));
-      setModalOpen(ModalType.GENERATE_ZK_PROOF);
-    } else {
-      addNotification('error', 'Cannot proceed: relayer quote is invalid or expired.');
-    }
-  }, [
-    quoteCommitment,
-    countdown,
-    setFeeCommitment,
-    setModalOpen,
-    addNotification,
-    feeBPS,
-    setFeeBPSForWithdraw,
-    isQuoteValid,
-  ]);
+    // Go directly to Review screen - quote will be requested there
+    setModalOpen(ModalType.REVIEW);
+  }, [setModalOpen]);
 
   const assetIcon = useMemo(() => {
     if (selectedPoolInfo?.asset === 'ETH') {
@@ -412,16 +498,34 @@ export const WithdrawForm = () => {
         />
 
         <FormControl fullWidth>
-          <TextField
-            id='target-address'
-            placeholder='Target Address'
-            value={target}
-            error={targetAddressHasError || (target !== '' && !isAddress(target))}
-            onChange={handleTargetAddressChange}
-            onBlur={handleTargetAddressBlur}
-            helperText={targetAddressHasError || (target !== '' && !isAddress(target)) ? 'Invalid address' : ''}
-            data-testid='target-address-input'
-          />
+          <Box sx={{ position: 'relative' }}>
+            <TextField
+              id='target-address'
+              placeholder='Target Address or ENS name'
+              value={inputValue}
+              error={targetAddressHasError}
+              onChange={handleTargetAddressChange}
+              onBlur={handleTargetAddressBlur}
+              spellCheck={false}
+              helperText={
+                targetAddressHasError ? (
+                  'Invalid address or ENS name'
+                ) : ensName ? (
+                  <ResolvedAddressDisplay />
+                ) : reverseEnsName ? (
+                  `ENS: ${reverseEnsName}`
+                ) : (
+                  ''
+                )
+              }
+              data-testid='target-address-input'
+              fullWidth
+              InputProps={{
+                startAdornment: ensAvatar ? <Avatar src={ensAvatar} sx={{ width: 24, height: 24, mr: 1 }} /> : null,
+                endAdornment: isLoadingEnsAddress ? <CircularProgress size={20} /> : null,
+              }}
+            />
+          </Box>
         </FormControl>
 
         <AmountInputSection
@@ -440,11 +544,11 @@ export const WithdrawForm = () => {
           selectedRelayer={selectedRelayer}
           relayersData={relayersData}
           handleRelayerChange={handleRelayerChange}
-          isQuoteLoading={isQuoteLoading}
-          quoteError={quoteError}
           feeText={feeText}
-          isQuoteValid={isQuoteValid}
-          countdown={countdown}
+          isQuoteLoading={false}
+          quoteError={null}
+          isQuoteValid={false}
+          countdown={0}
         />
 
         {selectedPoolInfo?.isStableAsset &&
@@ -469,10 +573,10 @@ export const WithdrawForm = () => {
         onClick={handleWithdraw}
         data-testid='confirm-withdrawal-button'
         sx={{ zIndex: 2 }}
-        startIcon={isQuoteLoading || isLoadingMinAmount ? <CircularProgress size={16} color='inherit' /> : null}
+        startIcon={isLoadingMinAmount ? <CircularProgress size={16} color='inherit' /> : null}
       >
-        {(isQuoteLoading || isLoadingMinAmount) && 'Getting Quote...'}
-        {!isQuoteLoading && !isLoadingMinAmount && 'Withdraw'}
+        {isLoadingMinAmount && 'Loading...'}
+        {!isLoadingMinAmount && 'Review Withdrawal'}
       </Button>
 
       <LinksSection />

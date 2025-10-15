@@ -1,3 +1,4 @@
+import { ChainAssets } from '~/config';
 import { Cookies, CustomThemes } from '~/types';
 
 export interface Env {
@@ -9,7 +10,9 @@ export interface Env {
   SHOW_DISCLAIMER: boolean;
   IS_TESTNET: boolean;
   GITHUB_HASH: string;
-  HYPERSYNC_KEY: string;
+  // HYPERSYNC_KEY removed from client-side for security
+  SENTRY_DSN: string;
+  SENTRY_AUTH_TOKEN: string;
 }
 
 export interface Constants {
@@ -19,6 +22,7 @@ export interface Constants {
   ITEMS_PER_PAGE: number;
   TOC_URL: string;
   PENDING_STATUS_MESSAGE: string;
+  DEFAULT_ASSET: ChainAssets;
 }
 
 export interface Config {

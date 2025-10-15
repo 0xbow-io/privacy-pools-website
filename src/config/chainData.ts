@@ -1,11 +1,12 @@
 import { Address, parseEther, parseUnits } from 'viem';
-import { Chain, mainnet, sepolia } from 'viem/chains';
+import { Chain, mainnet, optimismSepolia, sepolia } from 'viem/chains';
 import { getEnv } from '~/config/env';
 import { sUSDSAbi } from '~/config/sUSDSAbi';
 import { woethAbi } from '~/config/woethAbi';
 import daiIcon from '~/assets/icons/dai.svg';
 import frxusdIcon from '~/assets/icons/frxusd.svg';
 import mainnetIcon from '~/assets/icons/mainnet_color.svg';
+import optimismIcon from '~/assets/icons/optimism.svg';
 import susdsIcon from '~/assets/icons/susds.svg';
 import usd1Icon from '~/assets/icons/usd1.svg';
 import usdcIcon from '~/assets/icons/usdc.svg';
@@ -20,12 +21,13 @@ const { ALCHEMY_KEY, IS_TESTNET, ASP_ENDPOINT } = getEnv();
 
 // Add chains to the whitelist to be used in the app
 const mainnetChains: readonly [Chain, ...Chain[]] = [mainnet];
-const testnetChains: readonly [Chain, ...Chain[]] = [sepolia];
+const testnetChains: readonly [Chain, ...Chain[]] = [sepolia, optimismSepolia];
 
 export const whitelistedChains = IS_TESTNET ? testnetChains : mainnetChains;
 
 export type ChainAssets =
   | 'ETH'
+  | 'WETH'
   | 'USDS'
   | 'sUSDS'
   | 'DAI'
@@ -355,6 +357,36 @@ const testnetChainData: ChainData = {
         assetDecimals: 6,
         isStableAsset: true,
         isNativeToken: false,
+      },
+    ],
+  },
+  [optimismSepolia.id]: {
+    name: optimismSepolia.name,
+    symbol: optimismSepolia.nativeCurrency.symbol,
+    decimals: optimismSepolia.nativeCurrency.decimals,
+    image: optimismIcon.src,
+    explorerUrl: optimismSepolia.blockExplorers.default.url,
+    sdkRpcUrl: `/api/hypersync-rpc?chainId=11155420`, // Secure Hypersync proxy (relative URL)
+    rpcUrl: `https://opt-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    aspUrl: ASP_ENDPOINT,
+    relayers: [
+      { name: 'Testnet Relay', url: 'https://testnet-relayer.privacypools.com' },
+      // { name: 'Freedom Relay', url: 'https://fastrelay.xyz' },
+    ],
+    poolInfo: [
+      {
+        chainId: optimismSepolia.id,
+        assetAddress: '0x4200000000000000000000000000000000000006',
+        address: '0x6d79e6062C193F6aC31ca06D98D86Dc370EeDdA6',
+        scope: 8429575013385335244333569749759334171788704610098725134379761398714548791590n,
+        deploymentBlock: 32900681n,
+        entryPointAddress: '0x54aCA0D27500669FA37867233e05423701f11ba1',
+        maxDeposit: parseEther('1'),
+        asset: 'WETH',
+        assetDecimals: 18,
+        icon: mainnetIcon.src,
+        isStableAsset: false,
+        isNativeToken: true,
       },
     ],
   },

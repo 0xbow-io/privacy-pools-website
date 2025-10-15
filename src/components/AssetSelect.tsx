@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Image from 'next/image';
 import { Autocomplete, TextField, styled } from '@mui/material';
 import { ChainAssets } from '~/config';
@@ -12,6 +13,7 @@ export interface Option {
 
 const ALL_TOKEN_OPTIONS: Option[] = [
   { value: 'ETH', label: 'ETH' },
+  { value: 'WETH', label: 'WETH' },
   { value: 'wstETH', label: 'wstETH' },
   { value: 'WOETH', label: 'WOETH' },
   { value: 'wBTC', label: 'wBTC' },
@@ -30,6 +32,19 @@ export const AssetSelect: React.FC = () => {
   const supportedAssets_new = [...new Set(chain.poolInfo.map((pool) => pool.asset))];
 
   const filteredTokenOptions_new = ALL_TOKEN_OPTIONS.filter((option) => supportedAssets_new.includes(option.value));
+
+  // Auto-select first available option when options change
+  useEffect(() => {
+    // If there are filtered options available and no current selection matches the available options
+    if (filteredTokenOptions_new.length > 0) {
+      const currentSelectionExists = filteredTokenOptions_new.some((option) => option.value === selectedAsset);
+
+      // If no current selection or current selection is not in the available options, select the first one
+      if (!selectedAsset || !currentSelectionExists) {
+        setSelectedAsset(filteredTokenOptions_new[0].value);
+      }
+    }
+  }, [filteredTokenOptions_new, selectedAsset, setSelectedAsset]);
 
   const getAssetIcon_new = (asset: ChainAssets) => {
     const poolWithAsset = chain.poolInfo.find((pool) => pool.asset === asset);
