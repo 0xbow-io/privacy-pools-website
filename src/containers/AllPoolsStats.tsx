@@ -2,28 +2,18 @@
 
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import SearchIcon from '@mui/icons-material/Search';
-import {
-  Box,
-  Grid,
-  InputAdornment,
-  MenuItem,
-  Select,
-  SelectChangeEvent,
-  Stack,
-  styled,
-  TextField,
-  Typography,
-} from '@mui/material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { Box, Grid, InputAdornment, MenuItem, Select, Stack, styled, TextField, Typography } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
+import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { chainData, getConfig, PoolInfo } from '~/config';
 import { PAContainer, Section } from '~/containers';
 import type { PoolResponse } from '~/types';
 import { aspClient } from '~/utils';
 
-export interface PoolCardData {
+interface PoolCardData {
   poolName: string;
   icon?: string;
   asset: string;
@@ -31,21 +21,20 @@ export interface PoolCardData {
   scope: string;
   totalFunds: bigint;
   fundsPending: bigint;
-  totalFundsUSD?: number;
   growthPercentage?: number;
   decimals: number;
   acceptedDepositsCount: number;
   depositVarianceScore: number; // 0-1, where 1 is best (low variance)
 }
 
-export interface PrivacyScoreBar {
+interface PrivacyScoreBar {
   redFillWidth: number;
   greenFillWidth: number;
 }
 
 // Calculate deposit variance score from pool events
 // Lower variance (more uniform deposits) = better privacy
-export const calculateDepositVarianceScore = (poolData: PoolResponse | undefined): number => {
+const calculateDepositVarianceScore = (poolData: PoolResponse | undefined): number => {
   if (!poolData?.recentEvents || poolData.recentEvents.length < 2) {
     return 0.5; // Default to neutral score if insufficient data
   }
@@ -86,50 +75,18 @@ export const calculateDepositVarianceScore = (poolData: PoolResponse | undefined
   return score;
 };
 
-// Calculate numeric privacy score for sorting (0-1 scale)
-export const calculatePrivacyScoreValue = (fundsUSD: number, deposits: number, uniformity: number): number => {
-  const ONE_MILLION = 1_000_000;
-  const HUNDRED_MILLION = 100_000_000;
-
-  let fundsScore = 0;
-  if (fundsUSD >= HUNDRED_MILLION) {
-    fundsScore = 1;
-  } else if (fundsUSD > ONE_MILLION) {
-    const logMin = Math.log10(ONE_MILLION);
-    const logMax = Math.log10(HUNDRED_MILLION);
-    const logValue = Math.log10(fundsUSD);
-    fundsScore = (logValue - logMin) / (logMax - logMin);
-  }
-
-  const MIN_DEPOSITS = 1;
-  const MAX_DEPOSITS = 1000;
-  let depositScore = 0;
-  if (deposits > 0) {
-    const logMin = Math.log10(MIN_DEPOSITS);
-    const logMax = Math.log10(MAX_DEPOSITS);
-    const logValue = Math.log10(Math.min(deposits, MAX_DEPOSITS));
-    depositScore = Math.max(0.1, (logValue - logMin) / (logMax - logMin));
-  }
-
-  return (fundsScore + depositScore + uniformity) / 3;
-};
-
 // Calculate privacy score bar based on total funds, anonymity set size, and deposit uniformity
 // Middle point is 1M funds, green goes right (1M-100M), red goes left (0-1M)
 // Anonymity set size (deposit count) and deposit uniformity act as multipliers for the score
-export const calculatePrivacyScore = (
+const calculatePrivacyScore = (
   totalFundsUSD: number,
   depositCount: number,
   depositVarianceScore: number,
 ): PrivacyScoreBar => {
   const ONE_MILLION = 1_000_000;
   const HUNDRED_MILLION = 100_000_000;
-  const SIDE_WIDTH = 62; // Each side (red and green) is 62px wide
-
-  // If data appears to be loading (no funds and no deposits), return neutral state (all gray)
-  if (totalFundsUSD === 0 && depositCount === 0) {
-    return { redFillWidth: 0, greenFillWidth: 0 };
-  }
+  const RED_SEGMENT_WIDTH = 38.2041;
+  const GREEN_SEGMENT_WIDTH = 43.291;
 
   // Calculate anonymity set multiplier (0 to 1)
   // Logarithmic scale: 1 deposit = very low, 10 = decent, 100 = good, 1000+ = excellent
@@ -152,26 +109,22 @@ export const calculatePrivacyScore = (
 
   if (totalFundsUSD >= HUNDRED_MILLION) {
     // Max green, adjusted by privacy multiplier
-    return { redFillWidth: 0, greenFillWidth: SIDE_WIDTH * privacyMultiplier };
+    return { redFillWidth: 0, greenFillWidth: GREEN_SEGMENT_WIDTH * privacyMultiplier };
   } else if (totalFundsUSD > ONE_MILLION) {
     // Green zone: logarithmic scale from 1M to 100M, adjusted by privacy multiplier
     const logMin = Math.log10(ONE_MILLION);
     const logMax = Math.log10(HUNDRED_MILLION);
     const logValue = Math.log10(totalFundsUSD);
     const percentage = (logValue - logMin) / (logMax - logMin);
-    return { redFillWidth: 0, greenFillWidth: SIDE_WIDTH * percentage * privacyMultiplier };
+    return { redFillWidth: 0, greenFillWidth: GREEN_SEGMENT_WIDTH * percentage * privacyMultiplier };
   } else if (totalFundsUSD > 0) {
-    // Red zone: linear scale from 0 to 1M (lower funds = more red)
-    // Inverse privacy multiplier: worse privacy quality = more red
-    const fundsPercentage = (ONE_MILLION - totalFundsUSD) / ONE_MILLION;
-    // Inverse the privacy multiplier (1.1 - x maps 1.0->0.1 and 0.1->1.0)
-    const inversePrivacyMultiplier = 1.1 - privacyMultiplier;
-    return { redFillWidth: SIDE_WIDTH * fundsPercentage * inversePrivacyMultiplier, greenFillWidth: 0 };
+    // Red zone: linear scale from 0 to 1M (lower = more red)
+    // Note: Red indicates low value, so we don't boost it with anonymity multiplier
+    const percentage = (ONE_MILLION - totalFundsUSD) / ONE_MILLION;
+    return { redFillWidth: RED_SEGMENT_WIDTH * percentage, greenFillWidth: 0 };
   } else {
-    // Max red (no funds)
-    // Still affected by privacy quality - worse quality = more red
-    const inversePrivacyMultiplier = 1.1 - privacyMultiplier;
-    return { redFillWidth: SIDE_WIDTH * inversePrivacyMultiplier, greenFillWidth: 0 };
+    // Max red
+    return { redFillWidth: RED_SEGMENT_WIDTH, greenFillWidth: 0 };
   }
 };
 
@@ -184,11 +137,11 @@ const PoolCard = ({
   isLeftColumn: boolean;
   isFirstRow: boolean;
 }) => {
-  const router = useRouter();
+  const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
 
-  // Use totalFundsUSD from API (totalInPoolValueUsd)
-  const totalFundsUSD = pool.totalFundsUSD ?? 0;
-
+  // Format as currency - convert to number and format with commas
+  const totalFundsNumber = Number(totalFundsFormatted);
+  const totalFundsUSD = totalFundsNumber * 2500; // Rough ETH to USD conversion
   const totalFundsDisplay = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -202,19 +155,8 @@ const PoolCard = ({
   // Calculate privacy score bar based on total funds, deposit count, and deposit uniformity
   const privacyScoreBar = calculatePrivacyScore(totalFundsUSD, pool.acceptedDepositsCount, pool.depositVarianceScore);
 
-  // Calculate numeric privacy score value
-  const privacyScoreValue = calculatePrivacyScoreValue(
-    totalFundsUSD,
-    pool.acceptedDepositsCount,
-    pool.depositVarianceScore,
-  );
-
-  const handleClick = () => {
-    router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
-  };
-
   return (
-    <PoolCardContainer isLeftColumn={isLeftColumn} isFirstRow={isFirstRow} onClick={handleClick}>
+    <PoolCardContainer isLeftColumn={isLeftColumn} isFirstRow={isFirstRow}>
       <PoolHeader>
         <Stack direction='row' alignItems='center' gap={1}>
           {pool.icon && (
@@ -226,24 +168,8 @@ const PoolCard = ({
         </Stack>
         {hasGrowth && (
           <GrowthIndicator positive={isPositiveGrowth}>
-            {isPositiveGrowth ? (
-              <svg width='16' height='17' viewBox='0 0 16 17' fill='none' xmlns='http://www.w3.org/2000/svg'>
-                <path
-                  d='M10 4.25V5.25H13.2929L9 9.54295L6.8535 7.3965C6.80709 7.35005 6.75199 7.3132 6.69133 7.28806C6.63067 7.26292 6.56566 7.24998 6.5 7.24998C6.43434 7.24998 6.36933 7.26292 6.30867 7.28806C6.24801 7.3132 6.19291 7.35005 6.1465 7.3965L1 12.5429L1.70705 13.25L6.5 8.45705L8.6465 10.6035C8.69291 10.6499 8.74801 10.6868 8.80867 10.7119C8.86932 10.7371 8.93434 10.75 9 10.75C9.06566 10.75 9.13068 10.7371 9.19133 10.7119C9.25199 10.6868 9.30709 10.6499 9.3535 10.6035L14 5.95705V9.25H15V4.25H10Z'
-                  fill='#7D9C40'
-                />
-              </svg>
-            ) : (
-              <svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
-                <path
-                  d='M10 12V11H13.2929L9 6.70705L6.8535 8.8535C6.80709 8.89995 6.75199 8.9368 6.69133 8.96194C6.63067 8.98708 6.56566 9.00002 6.5 9.00002C6.43434 9.00002 6.36933 8.98708 6.30867 8.96194C6.24801 8.9368 6.19291 8.89995 6.1465 8.8535L1 3.70705L1.70705 3L6.5 7.79295L8.6465 5.6465C8.69291 5.60005 8.74801 5.5632 8.80867 5.53806C8.86932 5.51292 8.93434 5.49998 9 5.49998C9.06566 5.49998 9.13068 5.51292 9.19133 5.53806C9.25199 5.5632 9.30709 5.60005 9.3535 5.6465L14 10.293L14 7H15L15 12H10Z'
-                  fill='#BA6B5D'
-                />
-              </svg>
-            )}
-            <GrowthPercentage positive={isPositiveGrowth}>
-              {Math.abs(pool.growthPercentage || 0).toFixed(1)}%
-            </GrowthPercentage>
+            <TrendingUpIcon />
+            <GrowthPercentage>{Math.abs(pool.growthPercentage || 0).toFixed(1)}%</GrowthPercentage>
             <GrowthTimeframe>past 24h</GrowthTimeframe>
           </GrowthIndicator>
         )}
@@ -254,7 +180,7 @@ const PoolCard = ({
         <Stack direction='row' alignItems='center' gap='4px'>
           <StatLabel>Privacy score</StatLabel>
           <InfoTooltip
-            message={`Privacy score: ${(privacyScoreValue * 100).toFixed(1)}% - Based on pool size (${(pool.acceptedDepositsCount || 0).toLocaleString()} deposits), total funds, and deposit uniformity (${Math.round(pool.depositVarianceScore * 100)}%)`}
+            message={`Privacy score based on pool size (${(pool.acceptedDepositsCount || 0).toLocaleString()} deposits), total funds, and deposit uniformity (${Math.round(pool.depositVarianceScore * 100)}%)`}
           />
         </Stack>
       </PoolStats>
@@ -265,19 +191,33 @@ const PoolCard = ({
           <InfoTooltip message='Total funds in the pool' iconWidth={14} iconHeight={14} />
         </Stack>
         <PrivacyScoreBar>
-          {/* Left side (red zone): 62px total, gray background with red fill from right */}
-          <PrivacyScoreSide width={62}>
-            {privacyScoreBar.redFillWidth > 0 && (
-              <PrivacyScoreFill width={privacyScoreBar.redFillWidth} color='#BA6B5D' align='right' />
-            )}
-          </PrivacyScoreSide>
+          {/* Segment 1: Gray unless red is at max, then red */}
+          {privacyScoreBar.redFillWidth >= 38.2041 ? (
+            <PrivacyScoreSegment width={23.7959} color='#BA6B5D' />
+          ) : (
+            <PrivacyScoreSegment width={23.7959} />
+          )}
+          {/* Red zone (segment 2): gray portion then red portion */}
+          {38.2041 - privacyScoreBar.redFillWidth > 0 && (
+            <PrivacyScoreSegment width={38.2041 - privacyScoreBar.redFillWidth} />
+          )}
+          {privacyScoreBar.redFillWidth > 0 && (
+            <PrivacyScoreSegment width={privacyScoreBar.redFillWidth} color='#BA6B5D' />
+          )}
+          {/* Green zone (segment 3): green portion then gray portion */}
+          {privacyScoreBar.greenFillWidth > 0 && (
+            <PrivacyScoreSegment width={privacyScoreBar.greenFillWidth} color='#7D9C40' />
+          )}
+          {43.291 - privacyScoreBar.greenFillWidth > 0 && (
+            <PrivacyScoreSegment width={43.291 - privacyScoreBar.greenFillWidth} />
+          )}
+          {/* Segment 4: Gray unless green is at max, then green */}
+          {privacyScoreBar.greenFillWidth >= 43.291 ? (
+            <PrivacyScoreSegment width={18.709} color='#7D9C40' />
+          ) : (
+            <PrivacyScoreSegment width={18.709} />
+          )}
           <PrivacyScoreVerticalLine />
-          {/* Right side (green zone): 62px total, gray background with green fill from left */}
-          <PrivacyScoreSide width={62}>
-            {privacyScoreBar.greenFillWidth > 0 && (
-              <PrivacyScoreFill width={privacyScoreBar.greenFillWidth} color='#7D9C40' align='left' />
-            )}
-          </PrivacyScoreSide>
         </PrivacyScoreBar>
       </PoolStatsBottom>
     </PoolCardContainer>
@@ -289,7 +229,6 @@ type SortOption = 'most-popular' | 'most-private' | 'most-deposits' | 'most-unif
 export const AllPoolsStats = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('most-popular');
-  const [sortSelectOpen, setSortSelectOpen] = useState(false);
   const aspUrl = getConfig().env.ASP_ENDPOINT;
 
   // Build list of all pools to query
@@ -308,36 +247,13 @@ export const AllPoolsStats = () => {
     return pools;
   }, [aspUrl]);
 
-  // Get unique chain IDs for fetching pools-stats
-  const uniqueChainIds = useMemo(() => {
-    return Array.from(new Set(allPoolsToQuery.map((pool) => pool.chainId)));
-  }, [allPoolsToQuery]);
-
   // Fetch pool info for each individual pool
   const poolInfoQueries = useQueries({
     queries: allPoolsToQuery.map((pool) => ({
       queryKey: ['asp_pool_info', pool.chainId, pool.scope, pool.aspUrl],
       queryFn: () => aspClient.fetchPoolInfo(pool.aspUrl, pool.chainId, pool.scope),
-      refetchInterval: 120000, // Increased to 2 minutes
-      staleTime: 60000, // Consider data fresh for 60 seconds
+      refetchInterval: 60000,
       retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
-  });
-
-  // Fetch pools-stats for each chain to get growth24h data
-  const poolStatsQueries = useQueries({
-    queries: uniqueChainIds.map((chainId) => ({
-      queryKey: ['asp_pools_stats', chainId, aspUrl],
-      queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
-      refetchInterval: 120000,
-      staleTime: 60000,
-      retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
     })),
   });
 
@@ -345,34 +261,15 @@ export const AllPoolsStats = () => {
   const poolDataMap = useMemo(() => {
     const map = new Map<string, PoolResponse>();
 
-    // First, build map of growth data by chainId and scope from poolStatsQueries
-    const growthDataMap = new Map<string, number | null>();
-    poolStatsQueries.forEach((query, index) => {
-      if (!query.data?.pools) return;
-      const chainId = uniqueChainIds[index];
-
-      query.data.pools.forEach((poolStats) => {
-        const key = `${chainId}-${poolStats.scope}`;
-        growthDataMap.set(key, poolStats.growth24h ?? null);
-      });
-    });
-
-    // Then, build the main pool data map with growth data merged in
     poolInfoQueries.forEach((query, index) => {
       if (!query.data) return;
       const pool = allPoolsToQuery[index];
       const key = `${pool.chainId}-${pool.scope}`;
-
-      // Merge growth24h data from poolStatsQueries
-      const growth24h = growthDataMap.get(key);
-      map.set(key, {
-        ...query.data,
-        growth24h,
-      });
+      map.set(key, query.data);
     });
 
     return map;
-  }, [poolInfoQueries, poolStatsQueries, allPoolsToQuery, uniqueChainIds]);
+  }, [poolInfoQueries, allPoolsToQuery]);
 
   // Build pool list dynamically from chainData with real stats
   const allPools = useMemo(() => {
@@ -391,11 +288,6 @@ export const AllPoolsStats = () => {
             ? BigInt(poolData.totalDepositsValue) - BigInt(poolData.totalInPoolValue)
             : BigInt(0);
 
-        // Parse totalInPoolValueUsd from the API
-        const totalFundsUSD = poolData?.totalInPoolValueUsd
-          ? parseFloat(poolData.totalInPoolValueUsd.replace(/,/g, ''))
-          : undefined;
-
         pools.push({
           poolName: `${chain.name} - ${poolInfo.asset} Pool`,
           icon: poolInfo.icon,
@@ -404,9 +296,8 @@ export const AllPoolsStats = () => {
           scope: poolInfo.scope.toString(),
           totalFunds,
           fundsPending,
-          totalFundsUSD,
           decimals: poolInfo.assetDecimals || 18,
-          growthPercentage: poolData?.growth24h ?? undefined,
+          growthPercentage: 8.5, // Mock data for now
           acceptedDepositsCount: poolData?.acceptedDepositsCount || 0,
           depositVarianceScore: calculateDepositVarianceScore(poolData),
         });
@@ -435,24 +326,47 @@ export const AllPoolsStats = () => {
     const sortedPools = [...pools].sort((a, b) => {
       switch (sortBy) {
         case 'most-popular': {
-          // Sort by total funds in USD (descending) - from API's totalInPoolValueUsd
-          const aFundsUSD = a.totalFundsUSD ?? 0;
-          const bFundsUSD = b.totalFundsUSD ?? 0;
+          // Sort by total funds in USD (descending)
+          const aFundsUSD = Number(formatUnits(a.totalFunds, a.decimals)) * 2500;
+          const bFundsUSD = Number(formatUnits(b.totalFunds, b.decimals)) * 2500;
           return bFundsUSD - aFundsUSD;
         }
 
         case 'most-private': {
-          // Calculate privacy scores for comparison using the shared helper function
-          const aScore = calculatePrivacyScoreValue(
-            a.totalFundsUSD ?? 0,
-            a.acceptedDepositsCount,
-            a.depositVarianceScore,
-          );
-          const bScore = calculatePrivacyScoreValue(
-            b.totalFundsUSD ?? 0,
-            b.acceptedDepositsCount,
-            b.depositVarianceScore,
-          );
+          // Calculate privacy scores for comparison
+          const aFundsUSD = Number(formatUnits(a.totalFunds, a.decimals)) * 2500;
+          const bFundsUSD = Number(formatUnits(b.totalFunds, b.decimals)) * 2500;
+
+          // Simple privacy score: combination of funds position and deposit quality
+          const getPrivacyScore = (fundsUSD: number, deposits: number, uniformity: number) => {
+            const ONE_MILLION = 1_000_000;
+            const HUNDRED_MILLION = 100_000_000;
+
+            let fundsScore = 0;
+            if (fundsUSD >= HUNDRED_MILLION) {
+              fundsScore = 1;
+            } else if (fundsUSD > ONE_MILLION) {
+              const logMin = Math.log10(ONE_MILLION);
+              const logMax = Math.log10(HUNDRED_MILLION);
+              const logValue = Math.log10(fundsUSD);
+              fundsScore = (logValue - logMin) / (logMax - logMin);
+            }
+
+            const MIN_DEPOSITS = 1;
+            const MAX_DEPOSITS = 1000;
+            let depositScore = 0;
+            if (deposits > 0) {
+              const logMin = Math.log10(MIN_DEPOSITS);
+              const logMax = Math.log10(MAX_DEPOSITS);
+              const logValue = Math.log10(Math.min(deposits, MAX_DEPOSITS));
+              depositScore = Math.max(0.1, (logValue - logMin) / (logMax - logMin));
+            }
+
+            return (fundsScore + depositScore + uniformity) / 3;
+          };
+
+          const aScore = getPrivacyScore(aFundsUSD, a.acceptedDepositsCount, a.depositVarianceScore);
+          const bScore = getPrivacyScore(bFundsUSD, b.acceptedDepositsCount, b.depositVarianceScore);
 
           return bScore - aScore;
         }
@@ -477,7 +391,7 @@ export const AllPoolsStats = () => {
     setSearchQuery(e.target.value);
   };
 
-  const handleSortChange = (e: SelectChangeEvent<unknown>) => {
+  const handleSortChange = (e: React.ChangeEvent<{ value: unknown }>) => {
     setSortBy(e.target.value as SortOption);
   };
 
@@ -495,53 +409,7 @@ export const AllPoolsStats = () => {
           </Stack>
 
           <Stack direction='row' alignItems='center' gap={2}>
-            <SortSelect
-              value={sortBy}
-              onChange={handleSortChange}
-              size='small'
-              open={sortSelectOpen}
-              onOpen={() => setSortSelectOpen(true)}
-              onClose={() => setSortSelectOpen(false)}
-              IconComponent={() => null}
-              renderValue={(value) => {
-                const labels = {
-                  'most-popular': 'Most Popular',
-                  'most-private': 'Most Private',
-                  'most-deposits': 'Most Deposits',
-                  'most-uniform': 'Most Uniform',
-                };
-                return (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span>{labels[value as SortOption]}</span>
-                    <svg
-                      width='20'
-                      height='20'
-                      viewBox='0 0 20 20'
-                      fill='none'
-                      xmlns='http://www.w3.org/2000/svg'
-                      style={{
-                        transform: sortSelectOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                    >
-                      <path
-                        d='M6.17917 7.15414L10 10.975L13.8208 7.15414L15 8.33331L10 13.3333L5 8.33331L6.17917 7.15414Z'
-                        fill='#282828'
-                      />
-                    </svg>
-                  </Box>
-                );
-              }}
-              MenuProps={{
-                PaperProps: {
-                  sx: {
-                    '& .MuiMenuItem-root': {
-                      fontSize: '12px',
-                    },
-                  },
-                },
-              }}
-            >
+            <SortSelect value={sortBy} onChange={handleSortChange} size='small'>
               <MenuItem value='most-popular'>Most Popular</MenuItem>
               <MenuItem value='most-private'>Most Private</MenuItem>
               <MenuItem value='most-deposits'>Most Deposits</MenuItem>
@@ -607,13 +475,13 @@ const SortSelect = styled(Select)(({ theme }) => ({
   color: '#202224',
   backgroundColor: theme.palette.background.paper,
   '& .MuiOutlinedInput-notchedOutline': {
-    border: 'none',
+    borderColor: theme.palette.grey[300],
   },
   '&:hover .MuiOutlinedInput-notchedOutline': {
-    border: 'none',
+    borderColor: theme.palette.grey[400],
   },
   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-    border: 'none',
+    borderColor: theme.palette.primary.main,
   },
   '& .MuiSelect-select': {
     fontWeight: 400,
@@ -662,11 +530,6 @@ const PoolCardContainer = styled(Box, {
   backgroundColor: theme.palette.background.paper,
   minHeight: '131px',
   width: '100%',
-  cursor: 'pointer',
-  transition: 'background-color 0.2s ease',
-  '&:hover': {
-    backgroundColor: theme.palette.grey[50],
-  },
   [theme.breakpoints.down('sm')]: {
     borderRight: 'none',
     borderLeft: 'none',
@@ -708,7 +571,7 @@ const GrowthIndicator = styled(Stack, {
   flexDirection: 'row',
   alignItems: 'center',
   gap: '4px',
-  color: positive ? '#7D9C40' : '#BA6B5D',
+  color: positive ? '#7D9C40' : '#D32F2F',
   '& .MuiSvgIcon-root': {
     fontSize: '16px',
     width: '16px',
@@ -716,13 +579,11 @@ const GrowthIndicator = styled(Stack, {
   },
 }));
 
-const GrowthPercentage = styled('span', {
-  shouldForwardProp: (prop) => prop !== 'positive',
-})<{ positive?: boolean }>(({ positive }) => ({
+const GrowthPercentage = styled('span')(() => ({
   fontWeight: 400,
   fontSize: '12px',
   lineHeight: '100%',
-  color: positive ? '#7D9C40' : '#BA6B5D',
+  color: '#7D9C40',
 }));
 
 const GrowthTimeframe = styled('span')(() => ({
@@ -773,26 +634,13 @@ const PrivacyScoreBar = styled(Box)(() => ({
   display: 'flex',
 }));
 
-const PrivacyScoreSide = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'width',
-})<{ width: number }>(({ theme, width }) => ({
-  position: 'relative',
+const PrivacyScoreSegment = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'color',
+})<{ width: number; color?: string }>(({ theme, width, color }) => ({
   width: `${width}px`,
   height: '10px',
   marginTop: '3px',
-  backgroundColor: theme.palette.grey[200],
-  overflow: 'hidden',
-}));
-
-const PrivacyScoreFill = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'color' && prop !== 'align',
-})<{ width: number; color: string; align: 'left' | 'right' }>(({ width, color, align }) => ({
-  position: 'absolute',
-  width: `${width}px`,
-  height: '100%',
-  backgroundColor: color,
-  [align]: 0,
-  top: 0,
+  backgroundColor: color || theme.palette.grey[200],
 }));
 
 const PrivacyScoreVerticalLine = styled('div')(() => ({
@@ -802,5 +650,4 @@ const PrivacyScoreVerticalLine = styled('div')(() => ({
   width: '2px',
   height: '16px',
   backgroundColor: '#4D4D4D',
-  zIndex: 1,
 }));

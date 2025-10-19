@@ -9,8 +9,6 @@ interface PoolStats {
   acceptedDepositsValue: string;
   totalDepositsCount: number;
   acceptedDepositsCount: number;
-  growth24h?: number | null;
-  pendingGrowth24h?: number | null;
 }
 
 interface PoolStatsResponse {

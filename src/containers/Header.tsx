@@ -3,16 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { styled } from '@mui/material/styles';
-import { Disclaimer, Logo, Menu, SignInButton } from '~/components';
+import { Disclaimer, Logo, Menu, SignInButton, DepositAssetSelect } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
 import { useAuthContext } from '~/hooks';
 import { zIndex } from '~/utils';
 
 export const Header = () => {
-  const { isConnected } = useAuthContext();
-  const pathname = usePathname();
-
-  const isPoolsActive = pathname === '/';
+  const { isConnected, isLogged } = useAuthContext();
 
   return (
     <HeaderWrapper>
@@ -31,6 +28,12 @@ export const Header = () => {
         </LeftSection>
         <Actions>
           <ChainSelect />
+
+          {isLogged && (
+            <DepositContainer>
+              <DepositAssetSelect />
+            </DepositContainer>
+          )}
 
           {!isConnected && <SignInButton />}
           {isConnected && <Menu />}
@@ -80,28 +83,9 @@ const Actions = styled('div')({
   gap: '1rem',
 });
 
-const LeftSection = styled('div')({
+const DepositContainer = styled('div')({
   display: 'flex',
   alignItems: 'center',
-  gap: '2.4rem',
+  minWidth: '140px',
+  maxWidth: '200px',
 });
-
-const NavLinks = styled('div')({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '2rem',
-});
-
-const NavLink = styled(Link, {
-  shouldForwardProp: (prop) => prop !== 'active',
-})<{ active: string }>(({ active }) => ({
-  fontWeight: 400,
-  fontSize: '14px',
-  lineHeight: '100%',
-  color: '#000000',
-  textDecoration: 'none',
-  textDecorationLine: active === 'true' ? 'underline' : 'none',
-  '&:hover': {
-    opacity: 0.7,
-  },
-}));
