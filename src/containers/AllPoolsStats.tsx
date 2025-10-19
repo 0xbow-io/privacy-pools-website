@@ -24,7 +24,7 @@ import { PAContainer, Section } from '~/containers';
 import type { PoolResponse } from '~/types';
 import { aspClient } from '~/utils';
 
-interface PoolCardData {
+export interface PoolCardData {
   poolName: string;
   icon?: string;
   asset: string;
@@ -38,14 +38,14 @@ interface PoolCardData {
   depositVarianceScore: number; // 0-1, where 1 is best (low variance)
 }
 
-interface PrivacyScoreBar {
+export interface PrivacyScoreBar {
   redFillWidth: number;
   greenFillWidth: number;
 }
 
 // Calculate deposit variance score from pool events
 // Lower variance (more uniform deposits) = better privacy
-const calculateDepositVarianceScore = (poolData: PoolResponse | undefined): number => {
+export const calculateDepositVarianceScore = (poolData: PoolResponse | undefined): number => {
   if (!poolData?.recentEvents || poolData.recentEvents.length < 2) {
     return 0.5; // Default to neutral score if insufficient data
   }
@@ -89,7 +89,7 @@ const calculateDepositVarianceScore = (poolData: PoolResponse | undefined): numb
 // Calculate privacy score bar based on total funds, anonymity set size, and deposit uniformity
 // Middle point is 1M funds, green goes right (1M-100M), red goes left (0-1M)
 // Anonymity set size (deposit count) and deposit uniformity act as multipliers for the score
-const calculatePrivacyScore = (
+export const calculatePrivacyScore = (
   totalFundsUSD: number,
   depositCount: number,
   depositVarianceScore: number,

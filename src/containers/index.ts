@@ -10,6 +10,7 @@ export * from './PoolAccountsFull';
 export * from './PoolAccountsPreview';
 export * from './AllPoolAccountsPreview';
 export * from './AllPoolsStats';
+export * from './UserPoolsStats';
 export * from './Modals';
 export * from './ActivityFull';
 export * from './ActivityPreview';
