@@ -4,7 +4,18 @@ import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import SearchIcon from '@mui/icons-material/Search';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { Box, Grid, InputAdornment, MenuItem, Select, Stack, styled, TextField, Typography } from '@mui/material';
+import {
+  Box,
+  Grid,
+  InputAdornment,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Stack,
+  styled,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
@@ -391,7 +402,7 @@ export const AllPoolsStats = () => {
     setSearchQuery(e.target.value);
   };
 
-  const handleSortChange = (e: React.ChangeEvent<{ value: unknown }>) => {
+  const handleSortChange = (e: SelectChangeEvent<unknown>) => {
     setSortBy(e.target.value as SortOption);
   };
 
