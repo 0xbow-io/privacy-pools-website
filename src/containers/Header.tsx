@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { styled } from '@mui/material/styles';
-import { Disclaimer, Logo, Menu, SignInButton, DepositAssetSelect } from '~/components';
+import { Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
 import { useAuthContext } from '~/hooks';
 import { zIndex } from '~/utils';
 
 export const Header = () => {
-  const { isConnected, isLogged } = useAuthContext();
+  const { isConnected } = useAuthContext();
 
   return (
     <HeaderWrapper>
@@ -27,12 +27,6 @@ export const Header = () => {
         </LeftSection>
         <Actions>
           <ChainSelect />
-
-          {isLogged && (
-            <DepositContainer>
-              <DepositAssetSelect />
-            </DepositContainer>
-          )}
 
           {!isConnected && <SignInButton />}
           {isConnected && <Menu />}
@@ -80,13 +74,6 @@ const Actions = styled('div')({
   justifyContent: 'end',
   alignItems: 'center',
   gap: '1rem',
-});
-
-const DepositContainer = styled('div')({
-  display: 'flex',
-  alignItems: 'center',
-  minWidth: '140px',
-  maxWidth: '200px',
 });
 
 const LeftSection = styled('div')({

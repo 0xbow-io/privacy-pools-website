@@ -36,14 +36,16 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     balanceBN: { symbol, decimals },
     selectedPoolInfo: { assetDecimals },
   } = useChainContext();
-  const { poolsByAssetAndChain, amountPoolAsset, hideEmptyPools, toggleHideEmptyPools, poolAccounts } =
-    useAccountContext();
+  const accountContext = useAccountContext();
   const {
-    previewPoolAccounts,
-    previewGlobalEvents,
-    previewPersonalActivity,
-    isLoading: activityLoading,
-  } = useAdvancedView();
+    poolsByAssetAndChain,
+    amountPoolAsset,
+    hideEmptyPools,
+    toggleHideEmptyPools,
+    poolAccountsByChainScope,
+    historyData,
+  } = accountContext;
+  const { previewGlobalEvents, isLoading: activityLoading } = useAdvancedView();
   const { setModalOpen } = useModal();
   const { isLogged, isConnected, isAuthorized } = useAuthContext();
   const goTo = useGoTo();
@@ -56,7 +58,11 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const [activityView, setActivityView] = useState<'global' | 'personal'>(address ? 'personal' : 'global');
 
   // Fetch pool info for this specific pool
-  const poolScope = chain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase())?.scope.toString();
+  const poolScope = useMemo(() => {
+    const matchedPool = chain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase());
+    return matchedPool?.scope.toString();
+  }, [poolId, chain]);
+
   const { data: poolData } = useQuery({
     queryKey: ['pool_info', parsedChainId, poolScope, aspUrl],
     queryFn: () => aspClient.fetchPoolInfo(aspUrl, parsedChainId, poolScope || ''),
@@ -94,30 +100,57 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   }, [isLogged, amountPoolAsset, assetDecimals, decimals]);
 
   const myPoolAccountsCount = useMemo(() => {
-    if (!isLogged) return 0;
-    // Count pool accounts for this specific pool
-    const filtered = poolAccounts.filter((pa) => pa.chainId === parsedChainId && pa.scope.toString() === poolScope);
+    if (!isLogged || !poolScope) return 0;
+
+    // Use poolAccountsByChainScope to get accounts for this specific pool
+    const key = `${parsedChainId}-${poolScope}`;
+    const accountsForThisPool = poolAccountsByChainScope[key] || [];
 
     // Filter out empty pools if hideEmptyPools is true
     if (hideEmptyPools) {
-      return filtered.filter((pa) => pa.balance && BigInt(pa.balance) > 0n).length;
+      return accountsForThisPool.filter((pa) => pa.balance && BigInt(pa.balance) > 0n).length;
     }
 
-    return filtered.length;
-  }, [isLogged, poolAccounts, parsedChainId, poolScope, hideEmptyPools]);
+    return accountsForThisPool.length;
+  }, [isLogged, poolAccountsByChainScope, parsedChainId, poolScope, hideEmptyPools]);
 
   // Filter pool accounts for the current pool only
   const currentPoolAccounts = useMemo(() => {
-    if (!isLogged) return [];
-    const filtered = poolAccounts.filter((pa) => pa.chainId === parsedChainId && pa.scope.toString() === poolScope);
-
-    // Filter out empty pools if hideEmptyPools is true
-    if (hideEmptyPools) {
-      return filtered.filter((pa) => pa.balance && BigInt(pa.balance) > 0n);
+    if (!isLogged) {
+      return [];
     }
 
-    return filtered;
-  }, [isLogged, poolAccounts, parsedChainId, poolScope, hideEmptyPools]);
+    if (!poolScope) {
+      return [];
+    }
+
+    // Use poolAccountsByChainScope to get accounts for this specific pool
+    const key = `${parsedChainId}-${poolScope}`;
+    const accountsForThisPool = poolAccountsByChainScope[key] || [];
+
+    // Filter out empty pools if hideEmptyPools is true, then sort by timestamp
+    const filtered = hideEmptyPools
+      ? accountsForThisPool.filter((pa) => pa.balance && BigInt(pa.balance) > 0n)
+      : accountsForThisPool;
+
+    // Sort by deposit timestamp (newest first)
+    return [...filtered].sort((a, b) => Number(b.deposit.timestamp || 0) - Number(a.deposit.timestamp || 0));
+  }, [isLogged, poolAccountsByChainScope, parsedChainId, poolScope, hideEmptyPools]);
+
+  // Preview pool accounts (first 6 for display in PoolPage)
+  const localPreviewPoolAccounts = useMemo(() => currentPoolAccounts.slice(0, 6), [currentPoolAccounts]);
+
+  // Filter personal activity for this specific pool (matching useAdvancedView logic)
+  const localPersonalActivity = useMemo(() => {
+    if (!poolScope) return [];
+
+    return historyData
+      .filter((account) => account.scope.toString() === poolScope)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [historyData, poolScope]);
+
+  // Preview personal activity (first 6 for display)
+  const localPreviewPersonalActivity = useMemo(() => localPersonalActivity.slice(0, 6), [localPersonalActivity]);
 
   useEffect(() => {
     // Parse and set the chain ID
@@ -162,7 +195,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     }
   }, [address, activityView]);
 
-  const activityData = activityView === 'global' ? previewGlobalEvents : previewPersonalActivity;
+  const activityData = activityView === 'global' ? previewGlobalEvents : localPreviewPersonalActivity;
 
   return (
     <PoolPageContainer>
@@ -197,13 +230,13 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
               width='100%'
               justifyContent='flex-end'
             >
-              {previewPoolAccounts.length > 0 && (
-                <ViewAllButton onClick={handleShowEmptyPools} disabled={!poolsByAssetAndChain.length}>
+              {localPreviewPoolAccounts.length > 0 && (
+                <ViewAllButton onClick={handleShowEmptyPools} disabled={!poolsByAssetAndChain?.length}>
                   <ViewAllText>{hideEmptyPools ? 'Show' : 'Hide'} empty pools</ViewAllText>
                 </ViewAllButton>
               )}
 
-              {isAuthorized && previewPoolAccounts.length > 0 && (
+              {isAuthorized && localPreviewPoolAccounts.length > 0 && (
                 <ViewAllButton
                   onClick={handleNavigateToPoolAccounts}
                   disabled={poolsByAssetAndChain && !poolsByAssetAndChain.length}
@@ -257,11 +290,18 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
         {/* Pool Accounts Table */}
         {isLogged && (
-          <PAContainer>
+          <PAContainer id='lalala' style={{ borderRight: '0', borderBottom: '0', borderLeft: '0' }}>
             {currentPoolAccounts.length > 0 && (
               <>
-                <Section width='100%'>
-                  <Stack direction='row' alignItems='center' gap={1} width='100%'>
+                <Section width='100%' id='foo'>
+                  <Stack
+                    direction='row'
+                    alignItems='center'
+                    gap={1}
+                    width='100%'
+                    style={{ borderRight: '0px' }}
+                    id='lol'
+                  >
                     <Typography variant='subtitle1' fontWeight='bold' lineHeight='1'>
                       My Pool Accounts
                     </Typography>
@@ -602,7 +642,6 @@ const PoolPageContainer = styled('div')(() => ({
 const StatsContainer = styled(Box)(({ theme }) => ({
   width: '100%',
   borderTop: `1px solid ${theme.palette.grey[600]}`,
-  borderBottom: `1px solid ${theme.palette.grey[600]}`,
   padding: '20px 0',
 }));
 
