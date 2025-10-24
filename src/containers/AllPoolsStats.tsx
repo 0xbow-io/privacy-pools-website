@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import SearchIcon from '@mui/icons-material/Search';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
@@ -148,6 +149,7 @@ const PoolCard = ({
   isLeftColumn: boolean;
   isFirstRow: boolean;
 }) => {
+  const router = useRouter();
   const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
 
   // Format as currency - convert to number and format with commas
@@ -166,8 +168,12 @@ const PoolCard = ({
   // Calculate privacy score bar based on total funds, deposit count, and deposit uniformity
   const privacyScoreBar = calculatePrivacyScore(totalFundsUSD, pool.acceptedDepositsCount, pool.depositVarianceScore);
 
+  const handleClick = () => {
+    router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
+  };
+
   return (
-    <PoolCardContainer isLeftColumn={isLeftColumn} isFirstRow={isFirstRow}>
+    <PoolCardContainer isLeftColumn={isLeftColumn} isFirstRow={isFirstRow} onClick={handleClick}>
       <PoolHeader>
         <Stack direction='row' alignItems='center' gap={1}>
           {pool.icon && (
@@ -263,8 +269,12 @@ export const AllPoolsStats = () => {
     queries: allPoolsToQuery.map((pool) => ({
       queryKey: ['asp_pool_info', pool.chainId, pool.scope, pool.aspUrl],
       queryFn: () => aspClient.fetchPoolInfo(pool.aspUrl, pool.chainId, pool.scope),
-      refetchInterval: 60000,
+      refetchInterval: 120000, // Increased to 2 minutes
+      staleTime: 60000, // Consider data fresh for 60 seconds
       retryOnMount: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     })),
   });
 
@@ -541,6 +551,11 @@ const PoolCardContainer = styled(Box, {
   backgroundColor: theme.palette.background.paper,
   minHeight: '131px',
   width: '100%',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s ease',
+  '&:hover': {
+    backgroundColor: theme.palette.grey[50],
+  },
   [theme.breakpoints.down('sm')]: {
     borderRight: 'none',
     borderLeft: 'none',

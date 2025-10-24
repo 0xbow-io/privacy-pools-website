@@ -12,7 +12,7 @@ import { InfoTooltip } from '~/components/InfoTooltip';
 import { ChainAssets, chainData, getConfig } from '~/config';
 import { Section, PAContainer, ActionMenu } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
-import { EventType, ModalType, ReviewStatus } from '~/types';
+import { ModalType } from '~/types';
 import { ROUTER, aspClient } from '~/utils';
 
 interface PoolOption {
@@ -36,10 +36,14 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     balanceBN: { symbol, decimals },
     selectedPoolInfo: { assetDecimals },
   } = useChainContext();
-  const accountContext = useAccountContext();
-  const { poolsByAssetAndChain, amountPoolAsset, hideEmptyPools, toggleHideEmptyPools, poolAccountsByChainScope } =
-    accountContext;
-  const { previewGlobalEvents, isLoading: activityLoading } = useAdvancedView();
+  const { poolsByAssetAndChain, amountPoolAsset, hideEmptyPools, toggleHideEmptyPools, poolAccounts } =
+    useAccountContext();
+  const {
+    previewPoolAccounts,
+    previewGlobalEvents,
+    previewPersonalActivity,
+    isLoading: activityLoading,
+  } = useAdvancedView();
   const { setModalOpen } = useModal();
   const { isLogged, isConnected, isAuthorized } = useAuthContext();
   const goTo = useGoTo();
@@ -52,11 +56,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const [activityView, setActivityView] = useState<'global' | 'personal'>(address ? 'personal' : 'global');
 
   // Fetch pool info for this specific pool
-  const poolScope = useMemo(() => {
-    const matchedPool = chain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase());
-    return matchedPool?.scope.toString();
-  }, [poolId, chain]);
-
+  const poolScope = chain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase())?.scope.toString();
   const { data: poolData } = useQuery({
     queryKey: ['pool_info', parsedChainId, poolScope, aspUrl],
     queryFn: () => aspClient.fetchPoolInfo(aspUrl, parsedChainId, poolScope || ''),
@@ -94,98 +94,30 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   }, [isLogged, amountPoolAsset, assetDecimals, decimals]);
 
   const myPoolAccountsCount = useMemo(() => {
-    if (!isLogged || !poolScope) return 0;
-
-    // Use poolAccountsByChainScope to get accounts for this specific pool
-    const key = `${parsedChainId}-${poolScope}`;
-    const accountsForThisPool = poolAccountsByChainScope[key] || [];
+    if (!isLogged) return 0;
+    // Count pool accounts for this specific pool
+    const filtered = poolAccounts.filter((pa) => pa.chainId === parsedChainId && pa.scope.toString() === poolScope);
 
     // Filter out empty pools if hideEmptyPools is true
     if (hideEmptyPools) {
-      return accountsForThisPool.filter((pa) => pa.balance && BigInt(pa.balance) > 0n).length;
+      return filtered.filter((pa) => pa.balance && BigInt(pa.balance) > 0n).length;
     }
 
-    return accountsForThisPool.length;
-  }, [isLogged, poolAccountsByChainScope, parsedChainId, poolScope, hideEmptyPools]);
+    return filtered.length;
+  }, [isLogged, poolAccounts, parsedChainId, poolScope, hideEmptyPools]);
 
   // Filter pool accounts for the current pool only
   const currentPoolAccounts = useMemo(() => {
-    if (!isLogged) {
-      return [];
+    if (!isLogged) return [];
+    const filtered = poolAccounts.filter((pa) => pa.chainId === parsedChainId && pa.scope.toString() === poolScope);
+
+    // Filter out empty pools if hideEmptyPools is true
+    if (hideEmptyPools) {
+      return filtered.filter((pa) => pa.balance && BigInt(pa.balance) > 0n);
     }
 
-    if (!poolScope) {
-      return [];
-    }
-
-    // Use poolAccountsByChainScope to get accounts for this specific pool
-    const key = `${parsedChainId}-${poolScope}`;
-    const accountsForThisPool = poolAccountsByChainScope[key] || [];
-
-    // Filter out empty pools if hideEmptyPools is true, then sort by timestamp
-    const filtered = hideEmptyPools
-      ? accountsForThisPool.filter((pa) => pa.balance && BigInt(pa.balance) > 0n)
-      : accountsForThisPool;
-
-    // Sort by deposit timestamp (newest first)
-    return [...filtered].sort((a, b) => Number(b.deposit.timestamp || 0) - Number(a.deposit.timestamp || 0));
-  }, [isLogged, poolAccountsByChainScope, parsedChainId, poolScope, hideEmptyPools]);
-
-  // Preview pool accounts (first 6 for display in PoolPage)
-  const localPreviewPoolAccounts = useMemo(() => currentPoolAccounts.slice(0, 6), [currentPoolAccounts]);
-
-  // Build personal activity for this specific pool from poolAccountsByChainScope
-  // (same logic as historyData in AccountProvider but using cached pool accounts)
-  const localPersonalActivity = useMemo(() => {
-    if (!poolScope) return [];
-
-    const key = `${parsedChainId}-${poolScope}`;
-    const accountsForThisPool = poolAccountsByChainScope[key] || [];
-
-    const history = [];
-
-    for (const pa of accountsForThisPool) {
-      history.push({
-        type: EventType.DEPOSIT,
-        txHash: pa.deposit.txHash,
-        reviewStatus: pa.reviewStatus,
-        amount: pa.deposit.value,
-        timestamp: Number(pa.deposit.timestamp),
-        label: pa.label,
-        scope: pa.scope,
-      });
-
-      for (const [idx, child] of pa.children.entries()) {
-        history.push({
-          type: EventType.WITHDRAWAL,
-          txHash: child.txHash,
-          reviewStatus: ReviewStatus.APPROVED,
-          amount: (idx === 0 ? pa.deposit.value : pa.children[idx - 1].value) - child.value,
-          timestamp: Number(child.timestamp),
-          label: child.label,
-          scope: pa.scope,
-        });
-      }
-    }
-
-    for (const { ragequit, scope } of accountsForThisPool) {
-      if (!ragequit?.transactionHash) continue;
-      history.push({
-        type: EventType.EXIT,
-        txHash: ragequit?.transactionHash,
-        reviewStatus: ReviewStatus.APPROVED,
-        amount: ragequit?.value,
-        timestamp: Number(ragequit?.timestamp),
-        label: ragequit?.label,
-        scope: scope,
-      });
-    }
-
-    return history.sort((a, b) => b.timestamp - a.timestamp);
-  }, [poolAccountsByChainScope, parsedChainId, poolScope]);
-
-  // Preview personal activity (first 6 for display)
-  const localPreviewPersonalActivity = useMemo(() => localPersonalActivity.slice(0, 6), [localPersonalActivity]);
+    return filtered;
+  }, [isLogged, poolAccounts, parsedChainId, poolScope, hideEmptyPools]);
 
   useEffect(() => {
     // Parse and set the chain ID
@@ -224,8 +156,13 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   };
 
   // Update activity view to 'personal' when address becomes available
+  useEffect(() => {
+    if (address && activityView === 'global') {
+      setActivityView('personal');
+    }
+  }, [address, activityView]);
 
-  const activityData = activityView === 'global' ? previewGlobalEvents : localPreviewPersonalActivity;
+  const activityData = activityView === 'global' ? previewGlobalEvents : previewPersonalActivity;
 
   return (
     <PoolPageContainer>
@@ -260,13 +197,13 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
               width='100%'
               justifyContent='flex-end'
             >
-              {localPreviewPoolAccounts.length > 0 && (
-                <ViewAllButton onClick={handleShowEmptyPools} disabled={!poolsByAssetAndChain?.length}>
+              {previewPoolAccounts.length > 0 && (
+                <ViewAllButton onClick={handleShowEmptyPools} disabled={!poolsByAssetAndChain.length}>
                   <ViewAllText>{hideEmptyPools ? 'Show' : 'Hide'} empty pools</ViewAllText>
                 </ViewAllButton>
               )}
 
-              {isAuthorized && localPreviewPoolAccounts.length > 0 && (
+              {isAuthorized && previewPoolAccounts.length > 0 && (
                 <ViewAllButton
                   onClick={handleNavigateToPoolAccounts}
                   disabled={poolsByAssetAndChain && !poolsByAssetAndChain.length}
@@ -320,18 +257,11 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
         {/* Pool Accounts Table */}
         {isLogged && (
-          <PAContainer id='lalala' style={{ borderRight: '0', borderBottom: '0', borderLeft: '0' }}>
+          <PAContainer>
             {currentPoolAccounts.length > 0 && (
               <>
-                <Section width='100%' id='foo'>
-                  <Stack
-                    direction='row'
-                    alignItems='center'
-                    gap={1}
-                    width='100%'
-                    style={{ borderRight: '0px' }}
-                    id='lol'
-                  >
+                <Section width='100%'>
+                  <Stack direction='row' alignItems='center' gap={1} width='100%'>
                     <Typography variant='subtitle1' fontWeight='bold' lineHeight='1'>
                       My Pool Accounts
                     </Typography>
@@ -389,7 +319,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
       {/* Activity Section */}
       <ActivityContainer>
         <ActivitySection sx={{ width: '100%' }}>
-          <Box sx={{ width: '100%' }}>
+          <Box>
             <Stack direction='row' alignItems='center' gap={1} sx={{ marginBottom: '1.2rem' }}>
               <Typography variant='subtitle1' fontWeight='bold' lineHeight='1'>
                 Activity
@@ -397,33 +327,31 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
               <InfoTooltip message='This is a log of all of the global and personal activity in Privacy Pools.' />
             </Stack>
 
-            <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%'>
-              <Stack spacing='1.2rem' direction='row' alignItems='center'>
-                <ActivityButton
-                  variant='text'
-                  onClick={() => setActivityView('global')}
-                  active={String(activityView === 'global')}
-                >
-                  Global
-                </ActivityButton>
+            <Stack spacing='1.2rem' direction='row' alignItems='center'>
+              <ActivityButton
+                variant='text'
+                onClick={() => setActivityView('global')}
+                active={String(activityView === 'global')}
+              >
+                Global
+              </ActivityButton>
 
-                <ActivityDivider />
+              <ActivityDivider />
 
-                <ActivityButton
-                  variant='text'
-                  onClick={() => setActivityView('personal')}
-                  active={String(activityView === 'personal')}
-                  disabled={!address}
-                >
-                  Personal
-                </ActivityButton>
-              </Stack>
-
-              <ViewAllButton onClick={handleNavigateToActivity} disabled={!activityData?.length}>
-                <ViewAllText>View All</ViewAllText>
-              </ViewAllButton>
+              <ActivityButton
+                variant='text'
+                onClick={() => setActivityView('personal')}
+                active={String(activityView === 'personal')}
+                disabled={!address}
+              >
+                Personal
+              </ActivityButton>
             </Stack>
           </Box>
+
+          <ViewAllButton onClick={handleNavigateToActivity} disabled={!activityData?.length}>
+            <ViewAllText>View All</ViewAllText>
+          </ViewAllButton>
         </ActivitySection>
 
         <ActivityTable records={activityData} isLoading={activityLoading} view={activityView} size='small' />
@@ -461,7 +389,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
       value={selectedOption || undefined}
       onChange={handleChange}
       options={availableOptions}
-      getOptionLabel={(option) => option.label}
+      getOptionLabel={(option) => `${option.label}@${option.chainName}`}
       componentsProps={{
         popper: {
           style: { width: 'fit-content' },
@@ -508,7 +436,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
               </PoolIconWrapper>
             )}
             <span>
-              {option.label}@<ChainNameText>{option.chainName}</ChainNameText>
+              {option.label}@{option.chainName}
             </span>
           </PoolOptionContent>
         </li>
@@ -518,6 +446,10 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
         const { InputProps, inputProps, ...restParams } = params;
         const { endAdornment, ...restInputProps } = InputProps;
 
+        // Calculate input size based on selected option text length
+        const displayText = selectedOption ? `${selectedOption.label}@${selectedOption.chainName}` : '';
+        const inputSize = displayText.length || 10;
+
         return (
           <TextField
             {...restParams}
@@ -525,24 +457,11 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
             variant='outlined'
             InputProps={{
               ...restInputProps,
-              startAdornment: (
-                <>
-                  {icon && (
-                    <PoolIconWrapper sx={{ mr: '0.8rem' }}>
-                      <Image src={icon} alt={selectedOption?.label || ''} width={24} height={24} />
-                    </PoolIconWrapper>
-                  )}
-                  {selectedOption && (
-                    <Box
-                      component='span'
-                      sx={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: '16px' }}
-                    >
-                      <span>{selectedOption.label}</span>
-                      <ChainNameText>@{selectedOption.chainName}</ChainNameText>
-                    </Box>
-                  )}
-                </>
-              ),
+              startAdornment: icon ? (
+                <PoolIconWrapper sx={{ mr: '0.8rem' }}>
+                  <Image src={icon} alt={selectedOption?.label || ''} width={24} height={24} />
+                </PoolIconWrapper>
+              ) : null,
               endAdornment: (
                 <>
                   <Typography
@@ -559,8 +478,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
             }}
             inputProps={{
               ...inputProps,
-              value: '',
-              style: { width: 0, padding: 0, margin: 0, minWidth: 0, flex: 'none' }, // Hide the default input since we're using startAdornment
+              size: inputSize,
             }}
           />
         );
@@ -571,13 +489,10 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
 };
 
 const BackButton = styled(IconButton)(() => ({
-  padding: '11px 15px 11px 11px',
+  padding: '8px',
   width: '32px',
   height: '32px',
   border: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
   '&:hover': {
     backgroundColor: 'rgba(0, 0, 0, 0.04)',
     border: 'none',
@@ -590,7 +505,7 @@ const BackButton = styled(IconButton)(() => ({
 const PoolSelectAutocomplete = styled(Autocomplete<PoolOption, false, true, false>)(({ theme }) => ({
   width: 'fit-content',
   maxWidth: 'fit-content',
-  marginLeft: '-4px',
+  marginLeft: '-8px',
   '& .MuiOutlinedInput-root': {
     fontWeight: 600,
     fontSize: '16px',
@@ -617,11 +532,8 @@ const PoolSelectAutocomplete = styled(Autocomplete<PoolOption, false, true, fals
     cursor: 'pointer',
     padding: '0 !important',
     minWidth: '0 !important',
-    width: '0 !important',
+    width: 'auto !important',
     flex: '0 0 auto',
-    position: 'absolute',
-    opacity: 0,
-    pointerEvents: 'none',
   },
   '& .MuiInputBase-input': {
     overflow: 'visible !important',
@@ -677,14 +589,6 @@ const PoolIconWrapper = styled('div')(() => ({
   flexShrink: 0,
 }));
 
-const ChainNameText = styled('span')(({ theme }) => ({
-  color: theme.palette.grey[400],
-  fontWeight: 600,
-  //textDecoration: 'underline',
-  //textUnderlineOffset: '0.3rem',
-  lineHeight: '1.25',
-}));
-
 const PoolPageContainer = styled('div')(() => ({
   display: 'flex',
   flexDirection: 'column',
@@ -698,6 +602,7 @@ const PoolPageContainer = styled('div')(() => ({
 const StatsContainer = styled(Box)(({ theme }) => ({
   width: '100%',
   borderTop: `1px solid ${theme.palette.grey[600]}`,
+  borderBottom: `1px solid ${theme.palette.grey[600]}`,
   padding: '20px 0',
 }));
 

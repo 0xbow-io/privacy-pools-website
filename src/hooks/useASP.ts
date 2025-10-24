@@ -66,13 +66,6 @@ export const useASP = (
     refetchOnReconnect: false,
   });
 
-  const poolStatsQuery = useQuery({
-    queryKey: ['asp_pool_stats', chainId, aspUrl],
-    queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
-    refetchInterval: 60000,
-    retryOnMount: false,
-  });
-
   const depositsByLabelQuery = useMutation({
     mutationFn: (labels: string[]) => aspClient.fetchDepositsByLabel(aspUrl, chainId, scope, labels),
   });

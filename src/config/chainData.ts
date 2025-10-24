@@ -68,6 +68,7 @@ export interface PoolInfo {
   asset: ChainAssets;
   assetDecimals?: number;
   icon?: string;
+  color?: string; // Color for charts and visualizations
   isStableAsset?: boolean; // Includes stablecoins and yield-bearing stablecoins
   isNativeToken?: boolean; // True for native tokens (ETH on Ethereum, etc.)
   alternativeTokens?: AlternativeTokenConfig[]; // Allow depositing alternative tokens that get converted
@@ -120,6 +121,7 @@ const mainnetChainData: ChainData = {
         asset: 'ETH',
         assetDecimals: 18,
         icon: mainnetIcon.src,
+        color: '#627EEA',
         isStableAsset: false,
         isNativeToken: true,
       },
@@ -134,6 +136,7 @@ const mainnetChainData: ChainData = {
         asset: 'USDS',
         assetDecimals: 18,
         icon: usdsIcon.src,
+        color: '#4D4D4D',
         isStableAsset: true,
         isNativeToken: false,
       },
@@ -148,6 +151,7 @@ const mainnetChainData: ChainData = {
         asset: 'sUSDS',
         assetDecimals: 18,
         icon: susdsIcon.src,
+        color: '#21C55E',
         isStableAsset: true,
         isNativeToken: false,
         yield: {
@@ -177,6 +181,7 @@ const mainnetChainData: ChainData = {
         asset: 'DAI',
         assetDecimals: 18,
         icon: daiIcon.src,
+        color: '#F5AC37',
         isStableAsset: true,
         isNativeToken: false,
       },
@@ -191,6 +196,7 @@ const mainnetChainData: ChainData = {
         asset: 'USDT',
         assetDecimals: 6,
         icon: usdtIcon.src,
+        color: '#26A17B',
         isStableAsset: true,
         isNativeToken: false,
       },
@@ -205,6 +211,7 @@ const mainnetChainData: ChainData = {
         asset: 'USDC',
         assetDecimals: 6,
         icon: usdcIcon.src,
+        color: '#2775CA',
         isStableAsset: true,
         isNativeToken: false,
       },
@@ -219,6 +226,7 @@ const mainnetChainData: ChainData = {
         asset: 'wstETH',
         assetDecimals: 18,
         icon: wstethIcon.src,
+        color: '#00A3FF',
         isStableAsset: false,
         isNativeToken: false,
       },
@@ -233,6 +241,7 @@ const mainnetChainData: ChainData = {
         asset: 'wBTC',
         assetDecimals: 8,
         icon: wbtcIcon.src,
+        color: '#F7931A',
         isStableAsset: false,
         isNativeToken: false,
       },
@@ -247,6 +256,7 @@ const mainnetChainData: ChainData = {
         asset: 'USDe',
         assetDecimals: 18,
         icon: usdeIcon.src,
+        color: '#000000',
         isStableAsset: true,
         isNativeToken: false,
       },
@@ -261,6 +271,7 @@ const mainnetChainData: ChainData = {
         asset: 'USD1',
         assetDecimals: 18,
         icon: usd1Icon.src,
+        color: '#1E40AF',
         isStableAsset: true,
         isNativeToken: false,
       },
@@ -275,6 +286,7 @@ const mainnetChainData: ChainData = {
         asset: 'FRXUSD',
         assetDecimals: 18,
         icon: frxusdIcon.src,
+        color: '#000000',
         isStableAsset: true,
         isNativeToken: false,
       },
@@ -289,6 +301,7 @@ const mainnetChainData: ChainData = {
         asset: 'WOETH',
         assetDecimals: 18,
         icon: woethIcon.src,
+        color: '#627EEA',
         isStableAsset: false,
         isNativeToken: false,
         priceConversion: {

@@ -21,9 +21,8 @@ export const Header = () => {
             <Logo />
           </Link>
           <NavLinks>
-            <NavLink href='/' active={isPoolsActive ? 'true' : 'false'}>
-              Pools
-            </NavLink>
+            <NavLink href='/'>Pools</NavLink>
+            <NavLink href='/stats'>Stats</NavLink>
           </NavLinks>
         </LeftSection>
         <Actions>
@@ -88,4 +87,27 @@ const DepositContainer = styled('div')({
   alignItems: 'center',
   minWidth: '140px',
   maxWidth: '200px',
+});
+
+const LeftSection = styled('div')({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '2.4rem',
+});
+
+const NavLinks = styled('div')({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '2rem',
+});
+
+const NavLink = styled(Link)({
+  fontWeight: 400,
+  fontSize: '14px',
+  lineHeight: '100%',
+  color: '#000000',
+  textDecoration: 'none',
+  '&:hover': {
+    opacity: 0.7,
+  },
 });

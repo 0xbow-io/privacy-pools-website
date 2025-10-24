@@ -1,8 +1,6 @@
 'use client';
 
 import { Stack, Typography, Button, styled } from '@mui/material';
-import { formatUnits } from 'viem';
-import { AssetSelect } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { Section, PAContainer, ActionMenuContainer } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext } from '~/hooks';
