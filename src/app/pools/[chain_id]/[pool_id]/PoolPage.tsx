@@ -37,14 +37,8 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     selectedPoolInfo: { assetDecimals },
   } = useChainContext();
   const accountContext = useAccountContext();
-  const {
-    poolsByAssetAndChain,
-    amountPoolAsset,
-    hideEmptyPools,
-    toggleHideEmptyPools,
-    poolAccountsByChainScope,
-    historyData,
-  } = accountContext;
+  const { poolsByAssetAndChain, amountPoolAsset, hideEmptyPools, toggleHideEmptyPools, poolAccountsByChainScope } =
+    accountContext;
   const { previewGlobalEvents, isLoading: activityLoading } = useAdvancedView();
   const { setModalOpen } = useModal();
   const { isLogged, isConnected, isAuthorized } = useAuthContext();
@@ -140,14 +134,55 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   // Preview pool accounts (first 6 for display in PoolPage)
   const localPreviewPoolAccounts = useMemo(() => currentPoolAccounts.slice(0, 6), [currentPoolAccounts]);
 
-  // Filter personal activity for this specific pool (matching useAdvancedView logic)
+  // Build personal activity for this specific pool from poolAccountsByChainScope
+  // (same logic as historyData in AccountProvider but using cached pool accounts)
   const localPersonalActivity = useMemo(() => {
     if (!poolScope) return [];
 
-    return historyData
-      .filter((account) => account.scope.toString() === poolScope)
-      .sort((a, b) => b.timestamp - a.timestamp);
-  }, [historyData, poolScope]);
+    const key = `${parsedChainId}-${poolScope}`;
+    const accountsForThisPool = poolAccountsByChainScope[key] || [];
+
+    const history = [];
+
+    for (const pa of accountsForThisPool) {
+      history.push({
+        type: 'deposit' as const,
+        txHash: pa.deposit.txHash,
+        reviewStatus: pa.reviewStatus,
+        amount: pa.deposit.value,
+        timestamp: Number(pa.deposit.timestamp),
+        label: pa.label,
+        scope: pa.scope,
+      });
+
+      for (const [idx, child] of pa.children.entries()) {
+        history.push({
+          type: 'withdrawal' as const,
+          txHash: child.txHash,
+          reviewStatus: 'approved' as const,
+          amount: (idx === 0 ? pa.deposit.value : pa.children[idx - 1].value) - child.value,
+          timestamp: Number(child.timestamp),
+          label: child.label,
+          scope: pa.scope,
+        });
+      }
+    }
+
+    for (const { ragequit, scope } of accountsForThisPool) {
+      if (!ragequit?.transactionHash) continue;
+      history.push({
+        type: 'exit' as const,
+        txHash: ragequit?.transactionHash,
+        reviewStatus: 'approved' as const,
+        amount: ragequit?.value,
+        timestamp: Number(ragequit?.timestamp),
+        label: ragequit?.label,
+        scope: scope,
+      });
+    }
+
+    return history.sort((a, b) => b.timestamp - a.timestamp);
+  }, [poolAccountsByChainScope, parsedChainId, poolScope]);
 
   // Preview personal activity (first 6 for display)
   const localPreviewPersonalActivity = useMemo(() => localPersonalActivity.slice(0, 6), [localPersonalActivity]);
