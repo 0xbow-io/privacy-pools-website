@@ -14,7 +14,6 @@ export const Footer = () => {
   } = getConfig();
   const { setModalOpen } = useModal();
   const isMobile = useMediaQuery('(max-width:768px)'); // Explicit pixel-based mobile detection
-  console.log('isMobile', isMobile);
   const handleNewsletterClick = () => {
     setModalOpen(ModalType.NEWSLETTER_SUBSCRIPTION);
   };

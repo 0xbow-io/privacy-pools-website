@@ -6,22 +6,30 @@ import { Copy, Checkmark } from '@carbon/icons-react';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   FormControl,
+  FormControlLabel,
+  MenuItem,
+  Select,
   SelectChangeEvent,
   Stack,
   styled,
   TextField,
   Avatar,
   Tooltip,
+  Typography,
   useTheme,
 } from '@mui/material';
+import { useQueries } from '@tanstack/react-query';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useEnsAddress, useEnsAvatar, useEnsName } from 'wagmi';
-import { CoinIcon, ImageContainer, InputContainer, ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
+import { chainData, getConfig } from '~/config';
+import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
+import { useQuoteContext } from '~/contexts/QuoteContext';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
-import { getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
+import { aspClient, getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -422,29 +430,11 @@ export const WithdrawForm = () => {
   }, [poolAccount, setAmount, decimals]);
 
   const handleWithdraw = useCallback(() => {
+    // Set extraGas based on checkbox state
+    setExtraGas(receiveGasToken);
     // Go directly to Review screen - quote will be requested there
     setModalOpen(ModalType.REVIEW);
-  }, [setModalOpen]);
-
-  const assetIcon = useMemo(() => {
-    if (selectedPoolInfo?.asset === 'ETH') {
-      return <CoinIcon />;
-    }
-
-    if (selectedPoolInfo?.icon) {
-      return (
-        <ImageContainer>
-          <Image src={selectedPoolInfo.icon} alt={symbol} width={54} height={34} />
-        </ImageContainer>
-      );
-    }
-
-    return (
-      <ImageContainer>
-        <span style={{ width: '5.4rem', height: '5.4rem', backgroundColor: 'transparent' }}></span>
-      </ImageContainer>
-    );
-  }, [selectedPoolInfo?.asset, selectedPoolInfo?.icon, symbol]);
+  }, [setModalOpen, setExtraGas, receiveGasToken]);
 
   return (
     <ModalContainer>

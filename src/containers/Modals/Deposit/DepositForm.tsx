@@ -103,17 +103,6 @@ export const DepositForm = () => {
       const pool = chain.poolInfo[index];
       const totalFunds = query.data?.totalInPoolValue ? BigInt(query.data.totalInPoolValue) : BigInt(0);
 
-      console.log('TVL Debug:', {
-        asset: pool.asset,
-        isLoading: query.isLoading,
-        isSuccess: query.isSuccess,
-        isError: query.isError,
-        error: query.error,
-        hasData: !!query.data,
-        totalInPoolValue: query.data?.totalInPoolValue,
-        totalFunds: totalFunds.toString(),
-      });
-
       map.set(pool.asset, {
         tvl: totalFunds,
         decimals: pool.assetDecimals || 18,
