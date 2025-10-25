@@ -10,6 +10,10 @@ import { zIndex } from '~/utils';
 
 export const Header = () => {
   const { isConnected } = useAuthContext();
+  const pathname = usePathname();
+
+  const isPoolsActive = pathname === '/';
+  const isStatsActive = pathname === '/stats';
 
   return (
     <HeaderWrapper>
@@ -21,8 +25,12 @@ export const Header = () => {
             <Logo />
           </Link>
           <NavLinks>
-            <NavLink href='/'>Pools</NavLink>
-            <NavLink href='/stats'>Stats</NavLink>
+            <NavLink href='/' active={isPoolsActive ? 'true' : 'false'}>
+              Pools
+            </NavLink>
+            <NavLink href='/stats' active={isStatsActive ? 'true' : 'false'}>
+              Stats
+            </NavLink>
           </NavLinks>
         </LeftSection>
         <Actions>
@@ -88,13 +96,16 @@ const NavLinks = styled('div')({
   gap: '2rem',
 });
 
-const NavLink = styled(Link)({
+const NavLink = styled(Link, {
+  shouldForwardProp: (prop) => prop !== 'active',
+})<{ active: string }>(({ active }) => ({
   fontWeight: 400,
   fontSize: '14px',
   lineHeight: '100%',
   color: '#000000',
   textDecoration: 'none',
+  textDecorationLine: active === 'true' ? 'underline' : 'none',
   '&:hover': {
     opacity: 0.7,
   },
-});
+}));

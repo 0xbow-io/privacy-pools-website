@@ -3,16 +3,15 @@
 import { useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { Box, Grid, Stack, styled, Typography } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { chainData, getConfig, PoolInfo } from '~/config';
 import { useAccountContext } from '~/hooks';
-import type { PoolResponse } from '~/types';
+import { ReviewStatus, type PoolResponse } from '~/types';
 import { aspClient } from '~/utils';
-import { calculateDepositVarianceScore, calculatePrivacyScore, PoolCardData } from './AllPoolsStats';
+import { calculateDepositVarianceScore, PoolCardData } from './AllPoolsStats';
 
 export const UserPoolsStats = () => {
   const aspUrl = getConfig().env.ASP_ENDPOINT;
@@ -114,7 +113,7 @@ export const UserPoolsStats = () => {
     <PoolsGridContainer>
       <PoolsGrid container spacing={0}>
         {userPools.map((pool, index) => (
-          <Grid item xs={12} sm={6} key={`${pool.chainId}-${pool.scope}-${index}`}>
+          <Grid item xs={12} sm={userPools.length === 1 ? 12 : 6} key={`${pool.chainId}-${pool.scope}-${index}`}>
             <PoolCard pool={pool} isLeftColumn={index % 2 === 0} isFirstRow={index < 2} />
           </Grid>
         ))}
@@ -133,23 +132,31 @@ const PoolCard = ({
   isFirstRow: boolean;
 }) => {
   const router = useRouter();
+  const { poolAccountsByChainScope } = useAccountContext();
+
+  const dataKey = `${pool.chainId}-${pool.scope}`;
+  const poolAccounts = poolAccountsByChainScope[dataKey] || [];
+
+  // Calculate my balance (sum of all balances for this pool)
+  const myBalance = poolAccounts.reduce((sum, pa) => sum + BigInt(pa.balance || 0), BigInt(0));
+  const myBalanceFormatted = formatUnits(myBalance, pool.decimals);
+
+  // Calculate pending (sum of balances where reviewStatus is PENDING)
+  const pending = poolAccounts.reduce(
+    (sum, pa) => (pa.reviewStatus === ReviewStatus.PENDING ? sum + BigInt(pa.balance || 0) : sum),
+    BigInt(0),
+  );
+  const pendingFormatted = formatUnits(pending, pool.decimals);
+
+  // My Accounts count
+  const myAccountsCount = poolAccounts.length;
+
+  // Total Funds in Pool
   const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
 
-  // Format as currency - convert to number and format with commas
-  const totalFundsNumber = Number(totalFundsFormatted);
-  const totalFundsUSD = totalFundsNumber * 2500; // Rough ETH to USD conversion
-  const totalFundsDisplay = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(totalFundsUSD);
-
-  const hasGrowth = pool.growthPercentage !== undefined && pool.growthPercentage !== 0;
-  const isPositiveGrowth = (pool.growthPercentage || 0) > 0;
-
-  // Calculate privacy score bar based on total funds, deposit count, and deposit uniformity
-  const privacyScoreBar = calculatePrivacyScore(totalFundsUSD, pool.acceptedDepositsCount, pool.depositVarianceScore);
+  // Calculate Average Deposit Size
+  const averageDepositSize =
+    pool.acceptedDepositsCount > 0 ? Number(totalFundsFormatted) / pool.acceptedDepositsCount : 0;
 
   const handleClick = () => {
     router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
@@ -166,60 +173,43 @@ const PoolCard = ({
           )}
           <PoolName variant='body1'>{pool.asset} Pool</PoolName>
         </Stack>
-        {hasGrowth && (
-          <GrowthIndicator positive={isPositiveGrowth}>
-            <TrendingUpIcon />
-            <GrowthPercentage>{Math.abs(pool.growthPercentage || 0).toFixed(1)}%</GrowthPercentage>
-            <GrowthTimeframe>past 24h</GrowthTimeframe>
-          </GrowthIndicator>
-        )}
       </PoolHeader>
 
-      <PoolStats>
-        <StatLabel>Total funds</StatLabel>
-        <Stack direction='row' alignItems='center' gap='4px'>
-          <StatLabel>Privacy score</StatLabel>
-          <InfoTooltip
-            message={`Privacy score based on pool size (${(pool.acceptedDepositsCount || 0).toLocaleString()} deposits), total funds, and deposit uniformity (${Math.round(pool.depositVarianceScore * 100)}%)`}
-          />
-        </Stack>
-      </PoolStats>
+      <StatsRow>
+        <StatColumn>
+          <StatLabel>My balance</StatLabel>
+          <Stack direction='row' alignItems='center' gap='4px'>
+            <BalanceValue>${Number(myBalanceFormatted).toLocaleString()}</BalanceValue>
+            <InfoTooltip message='Your total balance in this pool' iconWidth={16} iconHeight={16} />
+          </Stack>
+        </StatColumn>
+        <StatColumn align='right'>
+          <StatLabel>Pending</StatLabel>
+          <PendingValue>${Number(pendingFormatted).toLocaleString()}</PendingValue>
+        </StatColumn>
+      </StatsRow>
 
-      <PoolStatsBottom>
-        <Stack direction='row' alignItems='center' gap='4px'>
-          <TotalFundsValue>{totalFundsDisplay}</TotalFundsValue>
-          <InfoTooltip message='Total funds in the pool' iconWidth={14} iconHeight={14} />
-        </Stack>
-        <PrivacyScoreBar>
-          {/* Segment 1: Gray unless red is at max, then red */}
-          {privacyScoreBar.redFillWidth >= 38.2041 ? (
-            <PrivacyScoreSegment width={23.7959} color='#BA6B5D' />
-          ) : (
-            <PrivacyScoreSegment width={23.7959} />
-          )}
-          {/* Red zone (segment 2): gray portion then red portion */}
-          {38.2041 - privacyScoreBar.redFillWidth > 0 && (
-            <PrivacyScoreSegment width={38.2041 - privacyScoreBar.redFillWidth} />
-          )}
-          {privacyScoreBar.redFillWidth > 0 && (
-            <PrivacyScoreSegment width={privacyScoreBar.redFillWidth} color='#BA6B5D' />
-          )}
-          {/* Green zone (segment 3): green portion then gray portion */}
-          {privacyScoreBar.greenFillWidth > 0 && (
-            <PrivacyScoreSegment width={privacyScoreBar.greenFillWidth} color='#7D9C40' />
-          )}
-          {43.291 - privacyScoreBar.greenFillWidth > 0 && (
-            <PrivacyScoreSegment width={43.291 - privacyScoreBar.greenFillWidth} />
-          )}
-          {/* Segment 4: Gray unless green is at max, then green */}
-          {privacyScoreBar.greenFillWidth >= 43.291 ? (
-            <PrivacyScoreSegment width={18.709} color='#7D9C40' />
-          ) : (
-            <PrivacyScoreSegment width={18.709} />
-          )}
-          <PrivacyScoreVerticalLine />
-        </PrivacyScoreBar>
-      </PoolStatsBottom>
+      <Separator />
+
+      <InfoStatsRow>
+        <StatLabel>My Accounts</StatLabel>
+        <SmallStatValue>{myAccountsCount}</SmallStatValue>
+      </InfoStatsRow>
+
+      <InfoStatsRow>
+        <StatLabel>Total Funds in Pool</StatLabel>
+        <SmallStatValue>${Number(totalFundsFormatted).toLocaleString()}</SmallStatValue>
+      </InfoStatsRow>
+
+      <InfoStatsRow>
+        <StatLabel>Average Deposit Size</StatLabel>
+        <SmallStatValue>${averageDepositSize.toLocaleString(undefined, { maximumFractionDigits: 0 })}</SmallStatValue>
+      </InfoStatsRow>
+
+      <InfoStatsRow>
+        <StatLabel>Total Accounts</StatLabel>
+        <SmallStatValue>{pool.acceptedDepositsCount.toLocaleString()}</SmallStatValue>
+      </InfoStatsRow>
     </PoolCardContainer>
   );
 };
@@ -289,89 +279,67 @@ const PoolName = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.primary,
 }));
 
-const GrowthIndicator = styled(Stack, {
-  shouldForwardProp: (prop) => prop !== 'positive',
-})<{ positive?: boolean }>(({ positive }) => ({
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: '4px',
-  color: positive ? '#7D9C40' : '#D32F2F',
-  '& .MuiSvgIcon-root': {
-    fontSize: '16px',
-    width: '16px',
-    height: '16px',
-  },
-}));
-
-const GrowthPercentage = styled('span')(() => ({
-  fontWeight: 400,
-  fontSize: '12px',
-  lineHeight: '100%',
-  color: '#7D9C40',
-}));
-
-const GrowthTimeframe = styled('span')(() => ({
-  fontWeight: 400,
-  fontSize: '12px',
-  lineHeight: '100%',
-  color: '#4D4D4D',
-}));
-
-const PoolStats = styled(Stack)(() => ({
+const StatsRow = styled(Box)(() => ({
+  display: 'flex',
   flexDirection: 'row',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
   width: '100%',
   gap: '16px',
-  marginBottom: '0px',
+  marginBottom: '8px',
 }));
 
-const PoolStatsBottom = styled(Stack)(() => ({
+const InfoStatsRow = styled(Box)(() => ({
+  display: 'flex',
   flexDirection: 'row',
   justifyContent: 'space-between',
   alignItems: 'center',
   width: '100%',
-  gap: '16px',
+  marginBottom: '4px',
 }));
 
-const StatLabel = styled(Typography)(({ theme }) => ({
+const StatColumn = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'align',
+})<{ align?: 'left' | 'right' }>(({ align }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: align === 'right' ? 'flex-end' : 'flex-start',
+  gap: '4px',
+  flex: 1,
+}));
+
+const StatLabel = styled(Typography)(() => ({
   fontWeight: 400,
   fontSize: '12px',
   lineHeight: '100%',
   color: '#4D4D4D',
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(0.5),
 }));
 
-const TotalFundsValue = styled(Typography)(({ theme }) => ({
+const BalanceValue = styled(Typography)(() => ({
   fontWeight: 700,
   fontSize: '24px',
-  lineHeight: '31px',
-  color: theme.palette.text.primary,
+  lineHeight: '100%',
+  color: '#000000',
 }));
 
-const PrivacyScoreBar = styled(Box)(() => ({
-  position: 'relative',
-  width: '124px',
-  height: '16px',
-  display: 'flex',
+const PendingValue = styled(Typography)(() => ({
+  fontWeight: 400,
+  fontSize: '24px',
+  lineHeight: '100%',
+  color: '#737373',
 }));
 
-const PrivacyScoreSegment = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'color',
-})<{ width: number; color?: string }>(({ theme, width, color }) => ({
-  width: `${width}px`,
-  height: '10px',
-  marginTop: '3px',
-  backgroundColor: color || theme.palette.grey[200],
+const SmallStatValue = styled(Typography)(() => ({
+  fontStyle: 'normal',
+  fontWeight: 700,
+  fontSize: '12px',
+  lineHeight: '100%',
+  color: '#4D4D4D',
 }));
 
-const PrivacyScoreVerticalLine = styled('div')(() => ({
-  position: 'absolute',
-  left: '62px',
-  top: 0,
-  width: '2px',
-  height: '16px',
-  backgroundColor: '#4D4D4D',
+const Separator = styled(Box)(() => ({
+  width: '100%',
+  height: '1px',
+  border: '1px solid #E6E6E6',
+  marginBottom: '8px',
 }));

@@ -575,117 +575,72 @@ export const DepositForm = () => {
       )}
 
       <InputContainer>
-        <Stack direction='row' justifyContent='space-between' alignItems='flex-start' width='100%'>
-          <Stack flexDirection='column' flex={1} gap='0.4rem'>
-            <AmountInput
-              id='amount'
-              variant='outlined'
-              placeholder='0'
-              value={inputAmount}
-              error={amountHasError}
-              onChange={handleAmountChange}
-              data-testid='deposit-input'
-            />
-            <UsdAmountText>
-              {inputAmount && !isNaN(Number(inputAmount))
-                ? `$${(Number(inputAmount) * currentPrice).toFixed(2)}`
-                : '$0.00'}
-            </UsdAmountText>
-          </Stack>
+        <Stack alignItems='center' flexDirection='column' width='100%'>
+          <Stack direction='row' gap='0.8rem' alignItems='center' width='100%'>
+            {chainIcon}
 
-          <TokenSelectorContainer>
-            <FormControl>
-              <TokenSelect
-                value={selectedPoolInfo?.asset || ''}
-                onChange={(e) => {
-                  const selectedAsset = e.target.value;
-                  // Switch to the selected pool
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  setSelectedAsset(selectedAsset as any);
-                  // Reset alternative token selection
-                  setSelectedAlternativeToken(null);
-                  setSelectedToken('native');
-                  // Reset amount
-                  setInputAmount('');
-                }}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    style: {
-                      minWidth: '288px',
-                    },
-                  },
-                }}
-                renderValue={(value) => {
-                  const pool = chain.poolInfo.find((p) => p.asset === value);
-                  return (
+            <FormControl className='amount-input'>
+              <AmountInput
+                id='amount'
+                variant='outlined'
+                placeholder='0'
+                value={inputAmount}
+                error={amountHasError}
+                onChange={handleAmountChange}
+                data-testid='deposit-input'
+              />
+              <MaxButton onClick={handleUseMax} disableElevation variant='text'>
+                Use Max
+              </MaxButton>
+            </FormControl>
+
+            <TokenSelectorContainer>
+              <FormControl>
+                <TokenSelect
+                  value={displaySymbol}
+                  onChange={(e) => {
+                    // Handle token change if needed
+                    const newToken = e.target.value;
+                    if (selectedPoolInfo?.alternativeTokens) {
+                      const altToken = selectedPoolInfo.alternativeTokens.find((t) => t.tokenSymbol === newToken);
+                      if (altToken) {
+                        setSelectedToken('alternative');
+                        setSelectedAlternativeToken(altToken);
+                      } else {
+                        setSelectedToken('native');
+                        setSelectedAlternativeToken(null);
+                      }
+                      setInputAmount('');
+                    }
+                  }}
+                  displayEmpty
+                  renderValue={(value) => (
                     <Stack direction='row' alignItems='center' gap='8px'>
-                      {pool?.icon ? (
-                        <Image src={pool.icon} alt={String(value)} width={20} height={20} />
+                      {selectedPoolInfo?.icon ? (
+                        <Image src={selectedPoolInfo.icon} alt={String(value)} width={20} height={20} />
                       ) : (
                         <Box width='20px' height='20px' />
                       )}
                       <Typography>{String(value)}</Typography>
                     </Stack>
-                  );
-                }}
-              >
-                {chain.poolInfo.map((pool) => {
-                  const poolTVLData = tvlByAsset.get(pool.asset);
-                  const tvlFormatted =
-                    poolTVLData && !poolTVLData.isLoading && poolTVLData.tvl > 0n
-                      ? (() => {
-                          const tvlInToken = Number(formatUnits(poolTVLData.tvl, poolTVLData.decimals));
-                          // Convert to USD using rough price estimates
-                          let priceUSD = 1; // Default for stablecoins
-                          if (
-                            pool.asset === 'ETH' ||
-                            pool.asset === 'WETH' ||
-                            pool.asset === 'wstETH' ||
-                            pool.asset === 'WOETH'
-                          ) {
-                            priceUSD = 2500; // ETH price
-                          } else if (pool.asset === 'wBTC') {
-                            priceUSD = 40000; // BTC price
-                          }
-                          const tvlUSD = tvlInToken * priceUSD;
-
-                          if (tvlUSD >= 1000000) {
-                            return `${(tvlUSD / 1000000).toFixed(1)}M`;
-                          } else if (tvlUSD >= 1000) {
-                            return `${(tvlUSD / 1000).toFixed(1)}K`;
-                          } else {
-                            return tvlUSD.toFixed(0);
-                          }
-                        })()
-                      : poolTVLData?.isLoading
-                        ? '...'
-                        : '0';
-
-                  return (
-                    <MenuItem key={pool.asset} value={pool.asset}>
-                      <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%' gap='16px'>
-                        <Stack direction='row' alignItems='center' gap='8px'>
-                          {pool.icon && <Image src={pool.icon} alt={pool.asset} width={32} height={32} />}
-                          <Typography fontSize='16px' fontWeight={500}>
-                            {pool.asset}
-                          </Typography>
-                        </Stack>
-                        <Typography fontSize='14px' fontWeight={400} color='#999' whiteSpace='nowrap'>
-                          TVL: {tvlFormatted}
-                        </Typography>
-                      </Stack>
-                    </MenuItem>
-                  );
-                })}
-              </TokenSelect>
-            </FormControl>
-            <BalanceText onClick={handleUseMax} style={{ cursor: 'pointer' }}>
-              Bal: {balanceUI} {displaySymbol}
-            </BalanceText>
-          </TokenSelectorContainer>
+                  )}
+                >
+                  <MenuItem value={selectedPoolInfo?.asset}>{selectedPoolInfo?.asset}</MenuItem>
+                  {isStakingEnabled &&
+                    selectedPoolInfo?.alternativeTokens?.map((token) => (
+                      <MenuItem key={token.tokenSymbol} value={token.tokenSymbol}>
+                        {token.tokenSymbol}
+                      </MenuItem>
+                    ))}
+                </TokenSelect>
+              </FormControl>
+              <BalanceText>
+                Bal: {balanceUI} {displaySymbol}
+              </BalanceText>
+            </TokenSelectorContainer>
+          </Stack>
+          {isDepositDisabled && <FormHelperText error>{errorMessage}</FormHelperText>}
         </Stack>
-        {isDepositDisabled && <FormHelperText error>{errorMessage}</FormHelperText>}
       </InputContainer>
 
       {/* ASP Selector */}
@@ -797,9 +752,6 @@ export const AmountInput = styled(TextField)(() => {
         border: 'none',
       },
     },
-    '& input::placeholder': {
-      opacity: 0.5,
-    },
   };
 });
 
@@ -889,14 +841,4 @@ const BalanceText = styled(Typography)(({ theme }) => ({
   fontWeight: 400,
   color: theme.palette.grey[600],
   whiteSpace: 'nowrap',
-  textAlign: 'right',
-  '&:hover': {
-    textDecoration: 'underline',
-  },
-}));
-
-const UsdAmountText = styled(Typography)(({ theme }) => ({
-  fontSize: '14px',
-  fontWeight: 400,
-  color: theme.palette.grey[600],
 }));
