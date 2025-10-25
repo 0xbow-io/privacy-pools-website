@@ -12,7 +12,7 @@ import { InfoTooltip } from '~/components/InfoTooltip';
 import { ChainAssets, chainData, getConfig } from '~/config';
 import { Section, PAContainer, ActionMenu } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
-import { ModalType } from '~/types';
+import { EventType, ModalType, ReviewStatus } from '~/types';
 import { ROUTER, aspClient } from '~/utils';
 
 interface PoolOption {
@@ -146,7 +146,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
     for (const pa of accountsForThisPool) {
       history.push({
-        type: 'deposit' as const,
+        type: EventType.DEPOSIT,
         txHash: pa.deposit.txHash,
         reviewStatus: pa.reviewStatus,
         amount: pa.deposit.value,
@@ -157,9 +157,9 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
       for (const [idx, child] of pa.children.entries()) {
         history.push({
-          type: 'withdrawal' as const,
+          type: EventType.WITHDRAWAL,
           txHash: child.txHash,
-          reviewStatus: 'approved' as const,
+          reviewStatus: ReviewStatus.APPROVED,
           amount: (idx === 0 ? pa.deposit.value : pa.children[idx - 1].value) - child.value,
           timestamp: Number(child.timestamp),
           label: child.label,
@@ -171,9 +171,9 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     for (const { ragequit, scope } of accountsForThisPool) {
       if (!ragequit?.transactionHash) continue;
       history.push({
-        type: 'exit' as const,
+        type: EventType.EXIT,
         txHash: ragequit?.transactionHash,
-        reviewStatus: 'approved' as const,
+        reviewStatus: ReviewStatus.APPROVED,
         amount: ragequit?.value,
         timestamp: Number(ragequit?.timestamp),
         label: ragequit?.label,
