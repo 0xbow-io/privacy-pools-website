@@ -16,36 +16,38 @@ import { calculateDepositVarianceScore, calculatePrivacyScore, PoolCardData } fr
 
 export const UserPoolsStats = () => {
   const aspUrl = getConfig().env.ASP_ENDPOINT;
-  const { poolAccounts } = useAccountContext();
+  const { poolAccountsByChainScope } = useAccountContext();
 
-  // Get unique pool combinations from user's pool accounts
+  // Get unique pool combinations from user's pool accounts (across all chains/scopes)
   const userPoolsToQuery = useMemo(() => {
-    if (!poolAccounts || poolAccounts.length === 0) return [];
-
     const uniquePools = new Map<string, { chainId: number; scope: string; poolInfo: PoolInfo }>();
 
-    poolAccounts.forEach((account) => {
-      const chain = chainData[account.chainId];
-      if (!chain) return;
+    // Iterate through all cached pool accounts from all chains/scopes
+    for (const [key, poolAccounts] of Object.entries(poolAccountsByChainScope)) {
+      if (!poolAccounts || poolAccounts.length === 0) continue;
 
-      const poolInfo = chain.poolInfo.find((p) => p.scope.toString() === account.scope.toString());
-      if (!poolInfo) return;
+      // Get the first account to extract chain and scope info
+      const firstAccount = poolAccounts[0];
+      const chain = chainData[firstAccount.chainId];
+      if (!chain) continue;
 
-      const key = `${account.chainId}-${account.scope}`;
+      const poolInfo = chain.poolInfo.find((p) => p.scope.toString() === firstAccount.scope.toString());
+      if (!poolInfo) continue;
+
       if (!uniquePools.has(key)) {
         uniquePools.set(key, {
-          chainId: account.chainId,
-          scope: account.scope.toString(),
+          chainId: firstAccount.chainId,
+          scope: firstAccount.scope.toString(),
           poolInfo,
         });
       }
-    });
+    }
 
     return Array.from(uniquePools.values()).map((pool) => ({
       ...pool,
       aspUrl,
     }));
-  }, [poolAccounts, aspUrl]);
+  }, [poolAccountsByChainScope, aspUrl]);
 
   // Fetch pool info for each user pool
   const poolInfoQueries = useQueries({
