@@ -53,7 +53,7 @@ export const ActivityTable = ({
     if (view === 'personal' && 'scope' in row) {
       // Find the pool info by scope across all chains
       for (const chain of Object.values(chainData)) {
-        const poolInfo = chain.poolInfo.find((p) => p.scope === row.scope);
+        const poolInfo = chain.poolInfo.find((p: { scope: bigint }) => p.scope === row.scope);
         if (poolInfo) {
           return `${formatDataNumber(BigInt(getAmount(row) || 0), poolInfo.assetDecimals || 18, 3, false, true, false)} ${poolInfo.asset}`;
         }
@@ -117,7 +117,7 @@ export const ActivityTable = ({
                         // For personal activity, look up the correct decimals by scope
                         if (view === 'personal' && 'scope' in row) {
                           for (const chain of Object.values(chainData)) {
-                            const poolInfo = chain.poolInfo.find((p) => p.scope === row.scope);
+                            const poolInfo = chain.poolInfo.find((p: { scope: bigint }) => p.scope === row.scope);
                             if (poolInfo) {
                               return formatUnits(
                                 getAmount(row as ActivityRecords[number]) as bigint,
