@@ -224,11 +224,6 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   };
 
   // Update activity view to 'personal' when address becomes available
-  useEffect(() => {
-    if (address && activityView === 'global') {
-      setActivityView('personal');
-    }
-  }, [address, activityView]);
 
   const activityData = activityView === 'global' ? previewGlobalEvents : localPreviewPersonalActivity;
 
