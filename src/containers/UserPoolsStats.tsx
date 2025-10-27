@@ -48,6 +48,11 @@ export const UserPoolsStats = () => {
     }));
   }, [poolAccountsByChainScope, aspUrl]);
 
+  // Get unique chain IDs for fetching pools-stats
+  const uniqueChainIds = useMemo(() => {
+    return Array.from(new Set(userPoolsToQuery.map((pool) => pool.chainId)));
+  }, [userPoolsToQuery]);
+
   // Fetch pool info for each user pool
   const poolInfoQueries = useQueries({
     queries: userPoolsToQuery.map((pool) => ({
@@ -62,19 +67,52 @@ export const UserPoolsStats = () => {
     })),
   });
 
+  // Fetch pools-stats for each chain to get growth24h data
+  const poolStatsQueries = useQueries({
+    queries: uniqueChainIds.map((chainId) => ({
+      queryKey: ['user_pools_stats', chainId, aspUrl],
+      queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
+      refetchInterval: 120000,
+      staleTime: 60000,
+      retryOnMount: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    })),
+  });
+
   // Build a map of pool data by chainId and scope for easy lookup
   const poolDataMap = useMemo(() => {
     const map = new Map<string, PoolResponse>();
 
+    // First, build map of growth data by chainId and scope from poolStatsQueries
+    const growthDataMap = new Map<string, number | null>();
+    poolStatsQueries.forEach((query, index) => {
+      if (!query.data?.pools) return;
+      const chainId = uniqueChainIds[index];
+
+      query.data.pools.forEach((poolStats) => {
+        const key = `${chainId}-${poolStats.scope}`;
+        growthDataMap.set(key, poolStats.growth24h ?? null);
+      });
+    });
+
+    // Then, build the main pool data map with growth data merged in
     poolInfoQueries.forEach((query, index) => {
       if (!query.data) return;
       const pool = userPoolsToQuery[index];
       const key = `${pool.chainId}-${pool.scope}`;
-      map.set(key, query.data);
+
+      // Merge growth24h data from poolStatsQueries
+      const growth24h = growthDataMap.get(key);
+      map.set(key, {
+        ...query.data,
+        growth24h,
+      });
     });
 
     return map;
-  }, [poolInfoQueries, userPoolsToQuery]);
+  }, [poolInfoQueries, poolStatsQueries, userPoolsToQuery, uniqueChainIds]);
 
   // Build pool list from user's pools with real stats
   const userPools = useMemo(() => {
@@ -96,7 +134,7 @@ export const UserPoolsStats = () => {
         totalFunds,
         fundsPending: BigInt(0),
         decimals: poolToQuery.poolInfo.assetDecimals || 18,
-        growthPercentage: 8.5, // Mock data for now
+        growthPercentage: poolData?.growth24h ?? undefined,
         acceptedDepositsCount: poolData?.acceptedDepositsCount || 0,
         depositVarianceScore: calculateDepositVarianceScore(poolData),
       });

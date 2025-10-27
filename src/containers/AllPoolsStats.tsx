@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import SearchIcon from '@mui/icons-material/Search';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   Box,
   Grid,
@@ -100,6 +99,11 @@ export const calculatePrivacyScore = (
   const RED_SEGMENT_WIDTH = 38.2041;
   const GREEN_SEGMENT_WIDTH = 43.291;
 
+  // If data appears to be loading (no funds and no deposits), return neutral state (all gray)
+  if (totalFundsUSD === 0 && depositCount === 0) {
+    return { redFillWidth: 0, greenFillWidth: 0 };
+  }
+
   // Calculate anonymity set multiplier (0 to 1)
   // Logarithmic scale: 1 deposit = very low, 10 = decent, 100 = good, 1000+ = excellent
   const MIN_DEPOSITS = 1;
@@ -185,8 +189,24 @@ const PoolCard = ({
         </Stack>
         {hasGrowth && (
           <GrowthIndicator positive={isPositiveGrowth}>
-            <TrendingUpIcon />
-            <GrowthPercentage>{Math.abs(pool.growthPercentage || 0).toFixed(1)}%</GrowthPercentage>
+            {isPositiveGrowth ? (
+              <svg width='16' height='17' viewBox='0 0 16 17' fill='none' xmlns='http://www.w3.org/2000/svg'>
+                <path
+                  d='M10 4.25V5.25H13.2929L9 9.54295L6.8535 7.3965C6.80709 7.35005 6.75199 7.3132 6.69133 7.28806C6.63067 7.26292 6.56566 7.24998 6.5 7.24998C6.43434 7.24998 6.36933 7.26292 6.30867 7.28806C6.24801 7.3132 6.19291 7.35005 6.1465 7.3965L1 12.5429L1.70705 13.25L6.5 8.45705L8.6465 10.6035C8.69291 10.6499 8.74801 10.6868 8.80867 10.7119C8.86932 10.7371 8.93434 10.75 9 10.75C9.06566 10.75 9.13068 10.7371 9.19133 10.7119C9.25199 10.6868 9.30709 10.6499 9.3535 10.6035L14 5.95705V9.25H15V4.25H10Z'
+                  fill='#7D9C40'
+                />
+              </svg>
+            ) : (
+              <svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
+                <path
+                  d='M10 12V11H13.2929L9 6.70705L6.8535 8.8535C6.80709 8.89995 6.75199 8.9368 6.69133 8.96194C6.63067 8.98708 6.56566 9.00002 6.5 9.00002C6.43434 9.00002 6.36933 8.98708 6.30867 8.96194C6.24801 8.9368 6.19291 8.89995 6.1465 8.8535L1 3.70705L1.70705 3L6.5 7.79295L8.6465 5.6465C8.69291 5.60005 8.74801 5.5632 8.80867 5.53806C8.86932 5.51292 8.93434 5.49998 9 5.49998C9.06566 5.49998 9.13068 5.51292 9.19133 5.53806C9.25199 5.5632 9.30709 5.60005 9.3535 5.6465L14 10.293L14 7H15L15 12H10Z'
+                  fill='#BA6B5D'
+                />
+              </svg>
+            )}
+            <GrowthPercentage positive={isPositiveGrowth}>
+              {Math.abs(pool.growthPercentage || 0).toFixed(1)}%
+            </GrowthPercentage>
             <GrowthTimeframe>past 24h</GrowthTimeframe>
           </GrowthIndicator>
         )}
@@ -264,6 +284,11 @@ export const AllPoolsStats = () => {
     return pools;
   }, [aspUrl]);
 
+  // Get unique chain IDs for fetching pools-stats
+  const uniqueChainIds = useMemo(() => {
+    return Array.from(new Set(allPoolsToQuery.map((pool) => pool.chainId)));
+  }, [allPoolsToQuery]);
+
   // Fetch pool info for each individual pool
   const poolInfoQueries = useQueries({
     queries: allPoolsToQuery.map((pool) => ({
@@ -278,19 +303,52 @@ export const AllPoolsStats = () => {
     })),
   });
 
+  // Fetch pools-stats for each chain to get growth24h data
+  const poolStatsQueries = useQueries({
+    queries: uniqueChainIds.map((chainId) => ({
+      queryKey: ['asp_pools_stats', chainId, aspUrl],
+      queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
+      refetchInterval: 120000,
+      staleTime: 60000,
+      retryOnMount: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    })),
+  });
+
   // Build a map of pool data by chainId and scope for easy lookup
   const poolDataMap = useMemo(() => {
     const map = new Map<string, PoolResponse>();
 
+    // First, build map of growth data by chainId and scope from poolStatsQueries
+    const growthDataMap = new Map<string, number | null>();
+    poolStatsQueries.forEach((query, index) => {
+      if (!query.data?.pools) return;
+      const chainId = uniqueChainIds[index];
+
+      query.data.pools.forEach((poolStats) => {
+        const key = `${chainId}-${poolStats.scope}`;
+        growthDataMap.set(key, poolStats.growth24h ?? null);
+      });
+    });
+
+    // Then, build the main pool data map with growth data merged in
     poolInfoQueries.forEach((query, index) => {
       if (!query.data) return;
       const pool = allPoolsToQuery[index];
       const key = `${pool.chainId}-${pool.scope}`;
-      map.set(key, query.data);
+
+      // Merge growth24h data from poolStatsQueries
+      const growth24h = growthDataMap.get(key);
+      map.set(key, {
+        ...query.data,
+        growth24h,
+      });
     });
 
     return map;
-  }, [poolInfoQueries, allPoolsToQuery]);
+  }, [poolInfoQueries, poolStatsQueries, allPoolsToQuery, uniqueChainIds]);
 
   // Build pool list dynamically from chainData with real stats
   const allPools = useMemo(() => {
@@ -318,7 +376,7 @@ export const AllPoolsStats = () => {
           totalFunds,
           fundsPending,
           decimals: poolInfo.assetDecimals || 18,
-          growthPercentage: 8.5, // Mock data for now
+          growthPercentage: poolData?.growth24h ?? undefined,
           acceptedDepositsCount: poolData?.acceptedDepositsCount || 0,
           depositVarianceScore: calculateDepositVarianceScore(poolData),
         });
@@ -597,7 +655,7 @@ const GrowthIndicator = styled(Stack, {
   flexDirection: 'row',
   alignItems: 'center',
   gap: '4px',
-  color: positive ? '#7D9C40' : '#D32F2F',
+  color: positive ? '#7D9C40' : '#BA6B5D',
   '& .MuiSvgIcon-root': {
     fontSize: '16px',
     width: '16px',
@@ -605,11 +663,13 @@ const GrowthIndicator = styled(Stack, {
   },
 }));
 
-const GrowthPercentage = styled('span')(() => ({
+const GrowthPercentage = styled('span', {
+  shouldForwardProp: (prop) => prop !== 'positive',
+})<{ positive?: boolean }>(({ positive }) => ({
   fontWeight: 400,
   fontSize: '12px',
   lineHeight: '100%',
-  color: '#7D9C40',
+  color: positive ? '#7D9C40' : '#BA6B5D',
 }));
 
 const GrowthTimeframe = styled('span')(() => ({
