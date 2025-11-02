@@ -389,7 +389,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
       {/* Activity Section */}
       <ActivityContainer>
         <ActivitySection sx={{ width: '100%' }}>
-          <Box>
+          <Box sx={{ width: '100%' }}>
             <Stack direction='row' alignItems='center' gap={1} sx={{ marginBottom: '1.2rem' }}>
               <Typography variant='subtitle1' fontWeight='bold' lineHeight='1'>
                 Activity
@@ -397,31 +397,33 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
               <InfoTooltip message='This is a log of all of the global and personal activity in Privacy Pools.' />
             </Stack>
 
-            <Stack spacing='1.2rem' direction='row' alignItems='center'>
-              <ActivityButton
-                variant='text'
-                onClick={() => setActivityView('global')}
-                active={String(activityView === 'global')}
-              >
-                Global
-              </ActivityButton>
+            <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%'>
+              <Stack spacing='1.2rem' direction='row' alignItems='center'>
+                <ActivityButton
+                  variant='text'
+                  onClick={() => setActivityView('global')}
+                  active={String(activityView === 'global')}
+                >
+                  Global
+                </ActivityButton>
 
-              <ActivityDivider />
+                <ActivityDivider />
 
-              <ActivityButton
-                variant='text'
-                onClick={() => setActivityView('personal')}
-                active={String(activityView === 'personal')}
-                disabled={!address}
-              >
-                Personal
-              </ActivityButton>
+                <ActivityButton
+                  variant='text'
+                  onClick={() => setActivityView('personal')}
+                  active={String(activityView === 'personal')}
+                  disabled={!address}
+                >
+                  Personal
+                </ActivityButton>
+              </Stack>
+
+              <ViewAllButton onClick={handleNavigateToActivity} disabled={!activityData?.length}>
+                <ViewAllText>View All</ViewAllText>
+              </ViewAllButton>
             </Stack>
           </Box>
-
-          <ViewAllButton onClick={handleNavigateToActivity} disabled={!activityData?.length}>
-            <ViewAllText>View All</ViewAllText>
-          </ViewAllButton>
         </ActivitySection>
 
         <ActivityTable records={activityData} isLoading={activityLoading} view={activityView} size='small' />
@@ -459,7 +461,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
       value={selectedOption || undefined}
       onChange={handleChange}
       options={availableOptions}
-      getOptionLabel={(option) => `${option.label}@${option.chainName}`}
+      getOptionLabel={(option) => option.label}
       componentsProps={{
         popper: {
           style: { width: 'fit-content' },
@@ -506,7 +508,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
               </PoolIconWrapper>
             )}
             <span>
-              {option.label}@{option.chainName}
+              {option.label}@<ChainNameText>{option.chainName}</ChainNameText>
             </span>
           </PoolOptionContent>
         </li>
@@ -516,10 +518,6 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
         const { InputProps, inputProps, ...restParams } = params;
         const { endAdornment, ...restInputProps } = InputProps;
 
-        // Calculate input size based on selected option text length
-        const displayText = selectedOption ? `${selectedOption.label}@${selectedOption.chainName}` : '';
-        const inputSize = displayText.length || 10;
-
         return (
           <TextField
             {...restParams}
@@ -527,11 +525,24 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
             variant='outlined'
             InputProps={{
               ...restInputProps,
-              startAdornment: icon ? (
-                <PoolIconWrapper sx={{ mr: '0.8rem' }}>
-                  <Image src={icon} alt={selectedOption?.label || ''} width={24} height={24} />
-                </PoolIconWrapper>
-              ) : null,
+              startAdornment: (
+                <>
+                  {icon && (
+                    <PoolIconWrapper sx={{ mr: '0.8rem' }}>
+                      <Image src={icon} alt={selectedOption?.label || ''} width={24} height={24} />
+                    </PoolIconWrapper>
+                  )}
+                  {selectedOption && (
+                    <Box
+                      component='span'
+                      sx={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: '16px' }}
+                    >
+                      <span>{selectedOption.label}</span>
+                      <ChainNameText>@{selectedOption.chainName}</ChainNameText>
+                    </Box>
+                  )}
+                </>
+              ),
               endAdornment: (
                 <>
                   <Typography
@@ -548,7 +559,8 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
             }}
             inputProps={{
               ...inputProps,
-              size: inputSize,
+              value: '',
+              style: { width: 0, padding: 0, margin: 0, minWidth: 0, flex: 'none' }, // Hide the default input since we're using startAdornment
             }}
           />
         );
@@ -559,10 +571,13 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
 };
 
 const BackButton = styled(IconButton)(() => ({
-  padding: '8px',
+  padding: '11px 15px 11px 11px',
   width: '32px',
   height: '32px',
   border: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   '&:hover': {
     backgroundColor: 'rgba(0, 0, 0, 0.04)',
     border: 'none',
@@ -575,7 +590,7 @@ const BackButton = styled(IconButton)(() => ({
 const PoolSelectAutocomplete = styled(Autocomplete<PoolOption, false, true, false>)(({ theme }) => ({
   width: 'fit-content',
   maxWidth: 'fit-content',
-  marginLeft: '-8px',
+  marginLeft: '-4px',
   '& .MuiOutlinedInput-root': {
     fontWeight: 600,
     fontSize: '16px',
@@ -602,8 +617,11 @@ const PoolSelectAutocomplete = styled(Autocomplete<PoolOption, false, true, fals
     cursor: 'pointer',
     padding: '0 !important',
     minWidth: '0 !important',
-    width: 'auto !important',
+    width: '0 !important',
     flex: '0 0 auto',
+    position: 'absolute',
+    opacity: 0,
+    pointerEvents: 'none',
   },
   '& .MuiInputBase-input': {
     overflow: 'visible !important',
@@ -657,6 +675,14 @@ const PoolIconWrapper = styled('div')(() => ({
   width: '24px',
   height: '24px',
   flexShrink: 0,
+}));
+
+const ChainNameText = styled('span')(({ theme }) => ({
+  color: theme.palette.grey[400],
+  fontWeight: 600,
+  //textDecoration: 'underline',
+  //textUnderlineOffset: '0.3rem',
+  lineHeight: '1.25',
 }));
 
 const PoolPageContainer = styled('div')(() => ({

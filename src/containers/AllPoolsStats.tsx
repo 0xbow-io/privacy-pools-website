@@ -266,6 +266,7 @@ type SortOption = 'most-popular' | 'most-private' | 'most-deposits' | 'most-unif
 export const AllPoolsStats = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('most-popular');
+  const [sortSelectOpen, setSortSelectOpen] = useState(false);
   const aspUrl = getConfig().env.ASP_ENDPOINT;
 
   // Build list of all pools to query
@@ -488,7 +489,53 @@ export const AllPoolsStats = () => {
           </Stack>
 
           <Stack direction='row' alignItems='center' gap={2}>
-            <SortSelect value={sortBy} onChange={handleSortChange} size='small'>
+            <SortSelect
+              value={sortBy}
+              onChange={handleSortChange}
+              size='small'
+              open={sortSelectOpen}
+              onOpen={() => setSortSelectOpen(true)}
+              onClose={() => setSortSelectOpen(false)}
+              IconComponent={() => null}
+              renderValue={(value) => {
+                const labels = {
+                  'most-popular': 'Most Popular',
+                  'most-private': 'Most Private',
+                  'most-deposits': 'Most Deposits',
+                  'most-uniform': 'Most Uniform',
+                };
+                return (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>{labels[value as SortOption]}</span>
+                    <svg
+                      width='20'
+                      height='20'
+                      viewBox='0 0 20 20'
+                      fill='none'
+                      xmlns='http://www.w3.org/2000/svg'
+                      style={{
+                        transform: sortSelectOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    >
+                      <path
+                        d='M6.17917 7.15414L10 10.975L13.8208 7.15414L15 8.33331L10 13.3333L5 8.33331L6.17917 7.15414Z'
+                        fill='#282828'
+                      />
+                    </svg>
+                  </Box>
+                );
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    '& .MuiMenuItem-root': {
+                      fontSize: '12px',
+                    },
+                  },
+                },
+              }}
+            >
               <MenuItem value='most-popular'>Most Popular</MenuItem>
               <MenuItem value='most-private'>Most Private</MenuItem>
               <MenuItem value='most-deposits'>Most Deposits</MenuItem>
@@ -554,13 +601,13 @@ const SortSelect = styled(Select)(({ theme }) => ({
   color: '#202224',
   backgroundColor: theme.palette.background.paper,
   '& .MuiOutlinedInput-notchedOutline': {
-    borderColor: theme.palette.grey[300],
+    border: 'none',
   },
   '&:hover .MuiOutlinedInput-notchedOutline': {
-    borderColor: theme.palette.grey[400],
+    border: 'none',
   },
   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-    borderColor: theme.palette.primary.main,
+    border: 'none',
   },
   '& .MuiSelect-select': {
     fontWeight: 400,
