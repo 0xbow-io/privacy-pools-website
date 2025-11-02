@@ -72,83 +72,117 @@ export const StatsPage = () => {
   });
 
   // Calculate total accepted and declined funds, and overall growth
-  const { totalAcceptedUSD, totalDeclinedUSD, distributionData, growthPercentage } = useMemo(() => {
-    let accepted = 0;
-    let declined = 0;
-    let totalValue24hAgo = 0;
-    const assetTotals: Record<string, { totalUSD: number; icon?: string; color?: string }> = {};
+  const { totalAcceptedUSD, totalDeclinedUSD, distributionData, growthPercentage, declinedGrowthPercentage } =
+    useMemo(() => {
+      let accepted = 0;
+      let declined = 0;
+      let totalValue24hAgo = 0;
+      let totalDeclinedValue24hAgo = 0;
+      const assetTotals: Record<string, { totalUSD: number; icon?: string; color?: string }> = {};
 
-    // Build map of growth data by chainId and scope from poolStatsQueries
-    const growthDataMap = new Map<string, number | null>();
-    poolStatsQueries.forEach((query, index) => {
-      if (!query.data?.pools) return;
-      const chainId = uniqueChainIds[index];
+      // Build map of growth data by chainId and scope from poolStatsQueries
+      const growthDataMap = new Map<string, number | null>();
+      const pendingGrowthDataMap = new Map<string, number | null>();
+      poolStatsQueries.forEach((query, index) => {
+        if (!query.data?.pools) return;
+        const chainId = uniqueChainIds[index];
 
-      query.data.pools.forEach((poolStats) => {
-        const key = `${chainId}-${poolStats.scope}`;
-        growthDataMap.set(key, poolStats.growth24h ?? null);
+        query.data.pools.forEach((poolStats) => {
+          const key = `${chainId}-${poolStats.scope}`;
+          growthDataMap.set(key, poolStats.growth24h ?? null);
+          pendingGrowthDataMap.set(key, poolStats.pendingGrowth24h ?? null);
+        });
       });
-    });
 
-    poolInfoQueries.forEach((query, index) => {
-      if (!query.data) return;
-      const pool = allPoolsToQuery[index];
-      const poolInfo = pool.poolInfo;
-      const poolKey = `${pool.chainId}-${pool.scope}`;
+      poolInfoQueries.forEach((query, index) => {
+        if (!query.data) return;
+        const pool = allPoolsToQuery[index];
+        const poolInfo = pool.poolInfo;
+        const poolKey = `${pool.chainId}-${pool.scope}`;
 
-      const totalInPool = query.data?.totalInPoolValue ? BigInt(query.data.totalInPoolValue) : BigInt(0);
-      const totalDeposits = query.data?.totalDepositsValue ? BigInt(query.data.totalDepositsValue) : BigInt(0);
-      const pending = totalDeposits - totalInPool;
+        // Use totalInPoolValueUsd from API if available, otherwise fallback to calculation
+        const acceptedUSD = query.data?.totalInPoolValueUsd
+          ? parseFloat(query.data.totalInPoolValueUsd.replace(/,/g, ''))
+          : (() => {
+              const totalInPool = query.data?.totalInPoolValue ? BigInt(query.data.totalInPoolValue) : BigInt(0);
+              const acceptedFormatted = Number(formatUnits(totalInPool, poolInfo.assetDecimals || 18));
+              return acceptedFormatted * 2500;
+            })();
 
-      const acceptedFormatted = Number(formatUnits(totalInPool, poolInfo.assetDecimals || 18));
-      const pendingFormatted = Number(formatUnits(pending > 0n ? pending : 0n, poolInfo.assetDecimals || 18));
+        // Calculate pending (declined) USD value
+        const pendingUSD =
+          query.data?.totalDepositsValueUsd && query.data?.totalInPoolValueUsd
+            ? parseFloat(query.data.totalDepositsValueUsd.replace(/,/g, '')) -
+              parseFloat(query.data.totalInPoolValueUsd.replace(/,/g, ''))
+            : (() => {
+                const totalInPool = query.data?.totalInPoolValue ? BigInt(query.data.totalInPoolValue) : BigInt(0);
+                const totalDeposits = query.data?.totalDepositsValue
+                  ? BigInt(query.data.totalDepositsValue)
+                  : BigInt(0);
+                const pending = totalDeposits - totalInPool;
+                const pendingFormatted = Number(formatUnits(pending > 0n ? pending : 0n, poolInfo.assetDecimals || 18));
+                return pendingFormatted * 2500;
+              })();
 
-      const acceptedUSD = acceptedFormatted * 2500;
-      const pendingUSD = pendingFormatted * 2500;
+        accepted += acceptedUSD;
+        declined += pendingUSD;
 
-      accepted += acceptedUSD;
-      declined += pendingUSD;
+        // Calculate value 24h ago for growth calculation using growth data from poolStatsQueries
+        const growth24h = growthDataMap.get(poolKey);
+        if (growth24h !== null && growth24h !== undefined) {
+          // Calculate previous value: currentValue / (1 + growth/100)
+          const previousValue = acceptedUSD / (1 + growth24h / 100);
+          totalValue24hAgo += previousValue;
+        } else {
+          // If no growth data, assume same value
+          totalValue24hAgo += acceptedUSD;
+        }
 
-      // Calculate value 24h ago for growth calculation using growth data from poolStatsQueries
-      const growth24h = growthDataMap.get(poolKey);
-      if (growth24h !== null && growth24h !== undefined) {
-        // Calculate previous value: currentValue / (1 + growth/100)
-        const previousValue = acceptedUSD / (1 + growth24h / 100);
-        totalValue24hAgo += previousValue;
-      } else {
-        // If no growth data, assume same value
-        totalValue24hAgo += acceptedUSD;
-      }
+        // Calculate declined value 24h ago for growth calculation
+        const pendingGrowth24h = pendingGrowthDataMap.get(poolKey);
+        if (pendingGrowth24h !== null && pendingGrowth24h !== undefined) {
+          // Calculate previous value: currentValue / (1 + growth/100)
+          const previousDeclinedValue = pendingUSD / (1 + pendingGrowth24h / 100);
+          totalDeclinedValue24hAgo += previousDeclinedValue;
+        } else {
+          // If no growth data, assume same value
+          totalDeclinedValue24hAgo += pendingUSD;
+        }
 
-      // Track by asset for distribution
-      if (!assetTotals[poolInfo.asset]) {
-        assetTotals[poolInfo.asset] = { totalUSD: 0, icon: poolInfo.icon, color: poolInfo.color };
-      }
-      assetTotals[poolInfo.asset].totalUSD += acceptedUSD;
-    });
+        // Track by asset for distribution
+        if (!assetTotals[poolInfo.asset]) {
+          assetTotals[poolInfo.asset] = { totalUSD: 0, icon: poolInfo.icon, color: poolInfo.color };
+        }
+        assetTotals[poolInfo.asset].totalUSD += acceptedUSD;
+      });
 
-    // Calculate overall growth percentage
-    const overallGrowth = totalValue24hAgo > 0 ? ((accepted - totalValue24hAgo) / totalValue24hAgo) * 100 : null;
+      // Calculate overall growth percentage
+      const overallGrowth = totalValue24hAgo > 0 ? ((accepted - totalValue24hAgo) / totalValue24hAgo) * 100 : null;
 
-    // Calculate percentages and create distribution data
-    const total = accepted;
-    const distribution: PoolDistributionItem[] = Object.entries(assetTotals)
-      .map(([asset, data]) => ({
-        asset,
-        color: data.color || '#999999',
-        icon: data.icon,
-        totalFundsUSD: data.totalUSD,
-        percentage: total > 0 ? (data.totalUSD / total) * 100 : 0,
-      }))
-      .sort((a, b) => b.totalFundsUSD - a.totalFundsUSD);
+      // Calculate overall declined growth percentage
+      const overallDeclinedGrowth =
+        totalDeclinedValue24hAgo > 0 ? ((declined - totalDeclinedValue24hAgo) / totalDeclinedValue24hAgo) * 100 : null;
 
-    return {
-      totalAcceptedUSD: accepted,
-      totalDeclinedUSD: declined,
-      distributionData: distribution,
-      growthPercentage: overallGrowth,
-    };
-  }, [poolInfoQueries, poolStatsQueries, allPoolsToQuery, uniqueChainIds]);
+      // Calculate percentages and create distribution data
+      const total = accepted;
+      const distribution: PoolDistributionItem[] = Object.entries(assetTotals)
+        .map(([asset, data]) => ({
+          asset,
+          color: data.color || '#999999',
+          icon: data.icon,
+          totalFundsUSD: data.totalUSD,
+          percentage: total > 0 ? (data.totalUSD / total) * 100 : 0,
+        }))
+        .sort((a, b) => b.totalFundsUSD - a.totalFundsUSD);
+
+      return {
+        totalAcceptedUSD: accepted,
+        totalDeclinedUSD: declined,
+        distributionData: distribution,
+        growthPercentage: overallGrowth,
+        declinedGrowthPercentage: overallDeclinedGrowth,
+      };
+    }, [poolInfoQueries, poolStatsQueries, allPoolsToQuery, uniqueChainIds]);
 
   return (
     <SafeAppWrapper>
@@ -230,18 +264,43 @@ export const StatsPage = () => {
                       </StatValue>
                       <InfoTooltip message='Total value of all pending/declined funds across all pools' />
                     </StatValueRow>
-                    <StatChange>
-                      <TrendIcon>
-                        <svg width='16' height='17' viewBox='0 0 16 17' fill='none' xmlns='http://www.w3.org/2000/svg'>
-                          <path
-                            d='M10 4.25V5.25H13.2929L9 9.54295L6.8535 7.3965C6.80709 7.35005 6.75199 7.3132 6.69133 7.28806C6.63067 7.26292 6.56566 7.24998 6.5 7.24998C6.43434 7.24998 6.36933 7.26292 6.30867 7.28806C6.24801 7.3132 6.19291 7.35005 6.1465 7.3965L1 12.5429L1.70705 13.25L6.5 8.45705L8.6465 10.6035C8.69291 10.6499 8.74801 10.6868 8.80867 10.7119C8.86932 10.7371 8.93434 10.75 9 10.75C9.06566 10.75 9.13068 10.7371 9.19133 10.7119C9.25199 10.6868 9.30709 10.6499 9.3535 10.6035L14 5.95705V9.25H15V4.25H10Z'
-                            fill='#7D9C40'
-                          />
-                        </svg>
-                      </TrendIcon>
-                      <StatChangeText>{growthPercentage}%</StatChangeText>{' '}
-                      <StatChangeTimeframe>past 24h</StatChangeTimeframe>
-                    </StatChange>
+                    {declinedGrowthPercentage !== null && (
+                      <StatChange>
+                        <TrendIcon>
+                          {declinedGrowthPercentage >= 0 ? (
+                            <svg
+                              width='16'
+                              height='17'
+                              viewBox='0 0 16 17'
+                              fill='none'
+                              xmlns='http://www.w3.org/2000/svg'
+                            >
+                              <path
+                                d='M10 4.25V5.25H13.2929L9 9.54295L6.8535 7.3965C6.80709 7.35005 6.75199 7.3132 6.69133 7.28806C6.63067 7.26292 6.56566 7.24998 6.5 7.24998C6.43434 7.24998 6.36933 7.26292 6.30867 7.28806C6.24801 7.3132 6.19291 7.35005 6.1465 7.3965L1 12.5429L1.70705 13.25L6.5 8.45705L8.6465 10.6035C8.69291 10.6499 8.74801 10.6868 8.80867 10.7119C8.86932 10.7371 8.93434 10.75 9 10.75C9.06566 10.75 9.13068 10.7371 9.19133 10.7119C9.25199 10.6868 9.30709 10.6499 9.3535 10.6035L14 5.95705V9.25H15V4.25H10Z'
+                                fill='#7D9C40'
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              width='16'
+                              height='16'
+                              viewBox='0 0 16 16'
+                              fill='none'
+                              xmlns='http://www.w3.org/2000/svg'
+                            >
+                              <path
+                                d='M10 12V11H13.2929L9 6.70705L6.8535 8.8535C6.80709 8.89995 6.75199 8.9368 6.69133 8.96194C6.63067 8.98708 6.56566 9.00002 6.5 9.00002C6.43434 9.00002 6.36933 8.98708 6.30867 8.96194C6.24801 8.9368 6.19291 8.89995 6.1465 8.8535L1 3.70705L1.70705 3L6.5 7.79295L8.6465 5.6465C8.69291 5.60005 8.74801 5.5632 8.80867 5.53806C8.86932 5.51292 8.93434 5.49998 9 5.49998C9.06566 5.49998 9.13068 5.51292 9.19133 5.53806C9.25199 5.5632 9.30709 5.60005 9.3535 5.6465L14 10.293L14 7H15L15 12H10Z'
+                                fill='#BA6B5D'
+                              />
+                            </svg>
+                          )}
+                        </TrendIcon>
+                        <StatChangeText positive={declinedGrowthPercentage >= 0}>
+                          {Math.abs(declinedGrowthPercentage).toFixed(1)}%
+                        </StatChangeText>{' '}
+                        <StatChangeTimeframe>past 24h</StatChangeTimeframe>
+                      </StatChange>
+                    )}
                   </StatsColumn>
                 </LeftSectionContainer>
               </Grid>

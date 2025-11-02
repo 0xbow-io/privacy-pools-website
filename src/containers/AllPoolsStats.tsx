@@ -32,6 +32,7 @@ export interface PoolCardData {
   scope: string;
   totalFunds: bigint;
   fundsPending: bigint;
+  totalFundsUSD?: number;
   growthPercentage?: number;
   decimals: number;
   acceptedDepositsCount: number;
@@ -154,11 +155,16 @@ const PoolCard = ({
   isFirstRow: boolean;
 }) => {
   const router = useRouter();
-  const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
 
-  // Format as currency - convert to number and format with commas
-  const totalFundsNumber = Number(totalFundsFormatted);
-  const totalFundsUSD = totalFundsNumber * 2500; // Rough ETH to USD conversion
+  // Use totalFundsUSD from API if available, otherwise fallback to calculation
+  const totalFundsUSD =
+    pool.totalFundsUSD ??
+    (() => {
+      const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
+      const totalFundsNumber = Number(totalFundsFormatted);
+      return totalFundsNumber * 2500; // Rough ETH to USD conversion fallback
+    })();
+
   const totalFundsDisplay = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -368,6 +374,11 @@ export const AllPoolsStats = () => {
             ? BigInt(poolData.totalDepositsValue) - BigInt(poolData.totalInPoolValue)
             : BigInt(0);
 
+        // Parse totalInPoolValueUsd from the API
+        const totalFundsUSD = poolData?.totalInPoolValueUsd
+          ? parseFloat(poolData.totalInPoolValueUsd.replace(/,/g, ''))
+          : undefined;
+
         pools.push({
           poolName: `${chain.name} - ${poolInfo.asset} Pool`,
           icon: poolInfo.icon,
@@ -376,6 +387,7 @@ export const AllPoolsStats = () => {
           scope: poolInfo.scope.toString(),
           totalFunds,
           fundsPending,
+          totalFundsUSD,
           decimals: poolInfo.assetDecimals || 18,
           growthPercentage: poolData?.growth24h ?? undefined,
           acceptedDepositsCount: poolData?.acceptedDepositsCount || 0,
