@@ -17,7 +17,6 @@ import {
   Typography,
 } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
-import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { chainData, getConfig, PoolInfo } from '~/config';
 import { PAContainer, Section } from '~/containers';
@@ -156,14 +155,8 @@ const PoolCard = ({
 }) => {
   const router = useRouter();
 
-  // Use totalFundsUSD from API if available, otherwise fallback to calculation
-  const totalFundsUSD =
-    pool.totalFundsUSD ??
-    (() => {
-      const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
-      const totalFundsNumber = Number(totalFundsFormatted);
-      return totalFundsNumber * 2500; // Rough ETH to USD conversion fallback
-    })();
+  // Use totalFundsUSD from API (totalInPoolValueUsd)
+  const totalFundsUSD = pool.totalFundsUSD ?? 0;
 
   const totalFundsDisplay = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -418,16 +411,16 @@ export const AllPoolsStats = () => {
     const sortedPools = [...pools].sort((a, b) => {
       switch (sortBy) {
         case 'most-popular': {
-          // Sort by total funds in USD (descending)
-          const aFundsUSD = Number(formatUnits(a.totalFunds, a.decimals)) * 2500;
-          const bFundsUSD = Number(formatUnits(b.totalFunds, b.decimals)) * 2500;
+          // Sort by total funds in USD (descending) - from API's totalInPoolValueUsd
+          const aFundsUSD = a.totalFundsUSD ?? 0;
+          const bFundsUSD = b.totalFundsUSD ?? 0;
           return bFundsUSD - aFundsUSD;
         }
 
         case 'most-private': {
-          // Calculate privacy scores for comparison
-          const aFundsUSD = Number(formatUnits(a.totalFunds, a.decimals)) * 2500;
-          const bFundsUSD = Number(formatUnits(b.totalFunds, b.decimals)) * 2500;
+          // Calculate privacy scores for comparison using API's totalInPoolValueUsd
+          const aFundsUSD = a.totalFundsUSD ?? 0;
+          const bFundsUSD = b.totalFundsUSD ?? 0;
 
           // Simple privacy score: combination of funds position and deposit quality
           const getPrivacyScore = (fundsUSD: number, deposits: number, uniformity: number) => {

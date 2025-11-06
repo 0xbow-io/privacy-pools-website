@@ -13,7 +13,6 @@ export const Header = () => {
   const pathname = usePathname();
 
   const isPoolsActive = pathname === '/';
-  const isStatsActive = pathname === '/stats';
 
   return (
     <HeaderWrapper>
@@ -27,9 +26,6 @@ export const Header = () => {
           <NavLinks>
             <NavLink href='/' active={isPoolsActive ? 'true' : 'false'}>
               Pools
-            </NavLink>
-            <NavLink href='/stats' active={isStatsActive ? 'true' : 'false'}>
-              Stats
             </NavLink>
           </NavLinks>
         </LeftSection>
