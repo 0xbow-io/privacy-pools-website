@@ -86,6 +86,34 @@ export const calculateDepositVarianceScore = (poolData: PoolResponse | undefined
   return score;
 };
 
+// Calculate numeric privacy score for sorting (0-1 scale)
+export const calculatePrivacyScoreValue = (fundsUSD: number, deposits: number, uniformity: number): number => {
+  const ONE_MILLION = 1_000_000;
+  const HUNDRED_MILLION = 100_000_000;
+
+  let fundsScore = 0;
+  if (fundsUSD >= HUNDRED_MILLION) {
+    fundsScore = 1;
+  } else if (fundsUSD > ONE_MILLION) {
+    const logMin = Math.log10(ONE_MILLION);
+    const logMax = Math.log10(HUNDRED_MILLION);
+    const logValue = Math.log10(fundsUSD);
+    fundsScore = (logValue - logMin) / (logMax - logMin);
+  }
+
+  const MIN_DEPOSITS = 1;
+  const MAX_DEPOSITS = 1000;
+  let depositScore = 0;
+  if (deposits > 0) {
+    const logMin = Math.log10(MIN_DEPOSITS);
+    const logMax = Math.log10(MAX_DEPOSITS);
+    const logValue = Math.log10(Math.min(deposits, MAX_DEPOSITS));
+    depositScore = Math.max(0.1, (logValue - logMin) / (logMax - logMin));
+  }
+
+  return (fundsScore + depositScore + uniformity) / 3;
+};
+
 // Calculate privacy score bar based on total funds, anonymity set size, and deposit uniformity
 // Middle point is 1M funds, green goes right (1M-100M), red goes left (0-1M)
 // Anonymity set size (deposit count) and deposit uniformity act as multipliers for the score
@@ -96,8 +124,7 @@ export const calculatePrivacyScore = (
 ): PrivacyScoreBar => {
   const ONE_MILLION = 1_000_000;
   const HUNDRED_MILLION = 100_000_000;
-  const RED_SEGMENT_WIDTH = 38.2041;
-  const GREEN_SEGMENT_WIDTH = 43.291;
+  const SIDE_WIDTH = 62; // Each side (red and green) is 62px wide
 
   // If data appears to be loading (no funds and no deposits), return neutral state (all gray)
   if (totalFundsUSD === 0 && depositCount === 0) {
@@ -125,22 +152,26 @@ export const calculatePrivacyScore = (
 
   if (totalFundsUSD >= HUNDRED_MILLION) {
     // Max green, adjusted by privacy multiplier
-    return { redFillWidth: 0, greenFillWidth: GREEN_SEGMENT_WIDTH * privacyMultiplier };
+    return { redFillWidth: 0, greenFillWidth: SIDE_WIDTH * privacyMultiplier };
   } else if (totalFundsUSD > ONE_MILLION) {
     // Green zone: logarithmic scale from 1M to 100M, adjusted by privacy multiplier
     const logMin = Math.log10(ONE_MILLION);
     const logMax = Math.log10(HUNDRED_MILLION);
     const logValue = Math.log10(totalFundsUSD);
     const percentage = (logValue - logMin) / (logMax - logMin);
-    return { redFillWidth: 0, greenFillWidth: GREEN_SEGMENT_WIDTH * percentage * privacyMultiplier };
+    return { redFillWidth: 0, greenFillWidth: SIDE_WIDTH * percentage * privacyMultiplier };
   } else if (totalFundsUSD > 0) {
-    // Red zone: linear scale from 0 to 1M (lower = more red)
-    // Note: Red indicates low value, so we don't boost it with anonymity multiplier
-    const percentage = (ONE_MILLION - totalFundsUSD) / ONE_MILLION;
-    return { redFillWidth: RED_SEGMENT_WIDTH * percentage, greenFillWidth: 0 };
+    // Red zone: linear scale from 0 to 1M (lower funds = more red)
+    // Inverse privacy multiplier: worse privacy quality = more red
+    const fundsPercentage = (ONE_MILLION - totalFundsUSD) / ONE_MILLION;
+    // Inverse the privacy multiplier (1.1 - x maps 1.0->0.1 and 0.1->1.0)
+    const inversePrivacyMultiplier = 1.1 - privacyMultiplier;
+    return { redFillWidth: SIDE_WIDTH * fundsPercentage * inversePrivacyMultiplier, greenFillWidth: 0 };
   } else {
-    // Max red
-    return { redFillWidth: RED_SEGMENT_WIDTH, greenFillWidth: 0 };
+    // Max red (no funds)
+    // Still affected by privacy quality - worse quality = more red
+    const inversePrivacyMultiplier = 1.1 - privacyMultiplier;
+    return { redFillWidth: SIDE_WIDTH * inversePrivacyMultiplier, greenFillWidth: 0 };
   }
 };
 
@@ -170,6 +201,13 @@ const PoolCard = ({
 
   // Calculate privacy score bar based on total funds, deposit count, and deposit uniformity
   const privacyScoreBar = calculatePrivacyScore(totalFundsUSD, pool.acceptedDepositsCount, pool.depositVarianceScore);
+
+  // Calculate numeric privacy score value
+  const privacyScoreValue = calculatePrivacyScoreValue(
+    totalFundsUSD,
+    pool.acceptedDepositsCount,
+    pool.depositVarianceScore,
+  );
 
   const handleClick = () => {
     router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
@@ -216,7 +254,7 @@ const PoolCard = ({
         <Stack direction='row' alignItems='center' gap='4px'>
           <StatLabel>Privacy score</StatLabel>
           <InfoTooltip
-            message={`Privacy score based on pool size (${(pool.acceptedDepositsCount || 0).toLocaleString()} deposits), total funds, and deposit uniformity (${Math.round(pool.depositVarianceScore * 100)}%)`}
+            message={`Privacy score: ${(privacyScoreValue * 100).toFixed(1)}% - Based on pool size (${(pool.acceptedDepositsCount || 0).toLocaleString()} deposits), total funds, and deposit uniformity (${Math.round(pool.depositVarianceScore * 100)}%)`}
           />
         </Stack>
       </PoolStats>
@@ -227,33 +265,19 @@ const PoolCard = ({
           <InfoTooltip message='Total funds in the pool' iconWidth={14} iconHeight={14} />
         </Stack>
         <PrivacyScoreBar>
-          {/* Segment 1: Gray unless red is at max, then red */}
-          {privacyScoreBar.redFillWidth >= 38.2041 ? (
-            <PrivacyScoreSegment width={23.7959} color='#BA6B5D' />
-          ) : (
-            <PrivacyScoreSegment width={23.7959} />
-          )}
-          {/* Red zone (segment 2): gray portion then red portion */}
-          {38.2041 - privacyScoreBar.redFillWidth > 0 && (
-            <PrivacyScoreSegment width={38.2041 - privacyScoreBar.redFillWidth} />
-          )}
-          {privacyScoreBar.redFillWidth > 0 && (
-            <PrivacyScoreSegment width={privacyScoreBar.redFillWidth} color='#BA6B5D' />
-          )}
-          {/* Green zone (segment 3): green portion then gray portion */}
-          {privacyScoreBar.greenFillWidth > 0 && (
-            <PrivacyScoreSegment width={privacyScoreBar.greenFillWidth} color='#7D9C40' />
-          )}
-          {43.291 - privacyScoreBar.greenFillWidth > 0 && (
-            <PrivacyScoreSegment width={43.291 - privacyScoreBar.greenFillWidth} />
-          )}
-          {/* Segment 4: Gray unless green is at max, then green */}
-          {privacyScoreBar.greenFillWidth >= 43.291 ? (
-            <PrivacyScoreSegment width={18.709} color='#7D9C40' />
-          ) : (
-            <PrivacyScoreSegment width={18.709} />
-          )}
+          {/* Left side (red zone): 62px total, gray background with red fill from right */}
+          <PrivacyScoreSide width={62}>
+            {privacyScoreBar.redFillWidth > 0 && (
+              <PrivacyScoreFill width={privacyScoreBar.redFillWidth} color='#BA6B5D' align='right' />
+            )}
+          </PrivacyScoreSide>
           <PrivacyScoreVerticalLine />
+          {/* Right side (green zone): 62px total, gray background with green fill from left */}
+          <PrivacyScoreSide width={62}>
+            {privacyScoreBar.greenFillWidth > 0 && (
+              <PrivacyScoreFill width={privacyScoreBar.greenFillWidth} color='#7D9C40' align='left' />
+            )}
+          </PrivacyScoreSide>
         </PrivacyScoreBar>
       </PoolStatsBottom>
     </PoolCardContainer>
@@ -418,40 +442,17 @@ export const AllPoolsStats = () => {
         }
 
         case 'most-private': {
-          // Calculate privacy scores for comparison using API's totalInPoolValueUsd
-          const aFundsUSD = a.totalFundsUSD ?? 0;
-          const bFundsUSD = b.totalFundsUSD ?? 0;
-
-          // Simple privacy score: combination of funds position and deposit quality
-          const getPrivacyScore = (fundsUSD: number, deposits: number, uniformity: number) => {
-            const ONE_MILLION = 1_000_000;
-            const HUNDRED_MILLION = 100_000_000;
-
-            let fundsScore = 0;
-            if (fundsUSD >= HUNDRED_MILLION) {
-              fundsScore = 1;
-            } else if (fundsUSD > ONE_MILLION) {
-              const logMin = Math.log10(ONE_MILLION);
-              const logMax = Math.log10(HUNDRED_MILLION);
-              const logValue = Math.log10(fundsUSD);
-              fundsScore = (logValue - logMin) / (logMax - logMin);
-            }
-
-            const MIN_DEPOSITS = 1;
-            const MAX_DEPOSITS = 1000;
-            let depositScore = 0;
-            if (deposits > 0) {
-              const logMin = Math.log10(MIN_DEPOSITS);
-              const logMax = Math.log10(MAX_DEPOSITS);
-              const logValue = Math.log10(Math.min(deposits, MAX_DEPOSITS));
-              depositScore = Math.max(0.1, (logValue - logMin) / (logMax - logMin));
-            }
-
-            return (fundsScore + depositScore + uniformity) / 3;
-          };
-
-          const aScore = getPrivacyScore(aFundsUSD, a.acceptedDepositsCount, a.depositVarianceScore);
-          const bScore = getPrivacyScore(bFundsUSD, b.acceptedDepositsCount, b.depositVarianceScore);
+          // Calculate privacy scores for comparison using the shared helper function
+          const aScore = calculatePrivacyScoreValue(
+            a.totalFundsUSD ?? 0,
+            a.acceptedDepositsCount,
+            a.depositVarianceScore,
+          );
+          const bScore = calculatePrivacyScoreValue(
+            b.totalFundsUSD ?? 0,
+            b.acceptedDepositsCount,
+            b.depositVarianceScore,
+          );
 
           return bScore - aScore;
         }
@@ -772,13 +773,26 @@ const PrivacyScoreBar = styled(Box)(() => ({
   display: 'flex',
 }));
 
-const PrivacyScoreSegment = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'color',
-})<{ width: number; color?: string }>(({ theme, width, color }) => ({
+const PrivacyScoreSide = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'width',
+})<{ width: number }>(({ theme, width }) => ({
+  position: 'relative',
   width: `${width}px`,
   height: '10px',
   marginTop: '3px',
-  backgroundColor: color || theme.palette.grey[200],
+  backgroundColor: theme.palette.grey[200],
+  overflow: 'hidden',
+}));
+
+const PrivacyScoreFill = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'color' && prop !== 'align',
+})<{ width: number; color: string; align: 'left' | 'right' }>(({ width, color, align }) => ({
+  position: 'absolute',
+  width: `${width}px`,
+  height: '100%',
+  backgroundColor: color,
+  [align]: 0,
+  top: 0,
 }));
 
 const PrivacyScoreVerticalLine = styled('div')(() => ({
@@ -788,4 +802,5 @@ const PrivacyScoreVerticalLine = styled('div')(() => ({
   width: '2px',
   height: '16px',
   backgroundColor: '#4D4D4D',
+  zIndex: 1,
 }));
