@@ -4,11 +4,20 @@ import { MtRootResponse, PoolResponse, MtLeavesResponse, DepositsByLabelResponse
 // Define type for pool stats response
 interface PoolStats {
   scope: string;
+  chainId: number;
   totalInPoolValue: string;
+  totalInPoolValueUsd: string;
   totalDepositsValue: string;
+  totalDepositsValueUsd: string;
   acceptedDepositsValue: string;
+  acceptedDepositsValueUsd: string;
   totalDepositsCount: number;
   acceptedDepositsCount: number;
+  pendingDepositsValue: string;
+  pendingDepositsValueUsd: string;
+  pendingDepositsCount: number;
+  tokenSymbol: string;
+  tokenAddress: string;
   growth24h?: number | null;
   pendingGrowth24h?: number | null;
 }
@@ -58,7 +67,7 @@ const aspClient = {
       'X-Pool-Scope': scope,
     }),
 
-  fetchPoolStats: (aspUrl: string, chainId: number) =>
+  fetchPoolStats: (aspUrl: string, chainId: number | 'all') =>
     fetchWithHeaders<PoolStatsResponse>(`${aspUrl}/${chainId}/public/pools-stats`),
 };
 

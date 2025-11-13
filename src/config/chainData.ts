@@ -17,7 +17,7 @@ import wbtcIcon from '~/assets/icons/wbtc.svg';
 import woethIcon from '~/assets/icons/woeth.svg';
 import wstethIcon from '~/assets/icons/wsteth.svg';
 
-const { ALCHEMY_KEY, IS_TESTNET, ASP_ENDPOINT } = getEnv();
+const { ALCHEMY_KEY, IS_TESTNET, SHOW_TEST_CHAINS, ASP_ENDPOINT } = getEnv();
 
 // Add chains to the whitelist to be used in the app
 const mainnetChains: readonly [Chain, ...Chain[]] = [mainnet];
@@ -37,7 +37,7 @@ export type ChainAssets =
   | 'wBTC'
   | 'USDe'
   | 'USD1'
-  | 'FRXUSD'
+  | 'frxUSD'
   | 'WOETH';
 
 export interface AlternativeTokenConfig {
@@ -283,7 +283,7 @@ const mainnetChainData: ChainData = {
         deploymentBlock: 23090335n,
         entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
         maxDeposit: parseUnits('1000000', 18),
-        asset: 'FRXUSD',
+        asset: 'frxUSD',
         assetDecimals: 18,
         icon: frxusdIcon.src,
         color: '#000000',
@@ -405,4 +405,24 @@ const testnetChainData: ChainData = {
   },
 };
 
+// Export chain data based on environment
+// For All Pools page: show both mainnet and testnet if SHOW_TEST_CHAINS is true
+// For wallet operations: only show appropriate chains based on IS_TESTNET
 export const chainData = IS_TESTNET ? testnetChainData : mainnetChainData;
+
+// Chain data for All Pools table (includes test chains if SHOW_TEST_CHAINS is enabled)
+export const allPoolsChainData: ChainData = (() => {
+  if (IS_TESTNET) {
+    return testnetChainData;
+  }
+
+  if (SHOW_TEST_CHAINS) {
+    // Combine mainnet and testnet data
+    return {
+      ...mainnetChainData,
+      ...testnetChainData,
+    };
+  }
+
+  return mainnetChainData;
+})();

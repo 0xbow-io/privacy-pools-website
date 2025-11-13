@@ -20,6 +20,7 @@ interface PoolOption {
   label: string;
   chainName: string;
   icon?: string;
+  scope?: string;
 }
 
 interface PoolPageProps {
@@ -68,6 +69,24 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     refetchOnReconnect: false,
   });
 
+  // Fetch pool stats to get pendingDepositsValueUsd
+  const { data: poolStatsData } = useQuery({
+    queryKey: ['pool_stats', parsedChainId, aspUrl],
+    queryFn: () => aspClient.fetchPoolStats(aspUrl, parsedChainId),
+    enabled: !!poolScope,
+    refetchInterval: 120000,
+    staleTime: 60000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  // Get the current pool's stats from the pools array
+  const currentPoolStats = useMemo(() => {
+    if (!poolStatsData?.pools || !poolScope) return null;
+    return poolStatsData.pools.find((pool) => pool.scope === poolScope);
+  }, [poolStatsData, poolScope]);
+
   // Calculate stats
   const acceptedFunds = useMemo(() => {
     if (!poolData?.totalInPoolValue) return 0;
@@ -76,11 +95,9 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   }, [poolData, assetDecimals, decimals]);
 
   const pendingFunds = useMemo(() => {
-    if (!poolData?.totalDepositsValue || !poolData?.totalInPoolValue) return 0;
-    const pending = BigInt(poolData.totalDepositsValue) - BigInt(poolData.totalInPoolValue);
-    const pendingFormatted = formatUnits(pending, assetDecimals || decimals);
-    return Number(pendingFormatted) * 2500; // Convert to USD
-  }, [poolData, assetDecimals, decimals]);
+    if (!currentPoolStats?.pendingDepositsValueUsd) return 0;
+    return Number(currentPoolStats.pendingDepositsValueUsd);
+  }, [currentPoolStats]);
 
   const myFunds = useMemo(() => {
     if (!isLogged) return 0;
@@ -436,16 +453,57 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string }) => {
   const router = useRouter();
   const { chain, setSelectedAsset } = useChainContext();
+  const aspUrl = getConfig().env.ASP_ENDPOINT;
+
+  // Fetch pool stats to get popularity data
+  const { data: poolStatsData } = useQuery({
+    queryKey: ['pool_stats_selector', chainId, aspUrl],
+    queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
+    refetchInterval: 120000,
+    staleTime: 60000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
   // Get all available pools for this chain
-  const availableOptions: PoolOption[] = chain?.poolInfo
+  const baseOptions: PoolOption[] = chain?.poolInfo
     ? chain.poolInfo.map((pool) => ({
         value: pool.asset as ChainAssets,
         label: pool.asset,
         chainName: chainData[chainId]?.name || 'Unknown',
         icon: pool.icon,
+        scope: pool.scope.toString(),
       }))
     : [];
+
+  // Sort pools by popularity (totalInPoolValueUsd) with priority assets first
+  const availableOptions = useMemo(() => {
+    if (!poolStatsData?.pools) return baseOptions;
+
+    // TEMPORARY: Priority assets for Frax announcement (easy to remove)
+    const PRIORITY_ASSETS = ['ETH', 'FRXUSD', 'USDC'];
+
+    return [...baseOptions].sort((a, b) => {
+      // Check if assets are in priority list
+      const aIsPriority = PRIORITY_ASSETS.includes(a.value.toUpperCase());
+      const bIsPriority = PRIORITY_ASSETS.includes(b.value.toUpperCase());
+
+      // If both are priority or both are not, sort by priority order or popularity
+      if (aIsPriority && bIsPriority) {
+        return PRIORITY_ASSETS.indexOf(a.value.toUpperCase()) - PRIORITY_ASSETS.indexOf(b.value.toUpperCase());
+      }
+      if (aIsPriority) return -1;
+      if (bIsPriority) return 1;
+
+      // Sort by totalInPoolValueUsd (most popular)
+      const aStats = poolStatsData.pools.find((p) => p.scope === a.scope);
+      const bStats = poolStatsData.pools.find((p) => p.scope === b.scope);
+      const aFunds = Number(aStats?.totalInPoolValueUsd || 0);
+      const bFunds = Number(bStats?.totalInPoolValueUsd || 0);
+      return bFunds - aFunds;
+    });
+  }, [baseOptions, poolStatsData]);
 
   const selectedOption = availableOptions.find((opt) => opt.value.toLowerCase() === poolId.toLowerCase());
 

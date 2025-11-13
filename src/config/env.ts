@@ -8,6 +8,7 @@ const env: Env = {
   TEST_MODE: process.env.NEXT_PUBLIC_TEST_MODE === 'true',
   SHOW_DISCLAIMER: process.env.NEXT_PUBLIC_SHOW_DISCLAIMER === 'true',
   IS_TESTNET: process.env.NEXT_PUBLIC_IS_TESTNET === 'true',
+  SHOW_TEST_CHAINS: process.env.NEXT_PUBLIC_SHOW_TEST_CHAINS === 'true',
   GITHUB_HASH: process.env.NEXT_PUBLIC_GITHUB_HASH as string,
   // HYPERSYNC_KEY removed from client-side for security
   SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN as string,

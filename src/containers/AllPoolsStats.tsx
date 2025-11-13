@@ -18,10 +18,11 @@ import {
 } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { chainData, getConfig, PoolInfo } from '~/config';
+import { allPoolsChainData, getConfig, PoolInfo } from '~/config';
 import { PAContainer, Section } from '~/containers';
 import type { PoolResponse } from '~/types';
 import { aspClient } from '~/utils';
+import type { PoolStats } from '~/utils/aspClient';
 
 export interface PoolCardData {
   poolName: string;
@@ -292,108 +293,57 @@ export const AllPoolsStats = () => {
   const [sortSelectOpen, setSortSelectOpen] = useState(false);
   const aspUrl = getConfig().env.ASP_ENDPOINT;
 
-  // Build list of all pools to query
-  const allPoolsToQuery = useMemo(() => {
-    const pools: Array<{ chainId: number; scope: string; aspUrl: string; poolInfo: PoolInfo }> = [];
-    Object.entries(chainData).forEach(([cId, chain]) => {
-      chain.poolInfo.forEach((poolInfo: PoolInfo) => {
-        pools.push({
-          chainId: parseInt(cId),
-          scope: poolInfo.scope.toString(),
-          aspUrl,
-          poolInfo,
-        });
-      });
-    });
-    return pools;
-  }, [aspUrl]);
-
-  // Get unique chain IDs for fetching pools-stats
-  const uniqueChainIds = useMemo(() => {
-    return Array.from(new Set(allPoolsToQuery.map((pool) => pool.chainId)));
-  }, [allPoolsToQuery]);
-
-  // Fetch pool info for each individual pool
-  const poolInfoQueries = useQueries({
-    queries: allPoolsToQuery.map((pool) => ({
-      queryKey: ['asp_pool_info', pool.chainId, pool.scope, pool.aspUrl],
-      queryFn: () => aspClient.fetchPoolInfo(pool.aspUrl, pool.chainId, pool.scope),
-      refetchInterval: 120000, // Increased to 2 minutes
-      staleTime: 60000, // Consider data fresh for 60 seconds
-      retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
+  // Fetch pools-stats for ALL chains in a single request
+  const poolStatsQuery = useQueries({
+    queries: [
+      {
+        queryKey: ['asp_pools_stats', 'all', aspUrl],
+        queryFn: () => aspClient.fetchPoolStats(aspUrl, 'all'),
+        refetchInterval: 120000, // 2 minutes
+        staleTime: 60000, // Consider data fresh for 60 seconds
+        retryOnMount: false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+    ],
   });
 
-  // Fetch pools-stats for each chain to get growth24h data
-  const poolStatsQueries = useQueries({
-    queries: uniqueChainIds.map((chainId) => ({
-      queryKey: ['asp_pools_stats', chainId, aspUrl],
-      queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
-      refetchInterval: 120000,
-      staleTime: 60000,
-      retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
-  });
+  // Build a map of pool stats by chainId and scope for easy lookup
+  const poolStatsMap = useMemo(() => {
+    const map = new Map<string, PoolStats>();
 
-  // Build a map of pool data by chainId and scope for easy lookup
-  const poolDataMap = useMemo(() => {
-    const map = new Map<string, PoolResponse>();
+    const query = poolStatsQuery[0];
+    if (!query.data?.pools) return map;
 
-    // First, build map of growth data by chainId and scope from poolStatsQueries
-    const growthDataMap = new Map<string, number | null>();
-    poolStatsQueries.forEach((query, index) => {
-      if (!query.data?.pools) return;
-      const chainId = uniqueChainIds[index];
-
-      query.data.pools.forEach((poolStats) => {
-        const key = `${chainId}-${poolStats.scope}`;
-        growthDataMap.set(key, poolStats.growth24h ?? null);
-      });
-    });
-
-    // Then, build the main pool data map with growth data merged in
-    poolInfoQueries.forEach((query, index) => {
-      if (!query.data) return;
-      const pool = allPoolsToQuery[index];
-      const key = `${pool.chainId}-${pool.scope}`;
-
-      // Merge growth24h data from poolStatsQueries
-      const growth24h = growthDataMap.get(key);
-      map.set(key, {
-        ...query.data,
-        growth24h,
-      });
+    query.data.pools.forEach((poolStats) => {
+      const key = `${poolStats.chainId}-${poolStats.scope}`;
+      map.set(key, poolStats);
     });
 
     return map;
-  }, [poolInfoQueries, poolStatsQueries, allPoolsToQuery, uniqueChainIds]);
+  }, [poolStatsQuery]);
 
-  // Build pool list dynamically from chainData with real stats
+  // Build pool list dynamically from allPoolsChainData with real stats
   const allPools = useMemo(() => {
     const pools: PoolCardData[] = [];
 
-    Object.entries(chainData).forEach(([cId, chain]) => {
+    Object.entries(allPoolsChainData).forEach(([cId, chain]) => {
       // Get all pools from this chain's poolInfo
       chain.poolInfo.forEach((poolInfo: PoolInfo) => {
         const dataKey = `${cId}-${poolInfo.scope}`;
-        const poolData = poolDataMap.get(dataKey);
+        const poolStats = poolStatsMap.get(dataKey);
 
-        const totalFunds = poolData?.totalInPoolValue ? BigInt(poolData.totalInPoolValue) : BigInt(0);
+        const totalFunds = poolStats?.totalInPoolValue ? BigInt(poolStats.totalInPoolValue) : BigInt(0);
         // Funds pending = total deposits - funds in pool
         const fundsPending =
-          poolData?.totalDepositsValue && poolData?.totalInPoolValue
-            ? BigInt(poolData.totalDepositsValue) - BigInt(poolData.totalInPoolValue)
+          poolStats?.totalDepositsValue && poolStats?.totalInPoolValue
+            ? BigInt(poolStats.totalDepositsValue) - BigInt(poolStats.totalInPoolValue)
             : BigInt(0);
 
         // Parse totalInPoolValueUsd from the API
-        const totalFundsUSD = poolData?.totalInPoolValueUsd
-          ? parseFloat(poolData.totalInPoolValueUsd.replace(/,/g, ''))
+        const totalFundsUSD = poolStats?.totalInPoolValueUsd
+          ? parseFloat(poolStats.totalInPoolValueUsd.replace(/,/g, ''))
           : undefined;
 
         pools.push({
@@ -406,15 +356,15 @@ export const AllPoolsStats = () => {
           fundsPending,
           totalFundsUSD,
           decimals: poolInfo.assetDecimals || 18,
-          growthPercentage: poolData?.growth24h ?? undefined,
-          acceptedDepositsCount: poolData?.acceptedDepositsCount || 0,
-          depositVarianceScore: calculateDepositVarianceScore(poolData),
+          growthPercentage: poolStats?.growth24h ?? undefined,
+          acceptedDepositsCount: poolStats?.acceptedDepositsCount || 0,
+          depositVarianceScore: 0.5, // Default since we don't have recentEvents from pools-stats
         });
       });
     });
 
     return pools;
-  }, [poolDataMap]);
+  }, [poolStatsMap]);
 
   // Filter and sort pools based on search query and sort option
   const filteredPools = useMemo(() => {
@@ -427,12 +377,25 @@ export const AllPoolsStats = () => {
         (pool) =>
           pool.poolName.toLowerCase().includes(query) ||
           pool.asset.toLowerCase().includes(query) ||
-          chainData[pool.chainId]?.name.toLowerCase().includes(query),
+          allPoolsChainData[pool.chainId]?.name.toLowerCase().includes(query),
       );
     }
 
     // Sort pools based on selected option
     const sortedPools = [...pools].sort((a, b) => {
+      // TEMPORARY: Priority assets for Frax announcement (easy to remove)
+      const PRIORITY_ASSETS = ['ETH', 'FRXUSD', 'USDC'];
+      const aIsPriority = PRIORITY_ASSETS.includes(a.asset.toUpperCase());
+      const bIsPriority = PRIORITY_ASSETS.includes(b.asset.toUpperCase());
+
+      // If both are priority or both are not, apply normal sorting
+      if (aIsPriority && bIsPriority) {
+        return PRIORITY_ASSETS.indexOf(a.asset.toUpperCase()) - PRIORITY_ASSETS.indexOf(b.asset.toUpperCase());
+      }
+      if (aIsPriority) return -1;
+      if (bIsPriority) return 1;
+
+      // Normal sorting logic
       switch (sortBy) {
         case 'most-popular': {
           // Sort by total funds in USD (descending) - from API's totalInPoolValueUsd
