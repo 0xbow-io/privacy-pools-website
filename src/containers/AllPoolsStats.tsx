@@ -200,15 +200,13 @@ const PoolCard = ({
   const hasGrowth = pool.growthPercentage !== undefined && pool.growthPercentage !== 0;
   const isPositiveGrowth = (pool.growthPercentage || 0) > 0;
 
-  // Calculate privacy score bar based on total funds, deposit count, and deposit uniformity
-  const privacyScoreBar = calculatePrivacyScore(totalFundsUSD, pool.acceptedDepositsCount, pool.depositVarianceScore);
-
-  // Calculate numeric privacy score value
-  const privacyScoreValue = calculatePrivacyScoreValue(
-    totalFundsUSD,
-    pool.acceptedDepositsCount,
-    pool.depositVarianceScore,
-  );
+  // HIDDEN: Privacy score calculations (commented out to hide privacy score)
+  // const privacyScoreBar = calculatePrivacyScore(totalFundsUSD, pool.acceptedDepositsCount, pool.depositVarianceScore);
+  // const privacyScoreValue = calculatePrivacyScoreValue(
+  //   totalFundsUSD,
+  //   pool.acceptedDepositsCount,
+  //   pool.depositVarianceScore,
+  // );
 
   const handleClick = () => {
     router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
@@ -252,12 +250,13 @@ const PoolCard = ({
 
       <PoolStats>
         <StatLabel>Total funds</StatLabel>
-        <Stack direction='row' alignItems='center' gap='4px'>
+        {/* HIDDEN: Privacy score label and tooltip */}
+        {/* <Stack direction='row' alignItems='center' gap='4px'>
           <StatLabel>Privacy score</StatLabel>
           <InfoTooltip
             message={`Privacy score: ${(privacyScoreValue * 100).toFixed(1)}% - Based on pool size (${(pool.acceptedDepositsCount || 0).toLocaleString()} deposits), total funds, and deposit uniformity (${Math.round(pool.depositVarianceScore * 100)}%)`}
           />
-        </Stack>
+        </Stack> */}
       </PoolStats>
 
       <PoolStatsBottom>
@@ -265,21 +264,20 @@ const PoolCard = ({
           <TotalFundsValue>{totalFundsDisplay}</TotalFundsValue>
           <InfoTooltip message='Total funds in the pool' iconWidth={14} iconHeight={14} />
         </Stack>
-        <PrivacyScoreBar>
-          {/* Left side (red zone): 62px total, gray background with red fill from right */}
+        {/* HIDDEN: Privacy score bar */}
+        {/* <PrivacyScoreBar>
           <PrivacyScoreSide width={62}>
             {privacyScoreBar.redFillWidth > 0 && (
               <PrivacyScoreFill width={privacyScoreBar.redFillWidth} color='#BA6B5D' align='right' />
             )}
           </PrivacyScoreSide>
           <PrivacyScoreVerticalLine />
-          {/* Right side (green zone): 62px total, gray background with green fill from left */}
           <PrivacyScoreSide width={62}>
             {privacyScoreBar.greenFillWidth > 0 && (
               <PrivacyScoreFill width={privacyScoreBar.greenFillWidth} color='#7D9C40' align='left' />
             )}
           </PrivacyScoreSide>
-        </PrivacyScoreBar>
+        </PrivacyScoreBar> */}
       </PoolStatsBottom>
     </PoolCardContainer>
   );
@@ -736,34 +734,35 @@ const PrivacyScoreBar = styled(Box)(() => ({
   display: 'flex',
 }));
 
-const PrivacyScoreSide = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'width',
-})<{ width: number }>(({ theme, width }) => ({
-  position: 'relative',
-  width: `${width}px`,
-  height: '10px',
-  marginTop: '3px',
-  backgroundColor: theme.palette.grey[200],
-  overflow: 'hidden',
-}));
+// HIDDEN: Privacy score styled components (commented out)
+// const PrivacyScoreSide = styled('div', {
+//   shouldForwardProp: (prop) => prop !== 'width',
+// })<{ width: number }>(({ theme, width }) => ({
+//   position: 'relative',
+//   width: `${width}px`,
+//   height: '10px',
+//   marginTop: '3px',
+//   backgroundColor: theme.palette.grey[200],
+//   overflow: 'hidden',
+// }));
 
-const PrivacyScoreFill = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'width' && prop !== 'color' && prop !== 'align',
-})<{ width: number; color: string; align: 'left' | 'right' }>(({ width, color, align }) => ({
-  position: 'absolute',
-  width: `${width}px`,
-  height: '100%',
-  backgroundColor: color,
-  [align]: 0,
-  top: 0,
-}));
+// const PrivacyScoreFill = styled('div', {
+//   shouldForwardProp: (prop) => prop !== 'width' && prop !== 'color' && prop !== 'align',
+// })<{ width: number; color: string; align: 'left' | 'right' }>(({ width, color, align }) => ({
+//   position: 'absolute',
+//   width: `${width}px`,
+//   height: '100%',
+//   backgroundColor: color,
+//   [align]: 0,
+//   top: 0,
+// }));
 
-const PrivacyScoreVerticalLine = styled('div')(() => ({
-  position: 'absolute',
-  left: '62px',
-  top: 0,
-  width: '2px',
-  height: '16px',
-  backgroundColor: '#4D4D4D',
-  zIndex: 1,
-}));
+// const PrivacyScoreVerticalLine = styled('div')(() => ({
+//   position: 'absolute',
+//   left: '62px',
+//   top: 0,
+//   width: '2px',
+//   height: '16px',
+//   backgroundColor: '#4D4D4D',
+//   zIndex: 1,
+// }));
