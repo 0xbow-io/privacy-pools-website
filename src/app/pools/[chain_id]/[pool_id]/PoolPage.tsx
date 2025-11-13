@@ -497,6 +497,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
       if (bIsPriority) return 1;
 
       // Sort by totalInPoolValueUsd (most popular)
+      if (!poolStatsData.pools) return 0;
       const aStats = poolStatsData.pools.find((p) => p.scope === a.scope);
       const bStats = poolStatsData.pools.find((p) => p.scope === b.scope);
       const aFunds = Number(aStats?.totalInPoolValueUsd || 0);

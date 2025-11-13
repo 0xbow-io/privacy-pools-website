@@ -37,7 +37,7 @@ export type ChainAssets =
   | 'wBTC'
   | 'USDe'
   | 'USD1'
-  | 'frxUSD'
+  | 'FRXUSD'
   | 'WOETH';
 
 export interface AlternativeTokenConfig {

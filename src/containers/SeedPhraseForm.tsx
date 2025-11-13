@@ -68,9 +68,6 @@ export const SeedPhraseForm = ({
   // Generate array of empty strings based on word count
   const arrOfKeys = Array.from({ length: wordCount }, (_, i) => `word-${i}`);
 
-  // Generate array of empty strings based on word count
-  const arrOfKeys = Array.from({ length: wordCount }, (_, i) => `word-${i}`);
-
   const copyToClipboard = () => {
     copyToClipboardUtil(seedPhrase);
   };
