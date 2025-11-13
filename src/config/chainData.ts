@@ -283,7 +283,7 @@ const mainnetChainData: ChainData = {
         deploymentBlock: 23090335n,
         entryPointAddress: '0x6818809EefCe719E480a7526D76bD3e561526b46',
         maxDeposit: parseUnits('1000000', 18),
-        asset: 'frxUSD',
+        asset: 'FRXUSD',
         assetDecimals: 18,
         icon: frxusdIcon.src,
         color: '#000000',
