@@ -141,9 +141,17 @@ export const AccountProvider = ({ children }: Props) => {
       });
 
       setPoolAccounts(updatedPoolAccounts);
+
+      // Also update poolAccountsByChainScope to prevent the useEffect from overwriting our changes
+      const scopeKey = `${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`;
+      setPoolAccountsByChainScope((prev) => ({
+        ...prev,
+        [scopeKey]: updatedPoolAccounts,
+      }));
+
       onFinish();
     },
-    [mtLeavesData],
+    [mtLeavesData, selectedPoolInfo],
   );
 
   // This is executed before updatePoolAccounts updates the state
