@@ -9,7 +9,7 @@ import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { PoolAccountTable, ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { allPoolsChainData, ChainAssets, chainData, getConfig } from '~/config';
+import { allPoolsChainData, ChainAssets, chainData, getConfig, PoolInfo } from '~/config';
 import { Section, PAContainer, ActionMenu } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
 import { EventType, ModalType, ReviewStatus } from '~/types';
@@ -500,7 +500,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
     const options: PoolOption[] = [];
 
     Object.entries(allPoolsChainData).forEach(([cId, chainInfo]) => {
-      chainInfo.poolInfo.forEach((pool) => {
+      chainInfo.poolInfo.forEach((pool: PoolInfo) => {
         options.push({
           value: pool.asset as ChainAssets,
           label: pool.asset,

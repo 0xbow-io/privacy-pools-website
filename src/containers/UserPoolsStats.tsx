@@ -130,6 +130,7 @@ export const UserPoolsStats = () => {
         icon: poolToQuery.poolInfo.icon,
         asset: poolToQuery.poolInfo.asset,
         chainId: poolToQuery.chainId,
+        chainName: chain.name,
         scope: poolToQuery.scope,
         totalFunds,
         fundsPending: BigInt(0),
