@@ -520,11 +520,11 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
     if (!poolStatsData?.pools) return baseOptions;
 
     // TEMPORARY: Priority pools for Frax announcement (chain-specific)
-    const PRIORITY_POOLS: Array<{ chainId: number; asset: string }> = []; /*[
-      { chainId: 1, asset: 'ETH' },     // Ethereum mainnet ETH
-      { chainId: 1, asset: 'FRXUSD' },  // Ethereum mainnet frxUSD
-      { chainId: 1, asset: 'USDC' },    // Ethereum mainnet USDC
-    ];*/
+    const PRIORITY_POOLS: Array<{ chainId: number; asset: string }> = [
+      { chainId: 1, asset: 'ETH' }, // Ethereum mainnet ETH
+      { chainId: 1, asset: 'FRXUSD' }, // Ethereum mainnet frxUSD
+      { chainId: 1, asset: 'USDC' }, // Ethereum mainnet USDC
+    ];
 
     return [...baseOptions].sort((a, b) => {
       // Check if pools are in priority list (chain-specific)

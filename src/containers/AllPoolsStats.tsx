@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
+import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { allPoolsChainData, getConfig, PoolInfo } from '~/config';
 import { PAContainer, Section } from '~/containers';
@@ -344,9 +345,19 @@ export const AllPoolsStats = () => {
             : BigInt(0);
 
         // Parse totalInPoolValueUsd from the API
-        const totalFundsUSD = poolStats?.totalInPoolValueUsd
-          ? parseFloat(poolStats.totalInPoolValueUsd.replace(/,/g, ''))
-          : undefined;
+        let totalFundsUSD: number | undefined;
+        if (poolStats?.totalInPoolValueUsd) {
+          const parsedUSD = parseFloat(poolStats.totalInPoolValueUsd.replace(/,/g, ''));
+          if (parsedUSD > 0) {
+            totalFundsUSD = parsedUSD;
+          } else if (poolStats?.totalInPoolValue && poolInfo.isStableAsset) {
+            // For stablecoins, if USD value is 0 but token value exists, use token value as USD (1:1)
+            totalFundsUSD = Number(formatUnits(BigInt(poolStats.totalInPoolValue), poolInfo.assetDecimals || 18));
+          }
+        } else if (poolStats?.totalInPoolValue && poolInfo.isStableAsset) {
+          // For stablecoins, if USD value is null/undefined but token value exists, use token value as USD (1:1)
+          totalFundsUSD = Number(formatUnits(BigInt(poolStats.totalInPoolValue), poolInfo.assetDecimals || 18));
+        }
 
         pools.push({
           poolName: `${chain.name} - ${poolInfo.asset} Pool`,
