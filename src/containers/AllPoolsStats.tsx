@@ -29,6 +29,7 @@ export interface PoolCardData {
   icon?: string;
   asset: string;
   chainId: number;
+  chainName: string; // Name of the chain (e.g., "Ethereum", "Sepolia")
   scope: string;
   totalFunds: bigint;
   fundsPending: bigint;
@@ -221,7 +222,10 @@ const PoolCard = ({
               <Image src={pool.icon} alt={pool.asset} width={24} height={24} />
             </IconWrapper>
           )}
-          <PoolName variant='body1'>{pool.asset} Pool</PoolName>
+          <Stack direction='column' gap='2px'>
+            <PoolName variant='body1'>{pool.asset} Pool</PoolName>
+            <ChainName variant='caption'>{pool.chainName}</ChainName>
+          </Stack>
         </Stack>
         {hasGrowth && (
           <GrowthIndicator positive={isPositiveGrowth}>
@@ -349,6 +353,7 @@ export const AllPoolsStats = () => {
           icon: poolInfo.icon,
           asset: poolInfo.asset,
           chainId: parseInt(cId),
+          chainName: chain.name,
           scope: poolInfo.scope.toString(),
           totalFunds,
           fundsPending,
@@ -381,19 +386,38 @@ export const AllPoolsStats = () => {
 
     // Sort pools based on selected option
     const sortedPools = [...pools].sort((a, b) => {
-      // TEMPORARY: Priority assets for Frax announcement (easy to remove)
-      const PRIORITY_ASSETS = ['ETH', 'FRXUSD', 'USDC'];
-      const aIsPriority = PRIORITY_ASSETS.includes(a.asset.toUpperCase());
-      const bIsPriority = PRIORITY_ASSETS.includes(b.asset.toUpperCase());
+      // TEMPORARY: Priority pools for Frax announcement (chain-specific)
+      // Format: 'chainId-asset' (e.g., '1-ETH' for Ethereum mainnet ETH)
+      const PRIORITY_POOLS: Array<{ chainId: number; asset: string }> = []; /*[
+        { chainId: 1, asset: 'ETH' },     // Ethereum mainnet ETH
+        { chainId: 1, asset: 'FRXUSD' },  // Ethereum mainnet frxUSD
+        { chainId: 1, asset: 'USDC' },    // Ethereum mainnet USDC
+      ];*/
 
-      // If both are priority or both are not, apply normal sorting
+      const aIsPriority = PRIORITY_POOLS.some(
+        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.asset.toUpperCase(),
+      );
+      const bIsPriority = PRIORITY_POOLS.some(
+        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.asset.toUpperCase(),
+      );
+
+      const aPriorityIndex = PRIORITY_POOLS.findIndex(
+        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.asset.toUpperCase(),
+      );
+      const bPriorityIndex = PRIORITY_POOLS.findIndex(
+        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.asset.toUpperCase(),
+      );
+
+      // Priority pools come first, sorted by their priority order
       if (aIsPriority && bIsPriority) {
-        return PRIORITY_ASSETS.indexOf(a.asset.toUpperCase()) - PRIORITY_ASSETS.indexOf(b.asset.toUpperCase());
+        return aPriorityIndex - bPriorityIndex;
+      } else if (aIsPriority) {
+        return -1;
+      } else if (bIsPriority) {
+        return 1;
       }
-      if (aIsPriority) return -1;
-      if (bIsPriority) return 1;
 
-      // Normal sorting logic
+      // Normal sorting logic (applies to non-priority pools)
       switch (sortBy) {
         case 'most-popular': {
           // Sort by total funds in USD (descending) - from API's totalInPoolValueUsd
@@ -661,6 +685,13 @@ const PoolName = styled(Typography)(({ theme }) => ({
   fontSize: '16px',
   lineHeight: '100%',
   color: theme.palette.text.primary,
+}));
+
+const ChainName = styled(Typography)(() => ({
+  fontWeight: 400,
+  fontSize: '12px',
+  lineHeight: '100%',
+  color: '#999',
 }));
 
 const GrowthIndicator = styled(Stack, {

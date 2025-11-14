@@ -25,7 +25,7 @@ import {
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { formatUnits, parseUnits, erc20Abi, encodeFunctionData } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
-import { getConfig } from '~/config';
+import { allPoolsChainData, getConfig, PoolInfo } from '~/config';
 import { getConstants } from '~/config/constants';
 import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
@@ -38,6 +38,7 @@ import {
   aspClient,
 } from '~/utils';
 import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
+import type { PoolStats } from '~/utils/aspClient';
 import { getBestYieldOpportunity, formatAPY } from '~/utils/poolUtils';
 import { fetchSUSDSAPY } from '~/utils/sUSDSYield';
 import { LinksSection } from '../LinksSection';
@@ -81,36 +82,62 @@ export const DepositForm = () => {
     return true;
   });
 
-  // Fetch TVL data for all pools on the current chain (same as AllPoolsStats)
+  // Fetch pools-stats for ALL chains in a single request (same as AllPoolsStats)
   const aspUrl = getConfig().env.ASP_ENDPOINT;
-  const poolTVLQueries = useQueries({
-    queries: chain.poolInfo.map((pool) => ({
-      queryKey: ['asp_pool_info', chainId, pool.scope.toString(), aspUrl],
-      queryFn: () => aspClient.fetchPoolInfo(aspUrl, chainId, pool.scope.toString()),
-      refetchInterval: 120000,
-      staleTime: 60000,
-      retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
+  const poolStatsQuery = useQueries({
+    queries: [
+      {
+        queryKey: ['asp_pools_stats', 'all', aspUrl],
+        queryFn: () => aspClient.fetchPoolStats(aspUrl, 'all'),
+        refetchInterval: 120000, // 2 minutes
+        staleTime: 60000, // Consider data fresh for 60 seconds
+        retryOnMount: false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+    ],
   });
 
-  // Build a map of TVL by asset (same structure as AllPoolsStats)
-  const tvlByAsset = useMemo(() => {
-    const map = new Map<string, { tvl: bigint; decimals: number; isLoading: boolean }>();
-    poolTVLQueries.forEach((query, index) => {
-      const pool = chain.poolInfo[index];
-      const totalFunds = query.data?.totalInPoolValue ? BigInt(query.data.totalInPoolValue) : BigInt(0);
+  // Build a map of pool stats by chainId and scope for easy lookup
+  const poolStatsMap = useMemo(() => {
+    const map = new Map<string, PoolStats>();
 
-      map.set(pool.asset, {
-        tvl: totalFunds,
-        decimals: pool.assetDecimals || 18,
-        isLoading: query.isLoading,
+    const query = poolStatsQuery[0];
+    if (!query.data?.pools) return map;
+
+    query.data.pools.forEach((poolStats) => {
+      const key = `${poolStats.chainId}-${poolStats.scope}`;
+      map.set(key, poolStats);
+    });
+
+    return map;
+  }, [poolStatsQuery]);
+
+  // Build list of all pools across all chains with their stats
+  const allPools = useMemo(() => {
+    const pools: Array<PoolInfo & { chainName: string; totalFundsUSD?: number }> = [];
+
+    Object.entries(allPoolsChainData).forEach(([cId, chain]) => {
+      chain.poolInfo.forEach((poolInfo: PoolInfo) => {
+        const dataKey = `${cId}-${poolInfo.scope}`;
+        const poolStats = poolStatsMap.get(dataKey);
+
+        // Parse totalInPoolValueUsd from the API
+        const totalFundsUSD = poolStats?.totalInPoolValueUsd
+          ? parseFloat(poolStats.totalInPoolValueUsd.replace(/,/g, ''))
+          : undefined;
+
+        pools.push({
+          ...poolInfo,
+          chainName: chain.name,
+          totalFundsUSD,
+        });
       });
     });
-    return map;
-  }, [poolTVLQueries, chain.poolInfo]);
+
+    return pools;
+  }, [poolStatsMap]);
 
   // Find yield opportunities for current token (only when staking is enabled)
   const yieldOpportunity = isStakingEnabled
@@ -596,12 +623,30 @@ export const DepositForm = () => {
           <TokenSelectorContainer>
             <FormControl>
               <TokenSelect
-                value={selectedPoolInfo?.asset || ''}
+                value={selectedPoolInfo ? `${chainId}-${selectedPoolInfo.asset}` : ''}
                 onChange={(e) => {
-                  const selectedAsset = e.target.value;
-                  // Switch to the selected pool
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  setSelectedAsset(selectedAsset as any);
+                  const selectedValue = String(e.target.value);
+                  // Parse chainId-asset format
+                  const [selectedChainId, selectedAsset] = selectedValue.split('-');
+
+                  // Find the selected pool from allPools
+                  const selectedPool = allPools.find(
+                    (p) => p.chainId === parseInt(selectedChainId) && p.asset === selectedAsset,
+                  );
+
+                  if (selectedPool) {
+                    // If selecting a pool from a different chain, we need to trigger a chain switch
+                    if (selectedPool.chainId !== chainId) {
+                      // Note: Chain switching should be handled by the wallet/user
+                      // For now, we'll just select the asset and let ChainProvider handle the chain
+                      addNotification('info', `Please switch to ${selectedPool.chainName} to deposit to this pool`);
+                    }
+
+                    // Switch to the selected pool asset
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    setSelectedAsset(selectedAsset as any);
+                  }
+
                   // Reset alternative token selection
                   setSelectedAlternativeToken(null);
                   setSelectedToken('native');
@@ -612,67 +657,61 @@ export const DepositForm = () => {
                 MenuProps={{
                   PaperProps: {
                     style: {
-                      minWidth: '288px',
+                      minWidth: '350px',
+                      maxHeight: '400px',
                     },
                   },
                 }}
                 renderValue={(value) => {
-                  const pool = chain.poolInfo.find((p) => p.asset === value);
+                  if (!value) return <Typography>Select Pool</Typography>;
+                  const [cId, asset] = String(value).split('-');
+                  const pool = allPools.find((p) => p.chainId === parseInt(cId) && p.asset === asset);
                   return (
                     <Stack direction='row' alignItems='center' gap='8px'>
                       {pool?.icon ? (
-                        <Image src={pool.icon} alt={String(value)} width={20} height={20} />
+                        <Image src={pool.icon} alt={asset} width={20} height={20} />
                       ) : (
                         <Box width='20px' height='20px' />
                       )}
-                      <Typography>{String(value)}</Typography>
+                      <Typography>{asset}</Typography>
                     </Stack>
                   );
                 }}
               >
-                {chain.poolInfo.map((pool) => {
-                  const poolTVLData = tvlByAsset.get(pool.asset);
-                  const tvlFormatted =
-                    poolTVLData && !poolTVLData.isLoading && poolTVLData.tvl > 0n
-                      ? (() => {
-                          const tvlInToken = Number(formatUnits(poolTVLData.tvl, poolTVLData.decimals));
-                          // Convert to USD using rough price estimates
-                          let priceUSD = 1; // Default for stablecoins
-                          if (
-                            pool.asset === 'ETH' ||
-                            pool.asset === 'WETH' ||
-                            pool.asset === 'wstETH' ||
-                            pool.asset === 'WOETH'
-                          ) {
-                            priceUSD = 2500; // ETH price
-                          } else if (pool.asset === 'wBTC') {
-                            priceUSD = 40000; // BTC price
-                          }
-                          const tvlUSD = tvlInToken * priceUSD;
+                {allPools.map((pool) => {
+                  const isLoading = poolStatsQuery[0].isLoading;
+                  const tvlUSD = pool.totalFundsUSD ?? 0;
 
+                  const tvlFormatted = isLoading
+                    ? '...'
+                    : tvlUSD > 0
+                      ? (() => {
                           if (tvlUSD >= 1000000) {
-                            return `${(tvlUSD / 1000000).toFixed(1)}M`;
+                            return `$${(tvlUSD / 1000000).toFixed(1)}M`;
                           } else if (tvlUSD >= 1000) {
-                            return `${(tvlUSD / 1000).toFixed(1)}K`;
+                            return `$${(tvlUSD / 1000).toFixed(1)}K`;
                           } else {
-                            return tvlUSD.toFixed(0);
+                            return `$${tvlUSD.toFixed(0)}`;
                           }
                         })()
-                      : poolTVLData?.isLoading
-                        ? '...'
-                        : '0';
+                      : '$0';
 
                   return (
-                    <MenuItem key={pool.asset} value={pool.asset}>
-                      <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%' gap='16px'>
-                        <Stack direction='row' alignItems='center' gap='8px'>
+                    <MenuItem key={`${pool.chainId}-${pool.asset}`} value={`${pool.chainId}-${pool.asset}`}>
+                      <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%' gap='12px'>
+                        <Stack direction='row' alignItems='center' gap='8px' flex={1}>
                           {pool.icon && <Image src={pool.icon} alt={pool.asset} width={32} height={32} />}
-                          <Typography fontSize='16px' fontWeight={500}>
-                            {pool.asset}
-                          </Typography>
+                          <Stack direction='column' gap='2px'>
+                            <Typography fontSize='16px' fontWeight={500}>
+                              {pool.asset}
+                            </Typography>
+                            <Typography fontSize='12px' fontWeight={400} color='#999'>
+                              {pool.chainName}
+                            </Typography>
+                          </Stack>
                         </Stack>
                         <Typography fontSize='14px' fontWeight={400} color='#999' whiteSpace='nowrap'>
-                          TVL: {tvlFormatted}
+                          {tvlFormatted}
                         </Typography>
                       </Stack>
                     </MenuItem>

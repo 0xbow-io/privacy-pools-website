@@ -542,7 +542,7 @@ export const WithdrawForm = () => {
         />
 
         {selectedPoolInfo?.isStableAsset &&
-          selectedPoolInfo?.asset !== 'FRXUSD' &&
+          selectedPoolInfo?.asset !== 'frxUSD' &&
           selectedPoolInfo?.asset !== 'WOETH' && (
             <FormControlLabel
               control={

@@ -117,7 +117,7 @@ export const ReviewModal = () => {
         <Stack gap={2} px='1.6rem' width='100%'>
           {actionType === EventType.WITHDRAWAL &&
             selectedPoolInfo?.isStableAsset &&
-            selectedPoolInfo?.asset !== 'FRXUSD' &&
+            selectedPoolInfo?.asset !== 'frxUSD' &&
             selectedPoolInfo?.asset !== 'WOETH' &&
             quoteState.extraGas && (
               <GasTokenDropSection>

@@ -9,7 +9,7 @@ import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { PoolAccountTable, ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { ChainAssets, chainData, getConfig } from '~/config';
+import { allPoolsChainData, ChainAssets, chainData, getConfig } from '~/config';
 import { Section, PAContainer, ActionMenu } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
 import { EventType, ModalType, ReviewStatus } from '~/types';
@@ -18,6 +18,7 @@ import { ROUTER, aspClient } from '~/utils';
 interface PoolOption {
   value: ChainAssets;
   label: string;
+  chainId: number;
   chainName: string;
   icon?: string;
   scope?: string;
@@ -89,10 +90,38 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
   // Calculate stats
   const acceptedFunds = useMemo(() => {
+    // First try to use acceptedDepositsValueUsd from currentPoolStats
+    if (currentPoolStats?.acceptedDepositsValueUsd) {
+      const usdValue = parseFloat(currentPoolStats.acceptedDepositsValueUsd.replace(/,/g, ''));
+      if (usdValue > 0) {
+        return usdValue;
+      }
+    }
+
+    // Fallback to acceptedDepositsValue if USD value is 0 or unavailable
+    if (currentPoolStats?.acceptedDepositsValue) {
+      const tokenAmount = formatUnits(BigInt(currentPoolStats.acceptedDepositsValue), assetDecimals || decimals);
+      // Estimate USD value using rough price estimates
+      let priceUSD = 1; // Default for stablecoins
+      if (symbol === 'ETH' || symbol === 'WETH' || symbol === 'wstETH' || symbol === 'WOETH') {
+        priceUSD = 2500; // ETH price
+      } else if (symbol === 'wBTC') {
+        priceUSD = 40000; // BTC price
+      }
+      return Number(tokenAmount) * priceUSD;
+    }
+
+    // Final fallback to poolData.totalInPoolValue
     if (!poolData?.totalInPoolValue) return 0;
     const totalFunds = formatUnits(BigInt(poolData.totalInPoolValue), assetDecimals || decimals);
-    return Number(totalFunds) * 2500; // Convert to USD
-  }, [poolData, assetDecimals, decimals]);
+    let priceUSD = 1; // Default for stablecoins
+    if (symbol === 'ETH' || symbol === 'WETH' || symbol === 'wstETH' || symbol === 'WOETH') {
+      priceUSD = 2500; // ETH price
+    } else if (symbol === 'wBTC') {
+      priceUSD = 40000; // BTC price
+    }
+    return Number(totalFunds) * priceUSD;
+  }, [currentPoolStats, poolData, assetDecimals, decimals, symbol]);
 
   const pendingFunds = useMemo(() => {
     if (!currentPoolStats?.pendingDepositsValueUsd) return 0;
@@ -452,13 +481,13 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 // Custom Pool Asset Select Component
 const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string }) => {
   const router = useRouter();
-  const { chain, setSelectedAsset } = useChainContext();
+  const { setSelectedAsset } = useChainContext();
   const aspUrl = getConfig().env.ASP_ENDPOINT;
 
-  // Fetch pool stats to get popularity data
+  // Fetch pool stats for ALL chains (same as AllPoolsStats)
   const { data: poolStatsData } = useQuery({
-    queryKey: ['pool_stats_selector', chainId, aspUrl],
-    queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
+    queryKey: ['pool_stats_selector', 'all', aspUrl],
+    queryFn: () => aspClient.fetchPoolStats(aspUrl, 'all'),
     refetchInterval: 120000,
     staleTime: 60000,
     refetchOnMount: false,
@@ -466,52 +495,81 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
     refetchOnReconnect: false,
   });
 
-  // Get all available pools for this chain
-  const baseOptions: PoolOption[] = chain?.poolInfo
-    ? chain.poolInfo.map((pool) => ({
-        value: pool.asset as ChainAssets,
-        label: pool.asset,
-        chainName: chainData[chainId]?.name || 'Unknown',
-        icon: pool.icon,
-        scope: pool.scope.toString(),
-      }))
-    : [];
+  // Get all available pools from ALL chains
+  const baseOptions: PoolOption[] = useMemo(() => {
+    const options: PoolOption[] = [];
 
-  // Sort pools by popularity (totalInPoolValueUsd) with priority assets first
+    Object.entries(allPoolsChainData).forEach(([cId, chainInfo]) => {
+      chainInfo.poolInfo.forEach((pool) => {
+        options.push({
+          value: pool.asset as ChainAssets,
+          label: pool.asset,
+          chainId: parseInt(cId),
+          chainName: chainInfo.name,
+          icon: pool.icon,
+          scope: pool.scope.toString(),
+        });
+      });
+    });
+
+    return options;
+  }, []);
+
+  // Sort pools by popularity (totalInPoolValueUsd) with priority pools first
   const availableOptions = useMemo(() => {
     if (!poolStatsData?.pools) return baseOptions;
 
-    // TEMPORARY: Priority assets for Frax announcement (easy to remove)
-    const PRIORITY_ASSETS = ['ETH', 'FRXUSD', 'USDC'];
+    // TEMPORARY: Priority pools for Frax announcement (chain-specific)
+    const PRIORITY_POOLS: Array<{ chainId: number; asset: string }> = []; /*[
+      { chainId: 1, asset: 'ETH' },     // Ethereum mainnet ETH
+      { chainId: 1, asset: 'FRXUSD' },  // Ethereum mainnet frxUSD
+      { chainId: 1, asset: 'USDC' },    // Ethereum mainnet USDC
+    ];*/
 
     return [...baseOptions].sort((a, b) => {
-      // Check if assets are in priority list
-      const aIsPriority = PRIORITY_ASSETS.includes(a.value.toUpperCase());
-      const bIsPriority = PRIORITY_ASSETS.includes(b.value.toUpperCase());
+      // Check if pools are in priority list (chain-specific)
+      const aIsPriority = PRIORITY_POOLS.some(
+        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.value.toUpperCase(),
+      );
+      const bIsPriority = PRIORITY_POOLS.some(
+        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.value.toUpperCase(),
+      );
 
-      // If both are priority or both are not, sort by priority order or popularity
+      const aPriorityIndex = PRIORITY_POOLS.findIndex(
+        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.value.toUpperCase(),
+      );
+      const bPriorityIndex = PRIORITY_POOLS.findIndex(
+        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.value.toUpperCase(),
+      );
+
+      // Priority pools come first, sorted by their priority order
       if (aIsPriority && bIsPriority) {
-        return PRIORITY_ASSETS.indexOf(a.value.toUpperCase()) - PRIORITY_ASSETS.indexOf(b.value.toUpperCase());
+        return aPriorityIndex - bPriorityIndex;
       }
       if (aIsPriority) return -1;
       if (bIsPriority) return 1;
 
-      // Sort by totalInPoolValueUsd (most popular)
+      // Sort by totalInPoolValueUsd (most popular) for non-priority pools
       if (!poolStatsData.pools) return 0;
-      const aStats = poolStatsData.pools.find((p) => p.scope === a.scope);
-      const bStats = poolStatsData.pools.find((p) => p.scope === b.scope);
-      const aFunds = Number(aStats?.totalInPoolValueUsd || 0);
-      const bFunds = Number(bStats?.totalInPoolValueUsd || 0);
+      // Use chainId-scope as key to find the right pool stats
+      const aKey = `${a.chainId}-${a.scope}`;
+      const bKey = `${b.chainId}-${b.scope}`;
+      const aStats = poolStatsData.pools.find((p) => `${p.chainId}-${p.scope}` === aKey);
+      const bStats = poolStatsData.pools.find((p) => `${p.chainId}-${p.scope}` === bKey);
+      const aFunds = aStats?.totalInPoolValueUsd ? parseFloat(aStats.totalInPoolValueUsd.replace(/,/g, '')) : 0;
+      const bFunds = bStats?.totalInPoolValueUsd ? parseFloat(bStats.totalInPoolValueUsd.replace(/,/g, '')) : 0;
       return bFunds - aFunds;
     });
   }, [baseOptions, poolStatsData]);
 
-  const selectedOption = availableOptions.find((opt) => opt.value.toLowerCase() === poolId.toLowerCase());
+  const selectedOption = availableOptions.find(
+    (opt) => opt.value.toLowerCase() === poolId.toLowerCase() && opt.chainId === chainId,
+  );
 
   const handleChange = (_event: React.SyntheticEvent, newValue: PoolOption | null) => {
     if (newValue) {
       setSelectedAsset(newValue.value);
-      router.push(`/pools/${chainId}/${newValue.value.toLowerCase()}`);
+      router.push(`/pools/${newValue.chainId}/${newValue.value.toLowerCase()}`);
     }
   };
 
@@ -559,7 +617,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
         },
       }}
       renderOption={(props, option) => (
-        <li {...props} key={option.value}>
+        <li {...props} key={`${option.chainId}-${option.value}`}>
           <PoolOptionContent>
             {option.icon && (
               <PoolIconWrapper>
