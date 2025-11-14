@@ -41,9 +41,9 @@ export const useAdvancedView = () => {
   const orderedPersonalActivity = useMemo(
     () =>
       historyData
-        .filter((account) => account.scope === selectedPoolInfo.scope)
+        .filter((account) => account.scope === selectedPoolInfo.scope && account.chainId === chainId)
         .sort((a, b) => b.timestamp - a.timestamp),
-    [historyData, selectedPoolInfo.scope],
+    [historyData, selectedPoolInfo.scope, chainId],
   );
 
   // Filter pool accounts based on hideEmptyPools setting
@@ -53,13 +53,13 @@ export const useAdvancedView = () => {
       : poolAccounts;
   }, [poolAccounts, hideEmptyPools, decimals]);
 
-  // Ordered pool accounts from newest to oldest and filter by selectedPoolInfo.scope
+  // Ordered pool accounts from newest to oldest and filter by selectedPoolInfo.scope and chainId
   const orderedPoolAccounts = useMemo(
     () =>
       [...filteredPoolAccounts]
-        .filter((account) => account.scope === selectedPoolInfo.scope)
+        .filter((account) => account.scope === selectedPoolInfo.scope && account.chainId === chainId)
         .sort((a, b) => Number(b.deposit.timestamp || 0) - Number(a.deposit.timestamp || 0)),
-    [filteredPoolAccounts, selectedPoolInfo.scope],
+    [filteredPoolAccounts, selectedPoolInfo.scope, chainId],
   );
 
   const fullPoolAccounts = useMemo(() => orderedPoolAccounts, [orderedPoolAccounts]);

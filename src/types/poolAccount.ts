@@ -26,4 +26,5 @@ export type HistoryData = {
   reviewStatus: ReviewStatus;
   label: bigint;
   scope: Hash;
+  chainId: number;
 }[];

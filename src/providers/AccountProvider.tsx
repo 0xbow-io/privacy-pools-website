@@ -305,6 +305,7 @@ export const AccountProvider = ({ children }: Props) => {
         timestamp: Number(pa.deposit.timestamp),
         label: pa.label,
         scope: pa.scope,
+        chainId: pa.chainId,
       });
 
       for (const [idx, child] of pa.children.entries()) {
@@ -316,11 +317,12 @@ export const AccountProvider = ({ children }: Props) => {
           timestamp: Number(child.timestamp),
           label: child.label,
           scope: pa.scope,
+          chainId: pa.chainId,
         });
       }
     }
 
-    for (const { ragequit, scope } of poolAccounts) {
+    for (const { ragequit, scope, chainId } of poolAccounts) {
       if (!ragequit?.transactionHash) continue;
       history.push({
         type: EventType.EXIT,
@@ -330,6 +332,7 @@ export const AccountProvider = ({ children }: Props) => {
         timestamp: Number(ragequit?.timestamp),
         label: ragequit?.label,
         scope: scope,
+        chainId: chainId,
       });
     }
 
