@@ -33,7 +33,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const { push } = useRouter();
   const { address } = useAccount();
   const aspUrl = getConfig().env.ASP_ENDPOINT;
-  const { setChainId, setSelectedAsset } = useChainContext();
+  const { setChainId, setSelectedAsset, price } = useChainContext();
   const {
     balanceBN: { symbol, decimals },
     selectedPoolInfo: { assetDecimals },
@@ -131,8 +131,9 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const myFunds = useMemo(() => {
     if (!isLogged) return 0;
     const amount = formatUnits(amountPoolAsset, assetDecimals || decimals);
-    return Number(amount) * 2500; // Convert to USD
-  }, [isLogged, amountPoolAsset, assetDecimals, decimals]);
+    // Use Alchemy price from ChainContext, fallback to 0 if not available
+    return Number(amount) * (price || 0);
+  }, [isLogged, amountPoolAsset, assetDecimals, decimals, price]);
 
   const myFundsToken = useMemo(() => {
     if (!isLogged) return '0';
