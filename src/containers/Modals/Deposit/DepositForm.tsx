@@ -136,7 +136,42 @@ export const DepositForm = () => {
       });
     });
 
-    return pools;
+    // Sort by priority first, then by totalFundsUSD descending (most popular first)
+    // TEMPORARY: Priority pools for Frax announcement (chain-specific)
+    const PRIORITY_POOLS: Array<{ chainId: number; asset: string }> = [
+      { chainId: 1, asset: 'ETH' }, // Ethereum mainnet ETH
+      { chainId: 1, asset: 'FRXUSD' }, // Ethereum mainnet frxUSD
+      { chainId: 1, asset: 'USDC' }, // Ethereum mainnet USDC
+    ];
+
+    return pools.sort((a, b) => {
+      // Check if pools are in priority list (chain-specific)
+      const aIsPriority = PRIORITY_POOLS.some(
+        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.asset.toUpperCase(),
+      );
+      const bIsPriority = PRIORITY_POOLS.some(
+        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.asset.toUpperCase(),
+      );
+
+      const aPriorityIndex = PRIORITY_POOLS.findIndex(
+        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.asset.toUpperCase(),
+      );
+      const bPriorityIndex = PRIORITY_POOLS.findIndex(
+        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.asset.toUpperCase(),
+      );
+
+      // Priority pools come first, sorted by their priority order
+      if (aIsPriority && bIsPriority) {
+        return aPriorityIndex - bPriorityIndex;
+      }
+      if (aIsPriority) return -1;
+      if (bIsPriority) return 1;
+
+      // Sort by totalFundsUSD for non-priority pools
+      const aFundsUSD = a.totalFundsUSD ?? 0;
+      const bFundsUSD = b.totalFundsUSD ?? 0;
+      return bFundsUSD - aFundsUSD;
+    });
   }, [poolStatsMap]);
 
   // Find yield opportunities for current token (only when staking is enabled)
@@ -659,6 +694,30 @@ export const DepositForm = () => {
                     style: {
                       minWidth: '350px',
                       maxHeight: '400px',
+                      overflow: 'hidden',
+                    },
+                    sx: {
+                      '& .MuiList-root': {
+                        padding: 0,
+                        maxHeight: '400px',
+                        overflowY: 'auto',
+                      },
+                      '& .MuiMenuItem-root': {
+                        paddingLeft: '16px',
+                        paddingRight: '16px',
+                        paddingTop: '12px',
+                        paddingBottom: '12px',
+                        position: 'relative',
+                        '&:not(:last-child)::after': {
+                          content: '""',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: '16px',
+                          right: '16px',
+                          height: '1px',
+                          backgroundColor: '#D9D9D9',
+                        },
+                      },
                     },
                   },
                 }}

@@ -756,9 +756,17 @@ const PoolSelectAutocomplete = styled(Autocomplete<PoolOption, false, true, fals
     marginLeft: '0px',
   },
   '& .MuiAutocomplete-popupIndicator': {
-    border: 'none',
+    border: '1px solid transparent',
     padding: '4px',
     marginRight: '0',
+    backgroundColor: 'transparent',
+    '&:hover': {
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+      border: '1px solid transparent',
+    },
+    '&:focus': {
+      border: '1px solid transparent',
+    },
   },
   [theme.breakpoints.down('sm')]: {
     maxWidth: '250px',
