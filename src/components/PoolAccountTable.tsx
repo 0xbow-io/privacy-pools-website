@@ -87,6 +87,7 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
       reviewStatus: poolAccount.reviewStatus,
       label: poolAccount.label,
       scope: poolAccount.scope,
+      chainId: poolAccount.chainId,
     });
     setPoolAccount(foundAccount);
     setModalOpen(ModalType.PA_DETAILS);

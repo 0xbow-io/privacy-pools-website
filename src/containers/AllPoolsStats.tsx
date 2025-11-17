@@ -39,6 +39,7 @@ export interface PoolCardData {
   decimals: number;
   acceptedDepositsCount: number;
   depositVarianceScore: number; // 0-1, where 1 is best (low variance)
+  originalKey?: string; // Optional: the original key from poolAccountsByChainScope for lookups
 }
 
 export interface PrivacyScoreBar {

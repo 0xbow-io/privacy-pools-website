@@ -19,7 +19,7 @@ export const UserPoolsStats = () => {
 
   // Get unique pool combinations from user's pool accounts (across all chains/scopes)
   const userPoolsToQuery = useMemo(() => {
-    const uniquePools = new Map<string, { chainId: number; scope: string; poolInfo: PoolInfo }>();
+    const uniquePools = new Map<string, { chainId: number; scope: string; poolInfo: PoolInfo; originalKey: string }>();
 
     // Iterate through all cached pool accounts from all chains/scopes
     for (const [key, poolAccounts] of Object.entries(poolAccountsByChainScope)) {
@@ -38,6 +38,7 @@ export const UserPoolsStats = () => {
           chainId: firstAccount.chainId,
           scope: firstAccount.scope.toString(),
           poolInfo,
+          originalKey: key, // Store the original key to use for lookups
         });
       }
     }
@@ -138,6 +139,7 @@ export const UserPoolsStats = () => {
         growthPercentage: poolData?.growth24h ?? undefined,
         acceptedDepositsCount: poolData?.acceptedDepositsCount || 0,
         depositVarianceScore: calculateDepositVarianceScore(poolData),
+        originalKey: poolToQuery.originalKey, // Store the original key for accurate lookups
       });
     });
 
@@ -173,7 +175,8 @@ const PoolCard = ({
   const router = useRouter();
   const { poolAccountsByChainScope } = useAccountContext();
 
-  const dataKey = `${pool.chainId}-${pool.scope}`;
+  // Use the originalKey if available, otherwise fallback to constructing the key
+  const dataKey = pool.originalKey || `${pool.chainId}-${pool.scope}`;
   const poolAccounts = poolAccountsByChainScope[dataKey] || [];
 
   // Calculate my balance (sum of all balances for this pool)
@@ -210,7 +213,10 @@ const PoolCard = ({
               <Image src={pool.icon} alt={pool.asset} width={24} height={24} />
             </IconWrapper>
           )}
-          <PoolName variant='body1'>{pool.asset} Pool</PoolName>
+          <Stack direction='column' gap='2px'>
+            <PoolName variant='body1'>{pool.asset} Pool</PoolName>
+            <ChainName variant='caption'>{pool.chainName}</ChainName>
+          </Stack>
         </Stack>
       </PoolHeader>
 
@@ -316,6 +322,13 @@ const PoolName = styled(Typography)(({ theme }) => ({
   fontSize: '16px',
   lineHeight: '100%',
   color: theme.palette.text.primary,
+}));
+
+const ChainName = styled(Typography)(() => ({
+  fontWeight: 400,
+  fontSize: '12px',
+  lineHeight: '100%',
+  color: '#999',
 }));
 
 const StatsRow = styled(Box)(() => ({

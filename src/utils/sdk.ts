@@ -294,11 +294,13 @@ export const getPoolAccountsFromAccount = async (account: PrivacyPoolAccount, ch
 
   const poolAccountsByChainScope = poolAccounts.reduce(
     (acc, curr) => {
-      acc[`${curr.chainId}-${curr.scope}`] = [...(acc[`${curr.chainId}-${curr.scope}`] || []), curr];
+      const key = `${curr.chainId}-${curr.scope}`;
+      acc[key] = [...(acc[key] || []), curr];
       return acc;
     },
     {} as Record<string, PoolAccount[]>,
   );
+
   const poolAccountsByCurrentChain = poolAccounts.filter((pa) => pa.chainId === chainId);
 
   return { poolAccounts: poolAccountsByCurrentChain, poolAccountsByChainScope };

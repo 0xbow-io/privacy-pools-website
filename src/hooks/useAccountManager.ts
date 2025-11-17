@@ -36,10 +36,19 @@ export function useAccountManager(
       _accountService.account,
       chainId,
     );
-    setPoolAccounts(poolAccounts);
-    setPoolAccountsByChainScope(poolAccountsByChainScope);
 
-    return poolAccounts;
+    // Deep clone to prevent mutation issues
+    const clonedPoolAccountsByChainScope: Record<string, PoolAccount[]> = {};
+    for (const [key, accounts] of Object.entries(poolAccountsByChainScope)) {
+      clonedPoolAccountsByChainScope[key] = accounts.map((pa) => ({ ...pa }));
+    }
+
+    const clonedPoolAccounts = poolAccounts.map((pa) => ({ ...pa }));
+
+    setPoolAccounts(clonedPoolAccounts);
+    setPoolAccountsByChainScope(clonedPoolAccountsByChainScope);
+
+    return clonedPoolAccounts;
   };
 
   return { loadAccount, createAccount };
