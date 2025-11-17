@@ -7,7 +7,7 @@ import { useQueries } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { SafeAppWrapper } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { chainData, getConfig, PoolInfo } from '~/config';
+import { chainData, PoolInfo } from '~/config';
 import { AllPoolsStats, PAContainer, Section } from '~/containers';
 import { aspClient } from '~/utils';
 
@@ -20,8 +20,6 @@ interface PoolDistributionItem {
 }
 
 export const StatsPage = () => {
-  const aspUrl = getConfig().env.ASP_ENDPOINT;
-
   // Build list of all pools to query
   const allPoolsToQuery = useMemo(() => {
     const pools: Array<{ chainId: number; scope: string; aspUrl: string; poolInfo: PoolInfo }> = [];
@@ -30,13 +28,13 @@ export const StatsPage = () => {
         pools.push({
           chainId: parseInt(cId),
           scope: poolInfo.scope.toString(),
-          aspUrl,
+          aspUrl: chain.aspUrl, // Get aspUrl from chain data
           poolInfo,
         });
       });
     });
     return pools;
-  }, [aspUrl]);
+  }, []);
 
   // Get unique chain IDs for fetching pools-stats
   const uniqueChainIds = useMemo(() => {
@@ -59,16 +57,19 @@ export const StatsPage = () => {
 
   // Fetch pools-stats for each chain to get growth24h data
   const poolStatsQueries = useQueries({
-    queries: uniqueChainIds.map((chainId) => ({
-      queryKey: ['stats_pools_stats', chainId, aspUrl],
-      queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
-      refetchInterval: 120000,
-      staleTime: 60000,
-      retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
+    queries: uniqueChainIds.map((chainId) => {
+      const aspUrl = chainData[chainId]?.aspUrl;
+      return {
+        queryKey: ['stats_pools_stats', chainId, aspUrl],
+        queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
+        refetchInterval: 120000,
+        staleTime: 60000,
+        retryOnMount: false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      };
+    }),
   });
 
   // Calculate total accepted and declined funds, and overall growth

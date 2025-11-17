@@ -7,14 +7,13 @@ import { Box, Grid, Stack, styled, Typography } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { chainData, getConfig, PoolInfo } from '~/config';
+import { chainData, PoolInfo } from '~/config';
 import { useAccountContext } from '~/hooks';
 import { ReviewStatus, type PoolResponse } from '~/types';
 import { aspClient } from '~/utils';
 import { calculateDepositVarianceScore, PoolCardData } from './AllPoolsStats';
 
 export const UserPoolsStats = () => {
-  const aspUrl = getConfig().env.ASP_ENDPOINT;
   const { poolAccountsByChainScope } = useAccountContext();
 
   // Get unique pool combinations from user's pool accounts (across all chains/scopes)
@@ -43,11 +42,14 @@ export const UserPoolsStats = () => {
       }
     }
 
-    return Array.from(uniquePools.values()).map((pool) => ({
-      ...pool,
-      aspUrl,
-    }));
-  }, [poolAccountsByChainScope, aspUrl]);
+    return Array.from(uniquePools.values()).map((pool) => {
+      const chain = chainData[pool.chainId];
+      return {
+        ...pool,
+        aspUrl: chain.aspUrl,
+      };
+    });
+  }, [poolAccountsByChainScope]);
 
   // Get unique chain IDs for fetching pools-stats
   const uniqueChainIds = useMemo(() => {
@@ -70,16 +72,19 @@ export const UserPoolsStats = () => {
 
   // Fetch pools-stats for each chain to get growth24h data
   const poolStatsQueries = useQueries({
-    queries: uniqueChainIds.map((chainId) => ({
-      queryKey: ['user_pools_stats', chainId, aspUrl],
-      queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
-      refetchInterval: 120000,
-      staleTime: 60000,
-      retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
+    queries: uniqueChainIds.map((chainId) => {
+      const aspUrl = chainData[chainId].aspUrl;
+      return {
+        queryKey: ['user_pools_stats', chainId, aspUrl],
+        queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
+        refetchInterval: 120000,
+        staleTime: 60000,
+        retryOnMount: false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      };
+    }),
   });
 
   // Build a map of pool data by chainId and scope for easy lookup

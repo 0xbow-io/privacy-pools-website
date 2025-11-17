@@ -24,7 +24,7 @@ import {
 import { useQueries } from '@tanstack/react-query';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useEnsAddress, useEnsAvatar, useEnsName } from 'wagmi';
-import { chainData, getConfig } from '~/config';
+import { chainData } from '~/config';
 import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
@@ -57,8 +57,8 @@ export const WithdrawForm = () => {
   const { poolAccounts } = useAccountContext();
   const { setExtraGas } = useQuoteContext();
 
-  const aspUrl = getConfig().env.ASP_ENDPOINT;
   const chain = chainData[chainId];
+  const aspUrl = chain.aspUrl;
 
   // Fetch TVL for all pools
   const poolTVLQueries = useQueries({

@@ -1,6 +1,6 @@
 import { Address, parseEther, parseUnits } from 'viem';
 import { Chain, mainnet, optimismSepolia, sepolia } from 'viem/chains';
-import { getEnv } from '~/config/env';
+import { getAspEndpointForChain, getEnv } from '~/config/env';
 import { sUSDSAbi } from '~/config/sUSDSAbi';
 import { woethAbi } from '~/config/woethAbi';
 import daiIcon from '~/assets/icons/dai.svg';
@@ -17,7 +17,7 @@ import wbtcIcon from '~/assets/icons/wbtc.svg';
 import woethIcon from '~/assets/icons/woeth.svg';
 import wstethIcon from '~/assets/icons/wsteth.svg';
 
-const { ALCHEMY_KEY, IS_TESTNET, SHOW_TEST_CHAINS, ASP_ENDPOINT } = getEnv();
+const { ALCHEMY_KEY, IS_TESTNET, SHOW_TEST_CHAINS } = getEnv();
 
 // Add chains to the whitelist to be used in the app
 const mainnetChains: readonly [Chain, ...Chain[]] = [mainnet];
@@ -108,7 +108,7 @@ const mainnetChainData: ChainData = {
     relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-    aspUrl: ASP_ENDPOINT,
+    aspUrl: getAspEndpointForChain(mainnet.id),
     poolInfo: [
       {
         chainId: mainnet.id,
@@ -325,7 +325,7 @@ const testnetChainData: ChainData = {
     explorerUrl: sepolia.blockExplorers.default.url,
     sdkRpcUrl: `/api/hypersync-rpc?chainId=11155111`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-    aspUrl: ASP_ENDPOINT,
+    aspUrl: getAspEndpointForChain(sepolia.id),
     relayers: [
       { name: 'Testnet Relay', url: 'https://testnet-relayer.privacypools.com' },
       { name: 'Freedom Relay', url: 'https://fastrelay.xyz' },
@@ -381,7 +381,7 @@ const testnetChainData: ChainData = {
     explorerUrl: optimismSepolia.blockExplorers.default.url,
     sdkRpcUrl: `/api/hypersync-rpc?chainId=11155420`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://opt-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-    aspUrl: ASP_ENDPOINT,
+    aspUrl: getAspEndpointForChain(optimismSepolia.id),
     relayers: [
       { name: 'Testnet Relay', url: 'https://testnet-relayer.privacypools.com' },
       // { name: 'Freedom Relay', url: 'https://fastrelay.xyz' },

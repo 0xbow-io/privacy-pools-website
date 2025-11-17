@@ -295,14 +295,26 @@ export const AllPoolsStats = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('most-popular');
   const [sortSelectOpen, setSortSelectOpen] = useState(false);
-  const aspUrl = getConfig().env.ASP_ENDPOINT;
 
-  // Fetch pools-stats for ALL chains in a single request
+  // Get ASP endpoints for test and non-test chains
+  const { ASP_ENDPOINT_TEST, ASP_ENDPOINT_NON_TEST } = getConfig().env;
+
+  // Fetch pools-stats from both ASP endpoints (test and non-test)
   const poolStatsQuery = useQueries({
     queries: [
       {
-        queryKey: ['asp_pools_stats', 'all', aspUrl],
-        queryFn: () => aspClient.fetchPoolStats(aspUrl, 'all'),
+        queryKey: ['asp_pools_stats', 'test', ASP_ENDPOINT_TEST],
+        queryFn: () => aspClient.fetchPoolStats(ASP_ENDPOINT_TEST, 'all'),
+        refetchInterval: 120000, // 2 minutes
+        staleTime: 60000, // Consider data fresh for 60 seconds
+        retryOnMount: false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+      {
+        queryKey: ['asp_pools_stats', 'non_test', ASP_ENDPOINT_NON_TEST],
+        queryFn: () => aspClient.fetchPoolStats(ASP_ENDPOINT_NON_TEST, 'all'),
         refetchInterval: 120000, // 2 minutes
         staleTime: 60000, // Consider data fresh for 60 seconds
         retryOnMount: false,
@@ -317,12 +329,14 @@ export const AllPoolsStats = () => {
   const poolStatsMap = useMemo(() => {
     const map = new Map<string, PoolStats>();
 
-    const query = poolStatsQuery[0];
-    if (!query.data?.pools) return map;
+    // Merge pools from both test and non-test queries
+    poolStatsQuery.forEach((query) => {
+      if (!query.data?.pools) return;
 
-    query.data.pools.forEach((poolStats) => {
-      const key = `${poolStats.chainId}-${poolStats.scope}`;
-      map.set(key, poolStats);
+      query.data.pools.forEach((poolStats) => {
+        const key = `${poolStats.chainId}-${poolStats.scope}`;
+        map.set(key, poolStats);
+      });
     });
 
     return map;

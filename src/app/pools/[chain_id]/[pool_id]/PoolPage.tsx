@@ -9,7 +9,7 @@ import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { PoolAccountTable, ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { allPoolsChainData, ChainAssets, chainData, getConfig, PoolInfo } from '~/config';
+import { allPoolsChainData, ChainAssets, chainData, PoolInfo } from '~/config';
 import { Section, PAContainer, ActionMenu } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
 import { EventType, ModalType, ReviewStatus } from '~/types';
@@ -32,7 +32,6 @@ interface PoolPageProps {
 export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const { push } = useRouter();
   const { address } = useAccount();
-  const aspUrl = getConfig().env.ASP_ENDPOINT;
   const { setChainId, setSelectedAsset, price } = useChainContext();
   const {
     balanceBN: { symbol, decimals },
@@ -59,10 +58,13 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     return matchedPool?.scope.toString();
   }, [poolId, chain]);
 
+  // Get the ASP URL for this chain
+  const aspUrl = chainData[parsedChainId]?.aspUrl;
+
   const { data: poolData } = useQuery({
     queryKey: ['pool_info', parsedChainId, poolScope, aspUrl],
     queryFn: () => aspClient.fetchPoolInfo(aspUrl, parsedChainId, poolScope || ''),
-    enabled: !!poolScope,
+    enabled: !!poolScope && !!aspUrl,
     refetchInterval: 120000, // Increased to 2 minutes
     staleTime: 60000, // Consider data fresh for 60 seconds
     refetchOnMount: false,
@@ -74,7 +76,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const { data: poolStatsData } = useQuery({
     queryKey: ['pool_stats', parsedChainId, aspUrl],
     queryFn: () => aspClient.fetchPoolStats(aspUrl, parsedChainId),
-    enabled: !!poolScope,
+    enabled: !!poolScope && !!aspUrl,
     refetchInterval: 120000,
     staleTime: 60000,
     refetchOnMount: false,
@@ -486,12 +488,15 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string }) => {
   const router = useRouter();
   const { setSelectedAsset } = useChainContext();
-  const aspUrl = getConfig().env.ASP_ENDPOINT;
 
-  // Fetch pool stats for ALL chains (same as AllPoolsStats)
+  // Get the ASP URL for this specific chain
+  const aspUrl = chainData[chainId]?.aspUrl;
+
+  // Fetch pool stats for this chain
   const { data: poolStatsData } = useQuery({
-    queryKey: ['pool_stats_selector', 'all', aspUrl],
-    queryFn: () => aspClient.fetchPoolStats(aspUrl, 'all'),
+    queryKey: ['pool_stats_selector', chainId, aspUrl],
+    queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
+    enabled: !!aspUrl,
     refetchInterval: 120000,
     staleTime: 60000,
     refetchOnMount: false,
