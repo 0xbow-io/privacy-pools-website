@@ -9,6 +9,7 @@ export const ValueSection = () => {
   const { poolAccounts } = useAccountContext();
   const {
     balanceBN: { symbol, decimals },
+    price,
   } = useChainContext();
 
   const paText = actionType === EventType.DEPOSIT ? 'To pool account' : 'From pool account';
@@ -26,6 +27,14 @@ export const ValueSection = () => {
     const pa = poolAccounts.find((pa) => pa.label === poolAccount?.label);
     return formatUnits(pa?.balance ?? BigInt(0), decimals);
   }, [poolAccount, poolAccounts, decimals]);
+
+  // Calculate USD value and determine estimated period
+  const { estimatedPeriod } = useMemo(() => {
+    const amountNum = parseFloat(formattedTotalAmount);
+    const usdVal = amountNum * price;
+    const period = usdVal < 10000 ? 'approx 1 hour' : 'Up to 7 days';
+    return { usdValue: usdVal, estimatedPeriod: period };
+  }, [formattedTotalAmount, price]);
 
   return (
     <Container>
@@ -55,7 +64,7 @@ export const ValueSection = () => {
           <Text variant='body2'>
             The ASP will validate that the funds are coming from a good actor (not a flagged account).
           </Text>
-          <Strong>Estimated period: Up to 7 days.</Strong>
+          <Strong>Estimated period: {estimatedPeriod}.</Strong>
         </>
       )}
     </Container>
