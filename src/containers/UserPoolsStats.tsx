@@ -6,15 +6,17 @@ import { useRouter } from 'next/navigation';
 import { Box, Grid, Stack, styled, Typography } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
+import { usePublicClient } from 'wagmi';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { chainData, PoolInfo } from '~/config';
 import { useAccountContext } from '~/hooks';
 import { ReviewStatus, type PoolResponse } from '~/types';
-import { aspClient } from '~/utils';
+import { aspClient, fetchTokenPrice } from '~/utils';
 import { calculateDepositVarianceScore, PoolCardData } from './AllPoolsStats';
 
 export const UserPoolsStats = () => {
   const { poolAccountsByChainScope } = useAccountContext();
+  const publicClient = usePublicClient();
 
   // Get unique pool combinations from user's pool accounts (across all chains/scopes)
   const userPoolsToQuery = useMemo(() => {
@@ -86,6 +88,43 @@ export const UserPoolsStats = () => {
       };
     }),
   });
+
+  // Get unique assets to fetch prices for
+  const uniqueAssets = useMemo(() => {
+    const assets = new Map<string, PoolInfo>();
+    userPoolsToQuery.forEach((pool) => {
+      if (!assets.has(pool.poolInfo.asset)) {
+        assets.set(pool.poolInfo.asset, pool.poolInfo);
+      }
+    });
+    return Array.from(assets.entries());
+  }, [userPoolsToQuery]);
+
+  // Fetch token prices for each unique asset
+  const priceQueries = useQueries({
+    queries: uniqueAssets.map(([asset, poolInfo]) => ({
+      queryKey: ['token_price', asset],
+      queryFn: () => fetchTokenPrice(asset, poolInfo, publicClient),
+      refetchInterval: 120000,
+      staleTime: 60000,
+      retryOnMount: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    })),
+  });
+
+  // Build a map of asset prices
+  const priceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    priceQueries.forEach((query, index) => {
+      const asset = uniqueAssets[index][0];
+      if (query.data !== undefined) {
+        map.set(asset, query.data);
+      }
+    });
+    return map;
+  }, [priceQueries, uniqueAssets]);
 
   // Build a map of pool data by chainId and scope for easy lookup
   const poolDataMap = useMemo(() => {
@@ -160,7 +199,12 @@ export const UserPoolsStats = () => {
       <PoolsGrid container spacing={0}>
         {userPools.map((pool, index) => (
           <Grid item xs={12} sm={userPools.length === 1 ? 12 : 6} key={`${pool.chainId}-${pool.scope}-${index}`}>
-            <PoolCard pool={pool} isLeftColumn={index % 2 === 0} isFirstRow={index < 2} />
+            <PoolCard
+              pool={pool}
+              isLeftColumn={index % 2 === 0}
+              isFirstRow={index < 2}
+              price={priceMap.get(pool.asset) ?? 0}
+            />
           </Grid>
         ))}
       </PoolsGrid>
@@ -172,10 +216,12 @@ const PoolCard = ({
   pool,
   isLeftColumn,
   isFirstRow,
+  price,
 }: {
   pool: PoolCardData;
   isLeftColumn: boolean;
   isFirstRow: boolean;
+  price: number;
 }) => {
   const router = useRouter();
   const { poolAccountsByChainScope } = useAccountContext();
@@ -187,6 +233,8 @@ const PoolCard = ({
   // Calculate my balance (sum of all balances for this pool)
   const myBalance = poolAccounts.reduce((sum, pa) => sum + BigInt(pa.balance || 0), BigInt(0));
   const myBalanceFormatted = formatUnits(myBalance, pool.decimals);
+  const myBalanceTokenAmount = Number(myBalanceFormatted);
+  const myBalanceUsd = myBalanceTokenAmount * price;
 
   // Calculate pending (sum of balances where reviewStatus is PENDING)
   const pending = poolAccounts.reduce(
@@ -194,16 +242,19 @@ const PoolCard = ({
     BigInt(0),
   );
   const pendingFormatted = formatUnits(pending, pool.decimals);
+  const pendingTokenAmount = Number(pendingFormatted);
+  const pendingUsd = pendingTokenAmount * price;
 
   // My Accounts count
   const myAccountsCount = poolAccounts.length;
 
   // Total Funds in Pool
   const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
+  const totalFundsTokenAmount = Number(totalFundsFormatted);
+  const totalFundsUsd = totalFundsTokenAmount * price;
 
-  // Calculate Average Deposit Size
-  const averageDepositSize =
-    pool.acceptedDepositsCount > 0 ? Number(totalFundsFormatted) / pool.acceptedDepositsCount : 0;
+  // Calculate Average Deposit Size (in USD)
+  const averageDepositSizeUsd = pool.acceptedDepositsCount > 0 ? totalFundsUsd / pool.acceptedDepositsCount : 0;
 
   const handleClick = () => {
     router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
@@ -229,13 +280,26 @@ const PoolCard = ({
         <StatColumn>
           <StatLabel>My balance</StatLabel>
           <Stack direction='row' alignItems='center' gap='4px'>
-            <BalanceValue>${Number(myBalanceFormatted).toLocaleString()}</BalanceValue>
-            <InfoTooltip message='Your total balance in this pool' iconWidth={16} iconHeight={16} />
+            <BalanceValue>${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</BalanceValue>
+            <InfoTooltip
+              message={`${myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset}`}
+              iconWidth={16}
+              iconHeight={16}
+            />
           </Stack>
         </StatColumn>
         <StatColumn align='right'>
           <StatLabel>Pending</StatLabel>
-          <PendingValue>${Number(pendingFormatted).toLocaleString()}</PendingValue>
+          <Stack direction='row' alignItems='center' gap='4px'>
+            <PendingValue>${pendingUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</PendingValue>
+            {pendingTokenAmount > 0 && (
+              <InfoTooltip
+                message={`${pendingTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset}`}
+                iconWidth={16}
+                iconHeight={16}
+              />
+            )}
+          </Stack>
         </StatColumn>
       </StatsRow>
 
@@ -248,12 +312,14 @@ const PoolCard = ({
 
       <InfoStatsRow>
         <StatLabel>Total Funds in Pool</StatLabel>
-        <SmallStatValue>${Number(totalFundsFormatted).toLocaleString()}</SmallStatValue>
+        <SmallStatValue>${totalFundsUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}</SmallStatValue>
       </InfoStatsRow>
 
       <InfoStatsRow>
         <StatLabel>Average Deposit Size</StatLabel>
-        <SmallStatValue>${averageDepositSize.toLocaleString(undefined, { maximumFractionDigits: 0 })}</SmallStatValue>
+        <SmallStatValue>
+          ${averageDepositSizeUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        </SmallStatValue>
       </InfoStatsRow>
 
       <InfoStatsRow>
