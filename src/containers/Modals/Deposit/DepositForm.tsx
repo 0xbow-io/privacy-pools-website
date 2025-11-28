@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { TrendingUp as TrendingUpIcon, Close as CloseIcon } from '@mui/icons-material';
 import {
@@ -22,6 +22,7 @@ import {
   AlertTitle,
   IconButton,
 } from '@mui/material';
+import { captureException, withScope } from '@sentry/nextjs';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { formatUnits, parseUnits, erc20Abi, encodeFunctionData } from 'viem';
 import { useAccount, usePublicClient, useSwitchChain } from 'wagmi';
@@ -53,6 +54,39 @@ export const DepositForm = () => {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
+
+  // Sentry error wrapper (consistent with hooks)
+  const logErrorToSentry = useCallback(
+    (error: Error | unknown, context: Record<string, unknown> = {}) => {
+      // Filter out expected user behavior errors (e.g., wallet rejection)
+      if (error && typeof error === 'object') {
+        const message = 'message' in error ? String(error.message) : '';
+        const errorCode = 'code' in error ? (error as { code: unknown }).code : undefined;
+        if (
+          errorCode === 4001 ||
+          message.includes('User rejected the request') ||
+          message.includes('User denied') ||
+          message.includes('User cancelled')
+        ) {
+          console.warn('Filtered user rejection error (not logging to Sentry)');
+          return;
+        }
+      }
+
+      withScope((scope) => {
+        scope.setUser({ address });
+        scope.setContext('switch_chain_context', {
+          currentChainId: chainId,
+          selectedAsset: selectedPoolInfo?.asset,
+          ...context,
+        });
+        scope.setTag('operation', 'switch_chain');
+        scope.setTag('chain_id', String(chainId ?? 'unknown'));
+        captureException(error);
+      });
+    },
+    [address, chainId, selectedPoolInfo?.asset],
+  );
   const isStakingEnabled = useStakingFeature();
   const {
     balanceBN: { symbol, formatted: balanceFormatted, decimals },
@@ -690,7 +724,11 @@ export const DepositForm = () => {
                         addNotification('info', `Switching to ${selectedPool.chainName}...`);
                       } catch (err) {
                         // Fall back to instructing the user if automatic switch fails
-                        console.log(err);
+                        logErrorToSentry(err, {
+                          targetChainId: selectedPool.chainId,
+                          targetChainName: selectedPool.chainName,
+                          from: 'DepositForm Pool Select',
+                        });
                         addNotification('error', `Please switch to ${selectedPool.chainName} to deposit to this pool`);
                       }
                     }
