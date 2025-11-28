@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { formatUnits, parseUnits, erc20Abi, encodeFunctionData } from 'viem';
-import { useAccount, usePublicClient } from 'wagmi';
+import { useAccount, usePublicClient, useSwitchChain } from 'wagmi';
 import { allPoolsChainData, getConfig, PoolInfo } from '~/config';
 import { getConstants } from '~/config/constants';
 import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature, useNotifications } from '~/hooks';
@@ -52,6 +52,7 @@ export const DepositForm = () => {
   const [asp, setAsp] = useState(ASP_OPTIONS[0]);
   const { address } = useAccount();
   const publicClient = usePublicClient();
+  const { switchChain } = useSwitchChain();
   const isStakingEnabled = useStakingFeature();
   const {
     balanceBN: { symbol, formatted: balanceFormatted, decimals },
@@ -682,11 +683,16 @@ export const DepositForm = () => {
                   );
 
                   if (selectedPool) {
-                    // If selecting a pool from a different chain, we need to trigger a chain switch
+                    // If selecting a pool from a different chain, trigger a wallet chain switch
                     if (selectedPool.chainId !== chainId) {
-                      // Note: Chain switching should be handled by the wallet/user
-                      // For now, we'll just select the asset and let ChainProvider handle the chain
-                      addNotification('info', `Please switch to ${selectedPool.chainName} to deposit to this pool`);
+                      try {
+                        switchChain({ chainId: selectedPool.chainId });
+                        addNotification('info', `Switching to ${selectedPool.chainName}...`);
+                      } catch (err) {
+                        // Fall back to instructing the user if automatic switch fails
+                        console.log(err);
+                        addNotification('error', `Please switch to ${selectedPool.chainName} to deposit to this pool`);
+                      }
                     }
 
                     // Switch to the selected pool asset
@@ -703,16 +709,21 @@ export const DepositForm = () => {
                 displayEmpty
                 MenuProps={{
                   PaperProps: {
-                    style: {
-                      minWidth: '350px',
-                      maxHeight: '400px',
-                      overflow: 'hidden',
-                    },
                     sx: {
+                      // Parent owns the border/radius; list inside scrolls
+                      border: '1px solid #D9D9D9 !important',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
                       '& .MuiList-root': {
                         padding: 0,
+                        minWidth: '350px',
                         maxHeight: '400px',
                         overflowY: 'auto',
+                        // Remove inner borders so Paper draws the frame
+                        border: 'none',
+                        borderRadius: 0,
+                        backgroundColor: 'transparent',
                       },
                       '& .MuiMenuItem-root': {
                         paddingLeft: '16px',
@@ -720,6 +731,7 @@ export const DepositForm = () => {
                         paddingTop: '12px',
                         paddingBottom: '12px',
                         position: 'relative',
+                        borderBottom: 'none',
                         '&:not(:last-child)::after': {
                           content: '""',
                           position: 'absolute',
