@@ -335,7 +335,7 @@ const mainnetChainData: ChainData = {
         address: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
         assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
         scope: 16871220592891773056516988350205562991488723955554544490977388368863952064937n,
-        deploymentBlock: 0n, // TODO: Set actual deployment block
+        deploymentBlock: 144288142n, // TODO: Set actual deployment block
         entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
         maxDeposit: parseEther('10000'),
         asset: 'ETH',
@@ -364,7 +364,7 @@ const mainnetChainData: ChainData = {
         address: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
         assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
         scope: 17149548501982159915340070383460891962313753442514083724083931901154966978790n,
-        deploymentBlock: 0n, // TODO: Set actual deployment block
+        deploymentBlock: 38694925n,
         entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
         maxDeposit: parseEther('10000'),
         asset: 'ETH',
@@ -385,7 +385,7 @@ const mainnetChainData: ChainData = {
     explorerUrl: bsc.blockExplorers.default.url,
     relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=56`,
-    rpcUrl: `https://bsc-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
     poolInfo: [
       {
@@ -393,7 +393,7 @@ const mainnetChainData: ChainData = {
         address: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
         assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
         scope: 11123939809302748675379459504943549959694064271441044886820019404791514187711n,
-        deploymentBlock: 0n, // TODO: Set actual deployment block
+        deploymentBlock: 69568985n,
         entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
         maxDeposit: parseEther('10000'),
         asset: 'BNB',
@@ -422,7 +422,7 @@ const mainnetChainData: ChainData = {
         address: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
         assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
         scope: 8660557530481358570801571473337513404087042974825976936311383951650375938465n,
-        deploymentBlock: 0n, // TODO: Set actual deployment block
+        deploymentBlock: 404391809n,
         entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
         maxDeposit: parseEther('10000'),
         asset: 'ETH',

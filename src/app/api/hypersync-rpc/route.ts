@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       '84532': `https://base-sepolia.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // Base Sepolia
       '42161': `https://arbitrum.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // arbitrum
       '421614': `https://arbitrum-sepolia.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // arbitrum-sepolia
+      '56': `https://bsc.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // BSC
     };
 
     const hypersyncUrl = hypersyncUrls[chainId];
@@ -58,7 +59,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      throw new Error(`Hypersync request failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.log('Status:', response.status, response.statusText);
+      console.log('Error body:', errorText);
+      throw new Error(`Hypersync request failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
