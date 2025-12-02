@@ -1,7 +1,9 @@
 import { english, generateMnemonic, mnemonicToAccount } from 'viem/accounts';
 
-export const generateSeedPhrase = () => {
-  return generateMnemonic(english);
+export const generateSeedPhrase = (wordCount: 12 | 24 = 12) => {
+  // 128 bits = 12 words, 256 bits = 24 words
+  const strength = wordCount === 24 ? 256 : 128;
+  return generateMnemonic(english, strength);
 };
 
 export const verifyAndSanitizeSeedPhrase = (seedPhrase: string) => {

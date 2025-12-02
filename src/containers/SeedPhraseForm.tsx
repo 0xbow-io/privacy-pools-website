@@ -22,7 +22,12 @@ import { captureException } from '@sentry/nextjs';
 import { useAccount, useSignTypedData } from 'wagmi';
 import { useModal } from '~/hooks';
 import { ModalType } from '~/types';
-import { useClipboard, deriveMnemonicFromWalletSignature, buildSeedDerivationTypedData } from '~/utils';
+import {
+  useClipboard,
+  deriveMnemonicFromWalletSignature,
+  buildSeedDerivationTypedData,
+  generateSeedPhrase,
+} from '~/utils';
 
 export const SeedPhraseForm = ({
   seedPhrase,
@@ -331,6 +336,11 @@ export const SeedPhraseForm = ({
           onClick={() => {
             setSetupMode('manual');
             onMethodChange?.('manual');
+            // Auto-generate seed phrase when entering manual mode for create
+            if (type === 'create' && !seedPhrase) {
+              const newSeedPhrase = generateSeedPhrase(wordCount);
+              setSplitSeedPhrase(newSeedPhrase.split(' '));
+            }
           }}
         >
           Manual Setup
@@ -358,8 +368,14 @@ export const SeedPhraseForm = ({
               onChange={(_, value) => {
                 if (value === 12 || value === 24) {
                   setWordCount(value);
-                  // Clear inputs when switching modes to avoid confusion
-                  setSplitSeedPhrase([]);
+                  // Generate new seed phrase when switching word count in create mode
+                  if (type === 'create') {
+                    const newSeedPhrase = generateSeedPhrase(value);
+                    setSplitSeedPhrase(newSeedPhrase.split(' '));
+                  } else {
+                    // Clear inputs when switching modes in load mode
+                    setSplitSeedPhrase([]);
+                  }
                 }
               }}
               size='small'
