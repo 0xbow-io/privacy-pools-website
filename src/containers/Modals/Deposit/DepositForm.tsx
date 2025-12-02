@@ -54,6 +54,35 @@ export const DepositForm = () => {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
+  const isStakingEnabled = useStakingFeature();
+  const {
+    balanceBN: { symbol, formatted: balanceFormatted, decimals },
+    price: currentPrice,
+    maxDeposit,
+    selectedPoolInfo,
+    chainId,
+    chain,
+    setSelectedAsset,
+  } = useChainContext();
+  const {
+    amount,
+    setAmount,
+    minimumDepositAmount,
+    vettingFeeBPS,
+    isAssetConfigLoading,
+    selectedAlternativeToken,
+    setSelectedAlternativeToken,
+  } = usePoolAccountsContext();
+  const [inputAmount, setInputAmount] = useState('');
+  const [selectedToken, setSelectedToken] = useState<'native' | 'alternative'>('native');
+  const [showYieldAlert, setShowYieldAlert] = useState(() => {
+    // Check if user has dismissed the alert before
+    if (typeof window !== 'undefined') {
+      const dismissed = localStorage.getItem('yieldAlertDismissed');
+      return dismissed !== 'true';
+    }
+    return true;
+  });
 
   // Sentry error wrapper (consistent with hooks)
   const logErrorToSentry = useCallback(
@@ -87,35 +116,6 @@ export const DepositForm = () => {
     },
     [address, chainId, selectedPoolInfo?.asset],
   );
-  const isStakingEnabled = useStakingFeature();
-  const {
-    balanceBN: { symbol, formatted: balanceFormatted, decimals },
-    price: currentPrice,
-    maxDeposit,
-    selectedPoolInfo,
-    chainId,
-    chain,
-    setSelectedAsset,
-  } = useChainContext();
-  const {
-    amount,
-    setAmount,
-    minimumDepositAmount,
-    vettingFeeBPS,
-    isAssetConfigLoading,
-    selectedAlternativeToken,
-    setSelectedAlternativeToken,
-  } = usePoolAccountsContext();
-  const [inputAmount, setInputAmount] = useState('');
-  const [selectedToken, setSelectedToken] = useState<'native' | 'alternative'>('native');
-  const [showYieldAlert, setShowYieldAlert] = useState(() => {
-    // Check if user has dismissed the alert before
-    if (typeof window !== 'undefined') {
-      const dismissed = localStorage.getItem('yieldAlertDismissed');
-      return dismissed !== 'true';
-    }
-    return true;
-  });
 
   // Fetch pools-stats from both ASP endpoints (test and non-test)
   const { ASP_ENDPOINT_TEST, ASP_ENDPOINT_NON_TEST } = getConfig().env;
