@@ -139,7 +139,7 @@ export const useDeposit = () => {
 
       let assetAllowance = 0n;
 
-      if (selectedPoolInfo.asset !== DEFAULT_ASSET) {
+      if (!selectedPoolInfo.isNativeToken && selectedPoolInfo.asset !== DEFAULT_ASSET) {
         assetAllowance = await allowance(selectedPoolInfo.assetAddress, address, selectedPoolInfo.entryPointAddress);
       }
 
@@ -165,8 +165,8 @@ export const useDeposit = () => {
 
         let hash: ViemHash;
 
-        if (selectedPoolInfo.asset === DEFAULT_ASSET) {
-          // ETH deposits don't need approval, use standard flow
+        if (selectedPoolInfo.isNativeToken || selectedPoolInfo.asset === DEFAULT_ASSET) {
+          // Chain native tokens deposits don't need approval, use standard flow
           const { request } = await publicClient
             .simulateContract({
               account: address,

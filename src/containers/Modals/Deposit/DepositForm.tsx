@@ -819,7 +819,14 @@ export const DepositForm = () => {
 
                   return (
                     <MenuItem key={`${pool.chainId}-${pool.asset}`} value={`${pool.chainId}-${pool.asset}`}>
-                      <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%' gap='12px'>
+                      <Stack
+                        direction='row'
+                        alignItems='center'
+                        justifyContent='space-between'
+                        width='100%'
+                        gap='12px'
+                        px={1}
+                      >
                         <Stack direction='row' alignItems='center' gap='8px' flex={1}>
                           {pool.icon && <Image src={pool.icon} alt={pool.asset} width={32} height={32} />}
                           <Stack direction='column' gap='2px'>

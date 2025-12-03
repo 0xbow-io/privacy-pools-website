@@ -89,12 +89,17 @@ export const ChainProvider = ({ children }: Props) => {
     return chain.poolInfo.find((pool) => pool.asset === selectedAsset) ?? chain.poolInfo[0];
   }, [chain, selectedAsset]);
 
+  console.log(
+    `fetching data for chainId: ${chainId}, selectedAsset: ${selectedAsset}, token: ${selectedAsset === DEFAULT_ASSET ? undefined : selectedPoolInfo.assetAddress}`,
+  );
   // User balance based on the selected asset
   const { data: userBalance } = useBalance({
     address,
     chainId,
-    token: selectedAsset === DEFAULT_ASSET ? undefined : selectedPoolInfo.assetAddress,
+    token: selectedPoolInfo.isNativeToken ? undefined : selectedPoolInfo.assetAddress, //selectedAsset === DEFAULT_ASSET ? undefined : selectedPoolInfo.assetAddress,
   });
+
+  console.log(`User balance for asset ${selectedAsset} on chain ${chainId}:`, userBalance);
 
   const balanceBN = useMemo(() => {
     if (userBalance) {
