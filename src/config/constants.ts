@@ -2,7 +2,7 @@ import { Constants } from '~/types';
 
 const constants: Constants = {
   FOOTER_LINKS: [
-    { label: 'White Paper', href: 'https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4563364' },
+    { label: 'White Paper', href: '/whitepaper.pdf' },
     { label: 'Docs', href: 'https://docs.privacypools.com' },
     { label: 'X', href: 'https://x.com/0xbowio' },
     {
