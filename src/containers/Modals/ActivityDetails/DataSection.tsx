@@ -3,7 +3,7 @@
 import { Stack, styled, Typography } from '@mui/material';
 import { formatUnits } from 'viem';
 import { ExtendedTooltip as Tooltip } from '~/components';
-import { useExternalServices, usePoolAccountsContext, useChainContext } from '~/hooks';
+import { useExternalServices, usePoolAccountsContext, useChainContext, useTransactionFee } from '~/hooks';
 import { EventType } from '~/types';
 import { formatDataNumber, formatTimestamp, getUsdBalance, truncateAddress } from '~/utils';
 
@@ -17,6 +17,7 @@ export const DataSection = () => {
   const { currentSelectedRelayerData } = useExternalServices();
   const isDeposit = selectedHistoryData?.type === EventType.DEPOSIT;
   const isExit = selectedHistoryData?.type === EventType.EXIT;
+  const isWithdrawal = !isDeposit && !isExit;
 
   const aspOrRelayer = {
     label: isDeposit ? 'ASP' : 'Relayer',
@@ -28,18 +29,28 @@ export const DataSection = () => {
   // const toAddress = isDeposit ? '' : selectedHistoryData?.address;
 
   const decimals = assetDecimals ?? balanceDecimals ?? 18;
-
-  const feeBps = isDeposit ? vettingFeeBPS : BigInt(currentSelectedRelayerData?.fees ?? 0n);
   const amountInWei = BigInt(selectedHistoryData?.amount ?? 0n);
+
+  // Fetch actual fee from on-chain data for withdrawals
+  const {
+    fee: onChainFee,
+    actualReceivedAmount,
+    isLoading: isFeeLoading,
+  } = useTransactionFee(isWithdrawal ? selectedHistoryData?.txHash : undefined, amountInWei);
+
+  // For deposits, calculate fee from BPS. For withdrawals, use on-chain data if available.
+  const feeBps = isDeposit ? vettingFeeBPS : BigInt(currentSelectedRelayerData?.fees ?? 0n);
 
   const denominator = 10000n - feeBps;
   const originalAmount = isDeposit ? (amountInWei * 10000n) / denominator : amountInWei;
 
-  const fees = (BigInt(feeBps) * BigInt(originalAmount)) / 100n / 100n;
+  // Use on-chain fee for withdrawals if available, otherwise fall back to calculated fee
+  const calculatedFees = (BigInt(feeBps) * BigInt(originalAmount)) / 100n / 100n;
+  const fees = isWithdrawal && onChainFee !== null ? onChainFee : calculatedFees;
 
   const feeFormatted = formatDataNumber(fees, decimals);
   const feeUSD = getUsdBalance(price, formatUnits(fees, decimals), decimals);
-  const feeText = `${feeFormatted} ${asset} (~ ${feeUSD} USD)`;
+  const feeText = isFeeLoading ? 'Loading...' : `${feeFormatted} ${asset} (~ ${feeUSD} USD)`;
 
   const feesCollectorAddress = isDeposit ? entryPointAddress : currentSelectedRelayerData?.relayerAddress;
   const feesCollector = `OxBow (${truncateAddress(feesCollectorAddress ?? '0x')})`;
@@ -48,9 +59,12 @@ export const DataSection = () => {
   const totalUSD = getUsdBalance(price, totalText, decimals);
   const valueText = `~${totalText.slice(0, 6)} ${asset} (~ ${totalUSD} USD)`;
 
-  const amountWithFee = originalAmount - fees;
+  // Use on-chain received amount for withdrawals if available
+  const amountWithFee = isWithdrawal && actualReceivedAmount !== null ? actualReceivedAmount : originalAmount - fees;
   const amountWithFeeUSD = getUsdBalance(price, formatUnits(amountWithFee, decimals), decimals);
-  const receivedText = `${formatUnits(amountWithFee, decimals)} ${asset} (~ ${amountWithFeeUSD} USD)`;
+  const receivedText = isFeeLoading
+    ? 'Loading...'
+    : `${formatUnits(amountWithFee, decimals)} ${asset} (~ ${amountWithFeeUSD} USD)`;
 
   // const poolAccountName = useMemo(() => {
   //   const name = poolAccounts.find((pool) => pool.label === selectedHistoryData?.commitment?.preimage?.label)?.name;
