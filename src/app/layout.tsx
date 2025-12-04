@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { Metadata } from 'next';
 import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
+import { GoogleAnalytics } from '@next/third-parties/google';
 import { MainContent, NoScriptMessage, PageWrapper } from '~/components';
 import { FeatureFlagInitializer } from '~/components/FeatureFlagInitializer';
 import { ibm_plex_mono } from '~/config/fonts';
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang='en' suppressHydrationWarning>
       <body className={ibm_plex_mono.className}>
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || 'G-D177C1SMBP'} />
         <AppRouterCacheProvider>
           <InitColorSchemeScript attribute='class' />
 
