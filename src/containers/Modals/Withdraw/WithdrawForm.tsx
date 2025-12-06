@@ -569,7 +569,7 @@ export const WithdrawForm = () => {
         {!isLoadingMinAmount && 'Review Withdrawal'}
       </Button>
 
-      <LinksSection />
+      <LinksSection context='withdrawal' />
     </ModalContainer>
   );
 };

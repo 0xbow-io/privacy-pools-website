@@ -160,7 +160,11 @@ export const ReviewModal = () => {
         )}
         <PoolAccountSection />
 
-        <LinksSection />
+        <LinksSection
+          context={
+            actionType === EventType.EXIT ? 'ragequit' : actionType === EventType.WITHDRAWAL ? 'withdrawal' : 'deposit'
+          }
+        />
       </ModalContainer>
     </BaseModal>
   );

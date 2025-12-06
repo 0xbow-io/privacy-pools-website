@@ -1,9 +1,19 @@
 import { Stack, styled, Typography } from '@mui/material';
 
-export const LinksSection = () => {
+type LinksSectionProps = {
+  context?: 'deposit' | 'withdrawal' | 'ragequit';
+};
+
+const FAQ_URLS = {
+  deposit: 'https://docs.privacypools.com/protocol/deposit',
+  withdrawal: 'https://docs.privacypools.com/protocol/withdrawal',
+  ragequit: 'https://docs.privacypools.com/protocol/ragequit',
+} as const;
+
+export const LinksSection = ({ context = 'deposit' }: LinksSectionProps) => {
   return (
     <Container gap='1.2rem' width='100%' alignItems='' direction='row' justifyContent='center'>
-      <Typography variant='body1' component='a' href='#' target='_blank'>
+      <Typography variant='body1' component='a' href={FAQ_URLS[context]} target='_blank'>
         FAQ
       </Typography>
       <Divider />
