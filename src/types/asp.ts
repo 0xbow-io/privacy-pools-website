@@ -34,6 +34,37 @@ export type AllEventsResponse = {
   }[];
 } & Pagination;
 
+export type GlobalPoolInfo = {
+  scope: string;
+  chainId: number;
+  chainName: string;
+  tokenSymbol: string;
+  tokenAddress: string;
+  poolAddress: string;
+  denomination: string;
+};
+
+export type GlobalEventType = EventType | 'ragequit';
+
+export type GlobalEvent = {
+  type: GlobalEventType;
+  eventId: number;
+  createdAt: string;
+  amount: string;
+  address: string;
+  txHash: string;
+  timestamp: number;
+  precommitmentHash?: string;
+  reviewStatus?: ReviewStatus;
+  aspRoot?: string;
+  label?: string;
+  pool: GlobalPoolInfo;
+};
+
+export type GlobalEventsResponse = {
+  events: GlobalEvent[];
+} & Pagination;
+
 export type PoolResponse = {
   overview: {
     chainId: number;

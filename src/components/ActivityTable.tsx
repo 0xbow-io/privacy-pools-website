@@ -12,7 +12,7 @@ import {
 } from '~/components';
 import { chainData, getConfig } from '~/config';
 import { usePoolAccountsContext, useModal, useChainContext, useAccountContext } from '~/hooks';
-import { ActivityRecords, HistoryData, ModalType, ReviewStatus } from '~/types';
+import { ActivityRecords, GlobalEvent, HistoryData, ModalType, ReviewStatus } from '~/types';
 import { formatDataNumber, getTimeAgo, getStatus } from '~/utils';
 
 const {
@@ -48,7 +48,16 @@ export const ActivityTable = ({
     return row.publicAmount;
   };
 
+  const isGlobalEvent = (row: ActivityRecords[number]): row is GlobalEvent => {
+    return 'pool' in row && row.pool !== undefined;
+  };
+
   const formatAmount = (row: ActivityRecords[number]) => {
+    // For global events, use pool info from the event itself
+    if (isGlobalEvent(row)) {
+      const eventDecimals = parseInt(row.pool.denomination, 10) || 18;
+      return `${formatDataNumber(BigInt(getAmount(row) || 0), eventDecimals, 3, false, true, false)} ${row.pool.tokenSymbol}`;
+    }
     // For personal activity, look up the pool info by scope to get correct asset symbol and decimals
     if (view === 'personal' && 'scope' in row) {
       // Find the pool info by scope across all chains
@@ -59,7 +68,7 @@ export const ActivityTable = ({
         }
       }
     }
-    // Fallback to current pool's symbol for global activity
+    // Fallback to current pool's symbol
     return `${formatDataNumber(BigInt(getAmount(row) || 0), assetDecimals || decimals, 3, false, true, false)} ${symbol}`;
   };
 
@@ -114,6 +123,11 @@ export const ActivityTable = ({
                   <STableCell>
                     <Tooltip
                       title={(() => {
+                        // For global events, use pool info from the event
+                        if (isGlobalEvent(row)) {
+                          const eventDecimals = parseInt(row.pool.denomination, 10) || 18;
+                          return formatUnits(BigInt(getAmount(row) || 0), eventDecimals);
+                        }
                         // For personal activity, look up the correct decimals by scope
                         if (view === 'personal' && 'scope' in row) {
                           for (const chain of Object.values(chainData)) {

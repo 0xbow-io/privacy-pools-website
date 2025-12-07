@@ -1,5 +1,6 @@
 export * from './useAccountType';
 export * from './useASP';
+export * from './useGlobalASP';
 export * from './useCustomConnect';
 export * from './useExternalServices';
 export * from './useRelayer';

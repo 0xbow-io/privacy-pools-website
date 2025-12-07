@@ -1,3 +1,3 @@
-import { HistoryData, AllEventsResponse } from '~/types';
+import { HistoryData, AllEventsResponse, GlobalEventsResponse } from '~/types';
 
-export type ActivityRecords = HistoryData | AllEventsResponse['events'];
+export type ActivityRecords = HistoryData | AllEventsResponse['events'] | GlobalEventsResponse['events'];

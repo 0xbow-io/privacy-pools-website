@@ -109,8 +109,11 @@ export const calculateRemainingTime = (expiration: number | undefined): number =
  * @param row Activity record with reviewStatus field
  * @returns ReviewStatus value
  */
-export const getStatus = (row: { type?: EventType; reviewStatus?: ReviewStatus | StatusObject }): ReviewStatus => {
-  if (row.type === EventType.WITHDRAWAL) {
+export const getStatus = (row: {
+  type?: EventType | string;
+  reviewStatus?: ReviewStatus | StatusObject;
+}): ReviewStatus => {
+  if (row.type === EventType.WITHDRAWAL || row.type === 'ragequit') {
     return ReviewStatus.APPROVED;
   }
 

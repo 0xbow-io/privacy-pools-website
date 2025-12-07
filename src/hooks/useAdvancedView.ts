@@ -1,12 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { getConfig } from '~/config';
-import { useChainContext, useExternalServices, useAccountContext } from '~/hooks';
-import { aspClient } from '~/utils';
+import { useChainContext, useExternalServices, useAccountContext, useGlobalASP } from '~/hooks';
 
 const {
   constants: { ITEMS_PER_PAGE },
@@ -15,27 +12,16 @@ const {
 export const useAdvancedView = () => {
   const {
     chainId,
-    chain: { aspUrl },
     selectedPoolInfo,
     balanceBN: { decimals },
   } = useChainContext();
-  const { aspData, isLoading: isLoadingExternalServices } = useExternalServices();
+  const { isLoading: isLoadingExternalServices } = useExternalServices();
   const { poolAccounts, historyData, hideEmptyPools } = useAccountContext();
+  const { globalEventsData, globalEventsByPage, isLoading: isLoadingGlobalEvents } = useGlobalASP();
 
-  // moved outside useExternalServices to avoid pre-rendering errors with useSearchParams
-  // https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
-  const searchParams = useSearchParams();
-  const currentPage = Number(searchParams.get('page') || 1);
+  const allEventsByPage = globalEventsByPage?.events ?? [];
 
-  const allEventsByPageQuery = useQuery({
-    queryKey: ['asp_all_events_by_page', currentPage, chainId, selectedPoolInfo.scope.toString()],
-    queryFn: () => aspClient.fetchAllEvents(aspUrl, chainId, selectedPoolInfo.scope.toString(), currentPage),
-    refetchInterval: 60000,
-    retryOnMount: false,
-  });
-  const allEventsByPage = allEventsByPageQuery.data?.events ?? [];
-
-  const isLoading = isLoadingExternalServices || allEventsByPageQuery.isLoading;
+  const isLoading = isLoadingExternalServices || isLoadingGlobalEvents;
 
   // Ordered personal activity from newest to oldest
   const orderedPersonalActivity = useMemo(
@@ -68,7 +54,7 @@ export const useAdvancedView = () => {
   const fullPersonalActivity = useMemo(() => orderedPersonalActivity, [orderedPersonalActivity]);
   const previewPersonalActivity = useMemo(() => orderedPersonalActivity.slice(0, 6), [orderedPersonalActivity]);
 
-  const recentGlobalEvents = useMemo(() => aspData?.allEventsData?.events ?? [], [aspData?.allEventsData?.events]);
+  const recentGlobalEvents = useMemo(() => globalEventsData?.events ?? [], [globalEventsData?.events]);
   const previewGlobalEvents = useMemo(() => recentGlobalEvents?.slice(0, 6), [recentGlobalEvents]);
 
   return {
@@ -80,6 +66,6 @@ export const useAdvancedView = () => {
     previewPersonalActivity,
     fullPersonalActivity,
     isLoading,
-    globalEventsCount: aspData?.allEventsData?.total ?? 0,
+    globalEventsCount: globalEventsByPage?.total ?? 0,
   };
 };

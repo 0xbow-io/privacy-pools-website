@@ -1,5 +1,12 @@
 import { getConstants } from '~/config/constants';
-import { MtRootResponse, PoolResponse, MtLeavesResponse, DepositsByLabelResponse, AllEventsResponse } from '~/types';
+import {
+  MtRootResponse,
+  PoolResponse,
+  MtLeavesResponse,
+  DepositsByLabelResponse,
+  AllEventsResponse,
+  GlobalEventsResponse,
+} from '~/types';
 
 // Define type for pool stats response
 interface PoolStats {
@@ -69,6 +76,9 @@ const aspClient = {
 
   fetchPoolStats: (aspUrl: string, chainId: number | 'all') =>
     fetchWithHeaders<PoolStatsResponse>(`${aspUrl}/${chainId}/public/pools-stats`),
+
+  fetchGlobalEvents: (aspUrl: string, page = 1, perPage = ITEMS_PER_PAGE) =>
+    fetchWithHeaders<GlobalEventsResponse>(`${aspUrl}/global/public/events?page=${page}&perPage=${perPage}`),
 };
 
 export { aspClient };
