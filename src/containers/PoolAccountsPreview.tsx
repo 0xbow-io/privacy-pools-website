@@ -1,19 +1,36 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { Stack, Typography, Button, styled } from '@mui/material';
 import { InfoTooltip } from '~/components/InfoTooltip';
+import { chainData } from '~/config';
 import { Section, PAContainer, ActionMenuContainer } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext } from '~/hooks';
 import { ModalType } from '~/types';
 import { ROUTER } from '~/utils';
 import { ActionMenu } from './ActionMenu';
+import { ChainFilterSelect } from './ChainFilterSelect';
 import { UserPoolsStats } from './UserPoolsStats';
 
 export const PoolAccountsPreview = () => {
-  const { allPools } = useAccountContext();
+  const { allPools, poolAccountsByChainScope } = useAccountContext();
   const { setModalOpen } = useModal();
   const { isLogged, isConnected } = useAuthContext();
   const goTo = useGoTo();
+  const [selectedChainIds, setSelectedChainIds] = useState<number[]>([]);
+
+  // Get unique chain IDs from user's pool accounts
+  const availableChainIds = useMemo(() => {
+    const chainIds = new Set<number>();
+    for (const [key] of Object.entries(poolAccountsByChainScope)) {
+      const [chainIdStr] = key.split('-');
+      const chainId = parseInt(chainIdStr, 10);
+      if (chainData[chainId]) {
+        chainIds.add(chainId);
+      }
+    }
+    return Array.from(chainIds);
+  }, [poolAccountsByChainScope]);
 
   const handleLogin = () => {
     goTo(ROUTER.account.base);
@@ -27,22 +44,31 @@ export const PoolAccountsPreview = () => {
     <>
       <PAContainer>
         <Section width='100%'>
-          <Stack direction='row' alignItems='center' gap={1}>
-            <Typography variant='subtitle1' fontWeight='bold' lineHeight='1' whiteSpace='nowrap'>
-              {isConnected ? 'My Pools' : 'Pool Accounts'}
-            </Typography>
-            {isLogged && allPools > 0 && (
-              <Typography variant='caption' fontWeight='bold' mt='0.2rem'>
-                ({allPools})
+          <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%'>
+            <Stack direction='row' alignItems='center' gap={1}>
+              <Typography variant='subtitle1' fontWeight='bold' lineHeight='1' whiteSpace='nowrap'>
+                {isConnected ? 'My Pools' : 'Pool Accounts'}
               </Typography>
+              {isLogged && allPools > 0 && (
+                <Typography variant='caption' fontWeight='bold' mt='0.2rem'>
+                  ({allPools})
+                </Typography>
+              )}
+              <InfoTooltip message='These are your active deposits in Privacy Pools and their status.' />
+            </Stack>
+            {isLogged && availableChainIds.length > 1 && (
+              <ChainFilterSelect
+                availableChainIds={availableChainIds}
+                selectedChainIds={selectedChainIds}
+                onSelectionChange={setSelectedChainIds}
+              />
             )}
-            <InfoTooltip message='These are your active deposits in Privacy Pools and their status.' />
           </Stack>
         </Section>
 
         {isLogged && (
           <>
-            <UserPoolsStats />
+            <UserPoolsStats selectedChainIds={selectedChainIds} />
 
             <ActionMenuContainer>
               <ActionMenu />

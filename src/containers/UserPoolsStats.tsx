@@ -14,7 +14,11 @@ import { ReviewStatus, type PoolResponse } from '~/types';
 import { aspClient, fetchTokenPrice } from '~/utils';
 import { calculateDepositVarianceScore, PoolCardData } from './AllPoolsStats';
 
-export const UserPoolsStats = () => {
+interface UserPoolsStatsProps {
+  selectedChainIds?: number[];
+}
+
+export const UserPoolsStats = ({ selectedChainIds = [] }: UserPoolsStatsProps) => {
   const { poolAccountsByChainScope } = useAccountContext();
   const publicClient = usePublicClient();
 
@@ -30,6 +34,11 @@ export const UserPoolsStats = () => {
       const firstAccount = poolAccounts[0];
       const chain = chainData[firstAccount.chainId];
       if (!chain) continue;
+
+      // Filter by selected chains (empty array means show all)
+      if (selectedChainIds.length > 0 && !selectedChainIds.includes(firstAccount.chainId)) {
+        continue;
+      }
 
       const poolInfo = chain.poolInfo.find((p) => p.scope.toString() === firstAccount.scope.toString());
       if (!poolInfo) continue;
@@ -51,7 +60,7 @@ export const UserPoolsStats = () => {
         aspUrl: chain.aspUrl,
       };
     });
-  }, [poolAccountsByChainScope]);
+  }, [poolAccountsByChainScope, selectedChainIds]);
 
   // Get unique chain IDs for fetching pools-stats
   const uniqueChainIds = useMemo(() => {
@@ -176,6 +185,7 @@ export const UserPoolsStats = () => {
         asset: poolToQuery.poolInfo.asset,
         chainId: poolToQuery.chainId,
         chainName: chain.name,
+        chainIcon: chain.image,
         scope: poolToQuery.scope,
         totalFunds,
         fundsPending: BigInt(0),
@@ -247,18 +257,6 @@ const PoolCard = ({
 
   const pendingFormatted = formatUnits(pending, pool.decimals);
   const pendingTokenAmount = Number(pendingFormatted);
-  const pendingUsd = pendingTokenAmount * price;
-
-  // My Accounts count
-  const myAccountsCount = poolAccounts.length;
-
-  // Total Funds in Pool
-  const totalFundsFormatted = formatUnits(pool.totalFunds, pool.decimals);
-  const totalFundsTokenAmount = Number(totalFundsFormatted);
-  const totalFundsUsd = totalFundsTokenAmount * price;
-
-  // Calculate Average Deposit Size (in USD)
-  const averageDepositSizeUsd = pool.acceptedDepositsCount > 0 ? totalFundsUsd / pool.acceptedDepositsCount : 0;
 
   const handleClick = () => {
     router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
@@ -271,6 +269,11 @@ const PoolCard = ({
           {pool.icon && (
             <IconWrapper>
               <Image src={pool.icon} alt={pool.asset} width={24} height={24} />
+              {pool.chainIcon && (
+                <ChainIconOverlay>
+                  <Image src={pool.chainIcon} alt={pool.chainName} width={14} height={14} />
+                </ChainIconOverlay>
+              )}
             </IconWrapper>
           )}
           <Stack direction='column' gap='2px'>
@@ -284,9 +287,9 @@ const PoolCard = ({
         <StatColumn>
           <StatLabel>My balance</StatLabel>
           <Stack direction='row' alignItems='center' gap='4px'>
-            <BalanceValue>${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</BalanceValue>
+            <BalanceValue>{myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</BalanceValue>
             <InfoTooltip
-              message={`${myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset}`}
+              message={`$${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
               iconWidth={16}
               iconHeight={16}
             />
@@ -295,41 +298,10 @@ const PoolCard = ({
         <StatColumn align='right'>
           <StatLabel>Pending</StatLabel>
           <Stack direction='row' alignItems='center' gap='4px'>
-            <PendingValue>${pendingUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</PendingValue>
-            {pendingTokenAmount > 0 && (
-              <InfoTooltip
-                message={`${pendingTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pool.asset}`}
-                iconWidth={16}
-                iconHeight={16}
-              />
-            )}
+            <PendingValue>{pendingTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</PendingValue>
           </Stack>
         </StatColumn>
       </StatsRow>
-
-      <Separator />
-
-      <InfoStatsRow>
-        <StatLabel>My Accounts</StatLabel>
-        <SmallStatValue>{myAccountsCount}</SmallStatValue>
-      </InfoStatsRow>
-
-      <InfoStatsRow>
-        <StatLabel>Total Funds in Pool</StatLabel>
-        <SmallStatValue>${totalFundsUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}</SmallStatValue>
-      </InfoStatsRow>
-
-      <InfoStatsRow>
-        <StatLabel>Average Deposit Size</StatLabel>
-        <SmallStatValue>
-          ${averageDepositSizeUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </SmallStatValue>
-      </InfoStatsRow>
-
-      <InfoStatsRow>
-        <StatLabel>Total Accounts</StatLabel>
-        <SmallStatValue>{pool.acceptedDepositsCount.toLocaleString()}</SmallStatValue>
-      </InfoStatsRow>
     </PoolCardContainer>
   );
 };
@@ -380,16 +352,31 @@ const PoolHeader = styled(Stack)(() => ({
 }));
 
 const IconWrapper = styled('div')(() => ({
+  position: 'relative',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   width: '24px',
   height: '24px',
-  '& img': {
+  '& > img': {
     width: '100%',
     height: '100%',
     objectFit: 'contain',
   },
+}));
+
+const ChainIconOverlay = styled('div')(() => ({
+  position: 'absolute',
+  bottom: -4,
+  right: -4,
+  width: '14px',
+  height: '14px',
+  borderRadius: '50%',
+  backgroundColor: '#fff',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 0 2px rgba(0,0,0,0.2)',
 }));
 
 const PoolName = styled(Typography)(({ theme }) => ({
@@ -414,15 +401,6 @@ const StatsRow = styled(Box)(() => ({
   width: '100%',
   gap: '16px',
   marginBottom: '8px',
-}));
-
-const InfoStatsRow = styled(Box)(() => ({
-  display: 'flex',
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  width: '100%',
-  marginBottom: '4px',
 }));
 
 const StatColumn = styled(Box, {
@@ -454,19 +432,4 @@ const PendingValue = styled(Typography)(() => ({
   fontSize: '24px',
   lineHeight: '100%',
   color: '#737373',
-}));
-
-const SmallStatValue = styled(Typography)(() => ({
-  fontStyle: 'normal',
-  fontWeight: 700,
-  fontSize: '12px',
-  lineHeight: '100%',
-  color: '#4D4D4D',
-}));
-
-const Separator = styled(Box)(() => ({
-  width: '100%',
-  height: '1px',
-  border: '1px solid #E6E6E6',
-  marginBottom: '8px',
 }));
