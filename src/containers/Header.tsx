@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { styled } from '@mui/material/styles';
 import { Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
@@ -10,9 +9,6 @@ import { zIndex } from '~/utils';
 
 export const Header = () => {
   const { isConnected } = useAuthContext();
-  const pathname = usePathname();
-
-  const isPoolsActive = pathname === '/';
 
   return (
     <HeaderWrapper>
@@ -23,11 +19,6 @@ export const Header = () => {
           <Link href='/'>
             <Logo />
           </Link>
-          <NavLinks>
-            <NavLink href='/' active={isPoolsActive ? 'true' : 'false'}>
-              Pools
-            </NavLink>
-          </NavLinks>
         </LeftSection>
         <Actions>
           <ChainSelect />
@@ -85,23 +76,3 @@ const LeftSection = styled('div')({
   alignItems: 'center',
   gap: '2.4rem',
 });
-
-const NavLinks = styled('div')({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '2rem',
-});
-
-const NavLink = styled(Link, {
-  shouldForwardProp: (prop) => prop !== 'active',
-})<{ active: string }>(({ active }) => ({
-  fontWeight: 400,
-  fontSize: '14px',
-  lineHeight: '100%',
-  color: '#000000',
-  textDecoration: 'none',
-  textDecorationLine: active === 'true' ? 'underline' : 'none',
-  '&:hover': {
-    opacity: 0.7,
-  },
-}));

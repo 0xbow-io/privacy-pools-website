@@ -31,6 +31,7 @@ export interface PoolCardData {
   asset: string;
   chainId: number;
   chainName: string; // Name of the chain (e.g., "Ethereum", "Sepolia")
+  chainIcon?: string; // Icon for the chain
   scope: string;
   totalFunds: bigint;
   fundsPending: bigint;
@@ -219,14 +220,17 @@ const PoolCard = ({
     <PoolCardContainer isLeftColumn={isLeftColumn} isFirstRow={isFirstRow} onClick={handleClick}>
       <PoolHeader>
         <Stack direction='row' alignItems='center' gap={1}>
-          {pool.icon && (
-            <IconWrapper>
-              <Image src={pool.icon} alt={pool.asset} width={24} height={24} />
-            </IconWrapper>
-          )}
-          <Stack direction='column' gap='2px'>
+          <IconWrapper>
+            {pool.icon && <Image src={pool.icon} alt={pool.asset} width={24} height={24} />}
+            {pool.chainIcon && (
+              <ChainIconOverlay>
+                <Image src={pool.chainIcon} alt={pool.chainName} width={14} height={14} />
+              </ChainIconOverlay>
+            )}
+          </IconWrapper>
+          <Stack direction='row' alignItems='center' gap={1}>
             <PoolName variant='body1'>{pool.asset} Pool</PoolName>
-            <ChainName variant='caption'>{pool.chainName}</ChainName>
+            <ChainName variant='body1'>{pool.chainName}</ChainName>
           </Stack>
         </Stack>
         {hasGrowth && (
@@ -380,6 +384,7 @@ export const AllPoolsStats = () => {
           asset: poolInfo.asset,
           chainId: parseInt(cId),
           chainName: chain.name,
+          chainIcon: chain.image,
           scope: poolInfo.scope.toString(),
           totalFunds,
           fundsPending,
@@ -694,16 +699,26 @@ const PoolHeader = styled(Stack)(() => ({
 }));
 
 const IconWrapper = styled('div')(() => ({
+  position: 'relative',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   width: '24px',
   height: '24px',
-  '& img': {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-  },
+}));
+
+const ChainIconOverlay = styled('div')(() => ({
+  position: 'absolute',
+  bottom: -4,
+  right: -4,
+  width: '14px',
+  height: '14px',
+  borderRadius: '50%',
+  backgroundColor: '#fff',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 0 2px rgba(0,0,0,0.2)',
 }));
 
 const PoolName = styled(Typography)(({ theme }) => ({
@@ -715,7 +730,7 @@ const PoolName = styled(Typography)(({ theme }) => ({
 
 const ChainName = styled(Typography)(() => ({
   fontWeight: 400,
-  fontSize: '12px',
+  fontSize: '14px',
   lineHeight: '100%',
   color: '#999',
 }));

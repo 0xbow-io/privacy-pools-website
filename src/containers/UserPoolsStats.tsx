@@ -224,7 +224,7 @@ const PoolCard = ({
   price: number;
 }) => {
   const router = useRouter();
-  const { poolAccountsByChainScope } = useAccountContext();
+  const { poolAccountsByChainScope, hasProcessedInitialDeposits } = useAccountContext();
 
   // Use the originalKey if available, otherwise fallback to constructing the key
   const dataKey = pool.originalKey || `${pool.chainId}-${pool.scope}`;
@@ -237,10 +237,14 @@ const PoolCard = ({
   const myBalanceUsd = myBalanceTokenAmount * price;
 
   // Calculate pending (sum of balances where reviewStatus is PENDING)
-  const pending = poolAccounts.reduce(
-    (sum, pa) => (pa.reviewStatus === ReviewStatus.PENDING ? sum + BigInt(pa.balance || 0) : sum),
-    BigInt(0),
-  );
+  // Show $0 until the initial deposit status fetch completes to avoid showing incorrect pending values
+  const pending = hasProcessedInitialDeposits
+    ? poolAccounts.reduce(
+        (sum, pa) => (pa.reviewStatus === ReviewStatus.PENDING ? sum + BigInt(pa.balance || 0) : sum),
+        BigInt(0),
+      )
+    : BigInt(0);
+
   const pendingFormatted = formatUnits(pending, pool.decimals);
   const pendingTokenAmount = Number(pendingFormatted);
   const pendingUsd = pendingTokenAmount * price;

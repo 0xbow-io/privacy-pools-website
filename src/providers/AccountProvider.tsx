@@ -1,11 +1,12 @@
 'use client';
 
 import { createContext, SetStateAction, Dispatch, useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { chainData } from '~/config/chainData';
 import { getEnv } from '~/config/env';
 import { useChainContext, useExternalServices, useNotifications, usePoolAccountsContext } from '~/hooks';
 import { useAccountManager } from '~/hooks/useAccountManager';
 import { AccountService, DepositsByLabelResponse, EventType, PoolAccount, ReviewStatus, HistoryData } from '~/types';
-import { addPoolAccount, addWithdrawal, getPoolAccountsFromAccount, addRagequit } from '~/utils';
+import { addPoolAccount, addWithdrawal, getPoolAccountsFromAccount, addRagequit, aspClient } from '~/utils';
 
 const { TEST_MODE } = getEnv();
 
@@ -19,6 +20,7 @@ type ContextType = {
   poolsByAssetAndChain: PoolAccount[];
   isLoading: boolean;
   hasApprovedDeposit: boolean;
+  hasProcessedInitialDeposits: boolean; // True after initial deposit status fetch completes
 
   createAccount: (seed: string) => void;
   loadAccount: (seed: string) => Promise<void>;
@@ -50,6 +52,7 @@ export const AccountProvider = ({ children }: Props) => {
   const [poolAccountsByChainScope, setPoolAccountsByChainScope] = useState<ContextType['poolAccountsByChainScope']>({});
   const [isLoading, setIsLoading] = useState(false);
   const [hideEmptyPools, setHideEmptyPools] = useState(false);
+  const [hasProcessedInitialDeposits, setHasProcessedInitialDeposits] = useState(false);
   const { selectedPoolInfo } = useChainContext();
   const { addNotification } = useNotifications();
   const {
@@ -201,6 +204,7 @@ export const AccountProvider = ({ children }: Props) => {
   );
 
   // Process deposits for ALL scopes (used on initial account load)
+  // This fetches from each chain's ASP endpoint separately since each ASP only returns deposits for its scope
   const fetchAndProcessAllDeposits = useCallback(
     async (poolAccountsByChainScopeToProcess: Record<string, PoolAccount[]>) => {
       setIsLoading(true);
@@ -211,35 +215,51 @@ export const AccountProvider = ({ children }: Props) => {
         return;
       }
 
-      // Collect all labels from all scopes
-      const allLabels: string[] = [];
-      for (const accounts of Object.values(poolAccountsByChainScopeToProcess)) {
-        for (const account of accounts) {
-          allLabels.push(account.label.toString());
-        }
-      }
-
-      if (allLabels.length === 0) {
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        const deposits = await fetchDepositsByLabel(allLabels);
-        if (deposits.length) {
-          // Process each scope with the deposits
+        // Fetch deposits for each scope from its respective ASP endpoint
+        const allDeposits: DepositsByLabelResponse = [];
+
+        for (const scopeKey of allScopeKeys) {
+          const accountsForScope = poolAccountsByChainScopeToProcess[scopeKey];
+          if (!accountsForScope || accountsForScope.length === 0) continue;
+
+          // Parse chainId and scope from the key (format: "chainId-scope")
+          const [chainIdStr, ...scopeParts] = scopeKey.split('-');
+          const chainId = parseInt(chainIdStr, 10);
+          const scope = scopeParts.join('-'); // Rejoin in case scope contains dashes
+
+          // Get the ASP URL for this chain
+          const chainInfo = chainData[chainId];
+          if (!chainInfo) {
+            continue;
+          }
+
+          const labels = accountsForScope.map((a) => a.label.toString());
+
+          try {
+            const deposits = await aspClient.fetchDepositsByLabel(chainInfo.aspUrl, chainId, scope, labels);
+            allDeposits.push(...deposits);
+          } catch (err) {
+            console.error(`Error fetching deposits for scope ${scopeKey}:`, err);
+          }
+        }
+
+        if (allDeposits.length > 0) {
+          // Process each scope with its deposits
           for (const scopeKey of allScopeKeys) {
             const accountsForScope = poolAccountsByChainScopeToProcess[scopeKey];
             if (!accountsForScope || accountsForScope.length === 0) continue;
 
             const scopeLabels = accountsForScope.map((a) => a.label.toString());
-            const scopeDeposits = deposits.filter((d) => scopeLabels.includes(d.label));
+            const scopeDeposits = allDeposits.filter((d) => scopeLabels.includes(d.label));
 
             if (scopeDeposits.length > 0) {
               // Update the scope in poolAccountsByChainScope
               setPoolAccountsByChainScope((prev) => {
                 const accountsToUpdate = prev[scopeKey];
-                if (!accountsToUpdate) return prev;
+                if (!accountsToUpdate) {
+                  return prev;
+                }
 
                 const updatedAccountsForScope = accountsToUpdate.map((entry) => {
                   const deposit = scopeDeposits.find((d) => d.label === entry.label.toString());
@@ -286,9 +306,10 @@ export const AccountProvider = ({ children }: Props) => {
         console.error('Error fetching deposits for all scopes:', error);
       } finally {
         setIsLoading(false);
+        setHasProcessedInitialDeposits(true);
       }
     },
-    [fetchDepositsByLabel, mtLeavesData],
+    [mtLeavesData],
   );
 
   const handleLoadAccount = useCallback(
@@ -297,23 +318,28 @@ export const AccountProvider = ({ children }: Props) => {
         throw new Error('Seed not found');
       }
 
-      const loadedPoolAccounts = await loadAccount(seed);
+      await loadAccount(seed);
 
-      // Build poolAccountsByChainScope from the loaded accounts for processing all scopes
-      const loadedPoolAccountsByChainScope: Record<string, PoolAccount[]> = {};
-      for (const pa of loadedPoolAccounts) {
-        const key = `${pa.chainId}-${pa.scope}`;
-        if (!loadedPoolAccountsByChainScope[key]) {
-          loadedPoolAccountsByChainScope[key] = [];
-        }
-        loadedPoolAccountsByChainScope[key].push(pa);
-      }
-
-      // Process ALL scopes on initial load to update reviewStatus for all pools
-      await fetchAndProcessAllDeposits(loadedPoolAccountsByChainScope);
+      // Small delay to ensure poolAccountsByChainScope state is updated
+      // before we process deposits for all scopes
+      await new Promise((resolve) => setTimeout(resolve, 100));
     },
-    [loadAccount, fetchAndProcessAllDeposits],
+    [loadAccount],
   );
+
+  // Effect to process all deposits when poolAccountsByChainScope is first populated
+  const hasProcessedInitialDepositsRef = useRef(false);
+  const fetchAndProcessAllDepositsRef = useRef(fetchAndProcessAllDeposits);
+  fetchAndProcessAllDepositsRef.current = fetchAndProcessAllDeposits;
+
+  useEffect(() => {
+    const scopeKeys = Object.keys(poolAccountsByChainScope);
+    if (scopeKeys.length > 0 && !hasProcessedInitialDepositsRef.current && seed) {
+      hasProcessedInitialDepositsRef.current = true;
+      // Process ALL scopes on initial load to update reviewStatus for all pools
+      fetchAndProcessAllDepositsRef.current(poolAccountsByChainScope);
+    }
+  }, [poolAccountsByChainScope, seed]);
 
   const handleUpdatePoolAccounts = useCallback(async () => {
     if (!accountServiceRef.current) throw new Error('Account service not found');
@@ -365,8 +391,11 @@ export const AccountProvider = ({ children }: Props) => {
 
   const resetGlobalState = () => {
     setPoolAccounts([]);
+    setPoolAccountsByChainScope({});
     setSeed(null);
     accountServiceRef.current = null;
+    hasProcessedInitialDepositsRef.current = false;
+    setHasProcessedInitialDeposits(false);
   };
 
   const toggleHideEmptyPools = useCallback(() => {
@@ -486,6 +515,7 @@ export const AccountProvider = ({ children }: Props) => {
         poolsByAssetAndChain,
         isLoading,
         hasApprovedDeposit,
+        hasProcessedInitialDeposits,
         allPools,
         amountPoolAsset,
         pendingAmountPoolAsset,
