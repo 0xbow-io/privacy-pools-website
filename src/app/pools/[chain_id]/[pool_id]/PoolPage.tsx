@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Stack, Typography, Button, styled, Box, Autocomplete, TextField, IconButton, Grid } from '@mui/material';
+import { Stack, Typography, Button, styled, Box, IconButton, Grid } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
@@ -14,15 +14,6 @@ import { Section, PAContainer, ActionMenu } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
 import { EventType, ModalType, ReviewStatus } from '~/types';
 import { ROUTER, aspClient } from '~/utils';
-
-interface PoolOption {
-  value: ChainAssets;
-  label: string;
-  chainId: number;
-  chainName: string;
-  icon?: string;
-  scope?: string;
-}
 
 interface PoolPageProps {
   chainId: string;
@@ -90,57 +81,28 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     return poolStatsData.pools.find((pool) => pool.scope === poolScope);
   }, [poolStatsData, poolScope]);
 
-  // Calculate stats
-  const acceptedFunds = useMemo(() => {
-    // First try to use acceptedDepositsValueUsd from currentPoolStats
-    if (currentPoolStats?.acceptedDepositsValueUsd) {
-      const usdValue = parseFloat(currentPoolStats.acceptedDepositsValueUsd.replace(/,/g, ''));
-      if (usdValue > 0) {
-        return usdValue;
-      }
-    }
-
-    // Fallback to acceptedDepositsValue if USD value is 0 or unavailable
+  // Calculate stats - token amounts
+  const acceptedFundsToken = useMemo(() => {
     if (currentPoolStats?.acceptedDepositsValue) {
-      const tokenAmount = formatUnits(BigInt(currentPoolStats.acceptedDepositsValue), assetDecimals || decimals);
-      // Estimate USD value using rough price estimates
-      let priceUSD = 1; // Default for stablecoins
-      if (symbol === 'ETH' || symbol === 'WETH' || symbol === 'wstETH' || symbol === 'WOETH') {
-        priceUSD = 2500; // ETH price
-      } else if (symbol === 'wBTC') {
-        priceUSD = 40000; // BTC price
-      }
-      return Number(tokenAmount) * priceUSD;
+      return Number(formatUnits(BigInt(currentPoolStats.acceptedDepositsValue), assetDecimals || decimals));
     }
-
-    // Final fallback to poolData.totalInPoolValue
     if (!poolData?.totalInPoolValue) return 0;
-    const totalFunds = formatUnits(BigInt(poolData.totalInPoolValue), assetDecimals || decimals);
-    let priceUSD = 1; // Default for stablecoins
-    if (symbol === 'ETH' || symbol === 'WETH' || symbol === 'wstETH' || symbol === 'WOETH') {
-      priceUSD = 2500; // ETH price
-    } else if (symbol === 'wBTC') {
-      priceUSD = 40000; // BTC price
-    }
-    return Number(totalFunds) * priceUSD;
-  }, [currentPoolStats, poolData, assetDecimals, decimals, symbol]);
+    return Number(formatUnits(BigInt(poolData.totalInPoolValue), assetDecimals || decimals));
+  }, [currentPoolStats, poolData, assetDecimals, decimals]);
 
-  const pendingFunds = useMemo(() => {
-    if (!currentPoolStats?.pendingDepositsValueUsd) return 0;
-    return Number(currentPoolStats.pendingDepositsValueUsd);
-  }, [currentPoolStats]);
-
-  const myFunds = useMemo(() => {
-    if (!isLogged) return 0;
-    const amount = formatUnits(amountPoolAsset, assetDecimals || decimals);
-    // Use Alchemy price from ChainContext, fallback to 0 if not available
-    return Number(amount) * (price || 0);
-  }, [isLogged, amountPoolAsset, assetDecimals, decimals, price]);
+  const pendingFundsToken = useMemo(() => {
+    if (!currentPoolStats?.pendingDepositsValue) return 0;
+    return Number(formatUnits(BigInt(currentPoolStats.pendingDepositsValue), assetDecimals || decimals));
+  }, [currentPoolStats, assetDecimals, decimals]);
 
   const myFundsToken = useMemo(() => {
-    if (!isLogged) return '0';
-    return formatUnits(amountPoolAsset, assetDecimals || decimals);
+    if (!isLogged) return 0;
+    return Number(formatUnits(amountPoolAsset, assetDecimals || decimals));
   }, [isLogged, amountPoolAsset, assetDecimals, decimals]);
+
+  const myFundsUsd = useMemo(() => {
+    return myFundsToken * (price || 0);
+  }, [myFundsToken, price]);
 
   const myPoolAccountsCount = useMemo(() => {
     if (!isLogged || !poolScope) return 0;
@@ -336,7 +298,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             <StatsColumn item xs={12} sm={3}>
               <StatLabel>Accepted Funds</StatLabel>
               <StatValue>
-                ${acceptedFunds.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {Math.round(acceptedFundsToken).toLocaleString('en-US')} {symbol}
               </StatValue>
               <StatChange>
                 <TrendIcon>↗</TrendIcon> 8.5% past 24h
@@ -346,7 +308,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             <StatsColumn item xs={12} sm={3}>
               <StatLabel>Pending Funds</StatLabel>
               <StatValue>
-                ${pendingFunds.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {Math.round(pendingFundsToken).toLocaleString('en-US')} {symbol}
               </StatValue>
               <StatChange>
                 <TrendIcon>↗</TrendIcon> 8.5% past 24h
@@ -356,11 +318,9 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             <StatsColumn item xs={12} sm={3}>
               <StatLabel>My Funds</StatLabel>
               <StatValue>
-                ${myFunds.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {Math.round(myFundsToken).toLocaleString('en-US')} {symbol}
               </StatValue>
-              <StatSubtext>
-                {myFundsToken} {symbol}
-              </StatSubtext>
+              <StatSubtext>${Math.round(myFundsUsd).toLocaleString('en-US')}</StatSubtext>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={3} isLast>
@@ -484,217 +444,194 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   );
 };
 
-// Custom Pool Asset Select Component
+// Custom Pool Asset Select Component with two-level selection (Chain -> Token)
 const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string }) => {
   const router = useRouter();
   const { setSelectedAsset } = useChainContext();
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedChainId, setSelectedChainId] = useState<number>(chainId);
+  const [chainSearchQuery, setChainSearchQuery] = useState('');
+  const [tokenSearchQuery, setTokenSearchQuery] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Get the ASP URL for this specific chain
-  const aspUrl = chainData[chainId]?.aspUrl;
+  // Get available chains that have pools, filtered by search
+  const availableChains = useMemo(() => {
+    const chains = Object.entries(allPoolsChainData).map(([cId, chainInfo]) => ({
+      chainId: parseInt(cId),
+      name: chainInfo.name,
+      image: chainInfo.image,
+    }));
 
-  // Fetch pool stats for this chain
-  const { data: poolStatsData } = useQuery({
-    queryKey: ['pool_stats_selector', chainId, aspUrl],
-    queryFn: () => aspClient.fetchPoolStats(aspUrl, chainId),
-    enabled: !!aspUrl,
-    refetchInterval: 120000,
-    staleTime: 60000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
+    if (!chainSearchQuery.trim()) return chains;
+    return chains.filter((c) => c.name.toLowerCase().includes(chainSearchQuery.toLowerCase()));
+  }, [chainSearchQuery]);
 
-  // Get all available pools from ALL chains
-  const baseOptions: PoolOption[] = useMemo(() => {
-    const options: PoolOption[] = [];
+  // Get tokens for the selected chain, filtered by search
+  const tokensForChain = useMemo(() => {
+    const chainInfo = allPoolsChainData[selectedChainId];
+    if (!chainInfo) return [];
+    const tokens = chainInfo.poolInfo.map((pool: PoolInfo) => ({
+      asset: pool.asset,
+      icon: pool.icon,
+      scope: pool.scope.toString(),
+    }));
 
-    Object.entries(allPoolsChainData).forEach(([cId, chainInfo]) => {
-      chainInfo.poolInfo.forEach((pool: PoolInfo) => {
-        options.push({
-          value: pool.asset as ChainAssets,
-          label: pool.asset,
-          chainId: parseInt(cId),
-          chainName: chainInfo.name,
-          icon: pool.icon,
-          scope: pool.scope.toString(),
-        });
-      });
-    });
+    if (!tokenSearchQuery.trim()) return tokens;
+    return tokens.filter((t) => t.asset.toLowerCase().includes(tokenSearchQuery.toLowerCase()));
+  }, [selectedChainId, tokenSearchQuery]);
 
-    return options;
-  }, []);
+  // Get current selection info
+  const currentChain = chainData[chainId];
+  const currentPool = currentChain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase());
 
-  // Sort pools by popularity (totalInPoolValueUsd) with priority pools first
-  const availableOptions = useMemo(() => {
-    if (!poolStatsData?.pools) return baseOptions;
-
-    // TEMPORARY: Priority pools for Frax announcement (chain-specific)
-    const PRIORITY_POOLS: Array<{ chainId: number; asset: string }> = [
-      { chainId: 1, asset: 'ETH' }, // Ethereum mainnet ETH
-      { chainId: 1, asset: 'FRXUSD' }, // Ethereum mainnet frxUSD
-      { chainId: 1, asset: 'USDC' }, // Ethereum mainnet USDC
-    ];
-
-    return [...baseOptions].sort((a, b) => {
-      // Check if pools are in priority list (chain-specific)
-      const aIsPriority = PRIORITY_POOLS.some(
-        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.value.toUpperCase(),
-      );
-      const bIsPriority = PRIORITY_POOLS.some(
-        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.value.toUpperCase(),
-      );
-
-      const aPriorityIndex = PRIORITY_POOLS.findIndex(
-        (p) => p.chainId === a.chainId && p.asset.toUpperCase() === a.value.toUpperCase(),
-      );
-      const bPriorityIndex = PRIORITY_POOLS.findIndex(
-        (p) => p.chainId === b.chainId && p.asset.toUpperCase() === b.value.toUpperCase(),
-      );
-
-      // Priority pools come first, sorted by their priority order
-      if (aIsPriority && bIsPriority) {
-        return aPriorityIndex - bPriorityIndex;
-      }
-      if (aIsPriority) return -1;
-      if (bIsPriority) return 1;
-
-      // Sort by totalInPoolValueUsd (most popular) for non-priority pools
-      if (!poolStatsData.pools) return 0;
-      // Use chainId-scope as key to find the right pool stats
-      const aKey = `${a.chainId}-${a.scope}`;
-      const bKey = `${b.chainId}-${b.scope}`;
-      const aStats = poolStatsData.pools.find((p) => `${p.chainId}-${p.scope}` === aKey);
-      const bStats = poolStatsData.pools.find((p) => `${p.chainId}-${p.scope}` === bKey);
-      const aFunds = aStats?.totalInPoolValueUsd ? parseFloat(aStats.totalInPoolValueUsd.replace(/,/g, '')) : 0;
-      const bFunds = bStats?.totalInPoolValueUsd ? parseFloat(bStats.totalInPoolValueUsd.replace(/,/g, '')) : 0;
-      return bFunds - aFunds;
-    });
-  }, [baseOptions, poolStatsData]);
-
-  const selectedOption = availableOptions.find(
-    (opt) => opt.value.toLowerCase() === poolId.toLowerCase() && opt.chainId === chainId,
-  );
-
-  const handleChange = (_event: React.SyntheticEvent, newValue: PoolOption | null) => {
-    if (newValue) {
-      setSelectedAsset(newValue.value);
-      router.push(`/pools/${newValue.chainId}/${newValue.value.toLowerCase()}`);
+  const handleToggle = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      setSelectedChainId(chainId); // Reset to current chain when opening
+      setChainSearchQuery('');
+      setTokenSearchQuery('');
     }
   };
 
-  return (
-    <PoolSelectAutocompleteStyled
-      value={selectedOption || undefined}
-      onChange={handleChange}
-      options={availableOptions}
-      getOptionLabel={(option) => option.label}
-      componentsProps={{
-        popper: {
-          style: { width: 'fit-content' },
-        },
-        paper: {
-          sx: {
-            border: '1px solid #000000',
-            boxShadow: 'none',
-            '& .MuiAutocomplete-listbox': {
-              padding: 0,
-              '&::-webkit-scrollbar': {
-                width: '4px',
-              },
-              '&::-webkit-scrollbar-track': {
-                background: 'transparent',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                background: '#E6E6E6',
-                borderRadius: '4px',
-              },
-              '&::-webkit-scrollbar-thumb:hover': {
-                background: '#D0D0D0',
-              },
-              scrollbarWidth: 'thin',
-              scrollbarColor: '#E6E6E6 transparent',
-            },
-            '& .MuiAutocomplete-option': {
-              padding: '12px 0px',
-              height: '45px',
-              borderBottom: '1px solid #E6E6E6',
-              '&:last-child': {
-                borderBottom: 'none',
-              },
-            },
-          },
-        },
-      }}
-      renderOption={(props, option) => (
-        <li {...props} key={`${option.chainId}-${option.value}`}>
-          <PoolOptionContent>
-            {option.icon && (
-              <PoolIconWrapper>
-                <Image src={option.icon} alt={option.label} width={24} height={24} />
-              </PoolIconWrapper>
-            )}
-            <span>
-              {option.label}@<ChainNameText>{option.chainName}</ChainNameText>
-            </span>
-          </PoolOptionContent>
-        </li>
-      )}
-      renderInput={(params) => {
-        const icon = selectedOption?.icon;
-        const { InputProps, inputProps, ...restParams } = params;
-        const { endAdornment, ...restInputProps } = InputProps;
+  const handleChainSelect = (newChainId: number) => {
+    setSelectedChainId(newChainId);
+    setTokenSearchQuery(''); // Clear token search when changing chain
+  };
 
-        return (
-          <TextField
-            {...restParams}
-            size='small'
-            variant='outlined'
-            InputProps={{
-              ...restInputProps,
-              startAdornment: (
-                <>
-                  {icon && (
-                    <PoolIconWrapper sx={{ mr: '0.8rem' }}>
-                      <Image src={icon} alt={selectedOption?.label || ''} width={24} height={24} />
-                    </PoolIconWrapper>
-                  )}
-                  {selectedOption && (
-                    <Box
-                      component='span'
-                      sx={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: '16px' }}
-                    >
-                      <span>{selectedOption.label}</span>
-                      <ChainNameText>@{selectedOption.chainName}</ChainNameText>
-                    </Box>
-                  )}
-                </>
-              ),
-              endAdornment: (
-                <>
-                  <Typography
-                    variant='subtitle1'
-                    fontWeight='bold'
-                    lineHeight='1'
-                    sx={{ ml: '4px', mr: '4px', whiteSpace: 'nowrap' }}
+  const handleTokenSelect = (asset: string) => {
+    setSelectedAsset(asset as ChainAssets);
+    router.push(`/pools/${selectedChainId}/${asset.toLowerCase()}`);
+    setIsOpen(false);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <PoolSelectorContainer ref={dropdownRef}>
+      <PoolSelectorButton onClick={handleToggle}>
+        {currentPool?.icon && (
+          <PoolIconWrapper>
+            <Image src={currentPool.icon} alt={currentPool.asset} width={24} height={24} />
+          </PoolIconWrapper>
+        )}
+        <span style={{ fontWeight: 600, fontSize: '16px' }}>
+          {currentPool?.asset}
+          <ChainNameText>@{currentChain?.name}</ChainNameText>
+        </span>
+        <Typography variant='subtitle1' fontWeight='bold' lineHeight='1' sx={{ ml: '4px', whiteSpace: 'nowrap' }}>
+          Pool
+        </Typography>
+        <DropdownArrow open={isOpen}>
+          <svg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'>
+            <path
+              d='M1 1.5L6 6.5L11 1.5'
+              stroke='black'
+              strokeWidth='1.5'
+              strokeLinecap='round'
+              strokeLinejoin='round'
+            />
+          </svg>
+        </DropdownArrow>
+      </PoolSelectorButton>
+
+      {isOpen && (
+        <PoolSelectorDropdown>
+          <DropdownContent>
+            {/* Chain selector (left side) */}
+            <ChainColumn>
+              <SearchContainer>
+                <SearchIconSvg />
+                <SearchInput
+                  type='text'
+                  placeholder='Search Chains'
+                  value={chainSearchQuery}
+                  onChange={(e) => setChainSearchQuery(e.target.value)}
+                />
+              </SearchContainer>
+              <ChainList showScrollbar={availableChains.length >= 7}>
+                {availableChains.map((chain) => (
+                  <ChainItem
+                    key={chain.chainId}
+                    selected={chain.chainId === selectedChainId}
+                    onClick={() => handleChainSelect(chain.chainId)}
                   >
-                    Pool
-                  </Typography>
-                  {endAdornment}
-                </>
-              ),
-            }}
-            inputProps={{
-              ...inputProps,
-              value: '',
-              style: { width: 0, padding: 0, margin: 0, minWidth: 0, flex: 'none' }, // Hide the default input since we're using startAdornment
-            }}
-          />
-        );
-      }}
-      disableClearable
-    />
+                    <Image src={chain.image} alt={chain.name} width={24} height={24} />
+                    <span>{chain.name}</span>
+                    {chain.chainId === selectedChainId && (
+                      <CheckIcon>
+                        <svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
+                          <path
+                            d='M13.5 4.5L6 12L2.5 8.5'
+                            stroke='black'
+                            strokeWidth='1.5'
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                          />
+                        </svg>
+                      </CheckIcon>
+                    )}
+                  </ChainItem>
+                ))}
+                {availableChains.length === 0 && <NoResultsText>No chains found</NoResultsText>}
+              </ChainList>
+            </ChainColumn>
+
+            {/* Token selector (right side) */}
+            <TokenColumn>
+              <SearchContainer>
+                <SearchIconSvg />
+                <SearchInput
+                  type='text'
+                  placeholder='Search Tokens'
+                  value={tokenSearchQuery}
+                  onChange={(e) => setTokenSearchQuery(e.target.value)}
+                />
+              </SearchContainer>
+              <TokenList showScrollbar={tokensForChain.length >= 7}>
+                {tokensForChain.map((token) => (
+                  <TokenItem
+                    key={token.asset}
+                    onClick={() => handleTokenSelect(token.asset)}
+                    selected={selectedChainId === chainId && token.asset.toLowerCase() === poolId.toLowerCase()}
+                  >
+                    {token.icon && <Image src={token.icon} alt={token.asset} width={24} height={24} />}
+                    <span>{token.asset}</span>
+                  </TokenItem>
+                ))}
+                {tokensForChain.length === 0 && <NoResultsText>No tokens found</NoResultsText>}
+              </TokenList>
+            </TokenColumn>
+          </DropdownContent>
+        </PoolSelectorDropdown>
+      )}
+    </PoolSelectorContainer>
   );
 };
+
+// Search icon component
+const SearchIconSvg = () => (
+  <SearchIcon>
+    <svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
+      <path
+        d='M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z'
+        stroke='#999'
+        strokeWidth='1.5'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      />
+      <path d='M14 14L11 11' stroke='#999' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' />
+    </svg>
+  </SearchIcon>
+);
 
 const BackButton = styled(IconButton)(() => ({
   padding: '11px 15px 11px 11px',
@@ -713,93 +650,182 @@ const BackButton = styled(IconButton)(() => ({
   },
 }));
 
-const PoolSelectAutocomplete = styled(Autocomplete<PoolOption, false, true, false>)(({ theme }) => ({
-  width: 'fit-content',
-  maxWidth: 'fit-content',
-  marginLeft: '-4px',
-  '& .MuiOutlinedInput-root': {
-    fontWeight: 600,
-    fontSize: '16px',
-    paddingLeft: '12px',
-    paddingRight: '8px',
-    paddingTop: '4px',
-    paddingBottom: '4px',
-    width: 'fit-content',
-    maxWidth: 'fit-content',
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    '& .MuiOutlinedInput-notchedOutline': {
-      border: 'none',
-    },
-    '&:hover .MuiOutlinedInput-notchedOutline': {
-      border: 'none',
-    },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-      border: 'none',
-    },
-  },
-  '& .MuiAutocomplete-input': {
-    cursor: 'pointer',
-    padding: '0 !important',
-    minWidth: '0 !important',
-    width: '0 !important',
-    flex: '0 0 auto',
-    position: 'absolute',
-    opacity: 0,
-    pointerEvents: 'none',
-  },
-  '& .MuiInputBase-input': {
-    overflow: 'visible !important',
-    textOverflow: 'clip !important',
-    whiteSpace: 'nowrap !important',
-  },
-  '& .MuiAutocomplete-endAdornment': {
-    position: 'relative !important',
-    top: 'auto !important',
-    right: 'auto !important',
-    transform: 'none !important',
-    display: 'flex',
-    alignItems: 'center',
-    marginLeft: '0px',
-  },
-  '& .MuiAutocomplete-popupIndicator': {
-    border: '1px solid transparent',
-    padding: '4px',
-    marginRight: '0',
-    backgroundColor: 'transparent',
-    '&:hover': {
-      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-      border: '1px solid transparent',
-    },
-    '&:focus': {
-      border: '1px solid transparent',
-    },
-  },
-  [theme.breakpoints.down('sm')]: {
-    maxWidth: '250px',
-  },
+// Pool selector styled components
+const PoolSelectorContainer = styled('div')(() => ({
+  position: 'relative',
+  display: 'inline-block',
 }));
 
-// Override the popper width globally for this autocomplete
-const PoolSelectAutocompleteStyled = styled(PoolSelectAutocomplete)(() => ({
-  '& + .MuiAutocomplete-popper': {
-    width: 'fit-content !important',
-    minWidth: '200px',
-    '& .MuiPaper-root': {
-      width: 'fit-content !important',
-    },
-    '& .MuiAutocomplete-listbox': {
-      width: 'fit-content !important',
-    },
-  },
-}));
-
-const PoolOptionContent = styled('div')(() => ({
+const PoolSelectorButton = styled('button')(() => ({
   display: 'flex',
   alignItems: 'center',
   gap: '8px',
-  width: '100%',
+  padding: '8px 12px',
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  '&:hover': {
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+  },
+}));
+
+const DropdownArrow = styled('span', {
+  shouldForwardProp: (prop) => prop !== 'open',
+})<{ open: boolean }>(({ open }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  marginLeft: '4px',
+  transition: 'transform 0.2s',
+  transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+}));
+
+const PoolSelectorDropdown = styled('div')(({ theme }) => ({
+  position: 'absolute',
+  top: '100%',
+  left: 0,
+  marginTop: '4px',
+  backgroundColor: '#fff',
+  border: '1px solid #000',
+  zIndex: 1000,
+  minWidth: '500px',
+  height: '380px',
+  overflow: 'hidden',
+  [theme.breakpoints.down('sm')]: {
+    position: 'fixed',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    top: 'auto',
+    minWidth: 'calc(100vw - 32px)',
+    maxWidth: '500px',
+  },
+}));
+
+const DropdownContent = styled('div')(() => ({
+  display: 'flex',
+  height: '100%',
+}));
+
+const ChainColumn = styled('div')(() => ({
+  width: '200px',
+  display: 'flex',
+  flexDirection: 'column',
+  borderRight: '1px solid #E6E6E6',
+  height: '100%',
+}));
+
+const TokenColumn = styled('div')(() => ({
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  height: '100%',
+}));
+
+const SearchContainer = styled('div')(() => ({
+  display: 'flex',
+  alignItems: 'center',
+  padding: '12px 16px',
+  borderBottom: '1px solid #E6E6E6',
+  gap: '8px',
+}));
+
+const SearchIcon = styled('div')(() => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+}));
+
+const SearchInput = styled('input')(() => ({
+  flex: 1,
+  border: 'none',
+  outline: 'none',
+  fontSize: '14px',
+  '&::placeholder': {
+    color: '#999',
+  },
+}));
+
+const ChainList = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'showScrollbar',
+})<{ showScrollbar?: boolean }>(({ showScrollbar = true }) => ({
+  flex: 1,
+  overflowY: 'auto',
+  '&::-webkit-scrollbar': {
+    width: showScrollbar ? '4px' : '0px',
+  },
+  '&::-webkit-scrollbar-thumb': {
+    background: '#E6E6E6',
+    borderRadius: '4px',
+  },
+  scrollbarWidth: showScrollbar ? 'thin' : 'none',
+}));
+
+const ChainItem = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'selected',
+})<{ selected: boolean }>(({ selected }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '12px 16px',
+  cursor: 'pointer',
+  backgroundColor: selected ? '#F5F5F5' : 'transparent',
+  fontSize: '13px',
+  fontWeight: selected ? 600 : 400,
+  '&:hover': {
+    backgroundColor: '#F5F5F5',
+  },
+  '& span': {
+    flex: 1,
+  },
+}));
+
+const CheckIcon = styled('div')(() => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+}));
+
+const TokenList = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'showScrollbar',
+})<{ showScrollbar?: boolean }>(({ showScrollbar = true }) => ({
+  flex: 1,
+  overflowY: 'auto',
+  '&::-webkit-scrollbar': {
+    width: showScrollbar ? '4px' : '0px',
+  },
+  '&::-webkit-scrollbar-thumb': {
+    background: '#E6E6E6',
+    borderRadius: '4px',
+  },
+  scrollbarWidth: showScrollbar ? 'thin' : 'none',
+}));
+
+const TokenItem = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'selected',
+})<{ selected: boolean }>(({ selected }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  padding: '12px 16px',
+  cursor: 'pointer',
+  backgroundColor: selected ? '#F5F5F5' : 'transparent',
+  fontSize: '14px',
+  fontWeight: selected ? 600 : 400,
+  borderBottom: '1px solid #E6E6E6',
+  '&:hover': {
+    backgroundColor: '#F5F5F5',
+  },
+  '&:last-child': {
+    borderBottom: 'none',
+  },
+}));
+
+const NoResultsText = styled('div')(() => ({
+  padding: '16px',
+  color: '#999',
+  fontSize: '13px',
+  textAlign: 'center',
 }));
 
 const PoolIconWrapper = styled('div')(() => ({
