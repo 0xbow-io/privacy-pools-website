@@ -1,21 +1,64 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Button, styled } from '@mui/material';
-import { useAccount } from 'wagmi';
-import { useModal, usePoolAccountsContext, useAccountContext } from '~/hooks';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { allPoolsChainData } from '~/config';
+import { useModal, usePoolAccountsContext, useAccountContext, useNotifications } from '~/hooks';
 import { useChainContext } from '~/hooks/context/useChainContext';
-import { EventType, ModalType } from '~/types';
+import { EventType, ModalType, ReviewStatus } from '~/types';
 
 export const WithdrawAssetSelect: React.FC = () => {
-  const { hasSomeRelayerAvailable } = useChainContext();
+  const { hasSomeRelayerAvailable, chainId, setSelectedAsset } = useChainContext();
   const { setModalOpen } = useModal();
   const { setActionType } = usePoolAccountsContext();
-  const { hasApprovedDeposit, seed } = useAccountContext();
+  const { poolAccountsByChainScope, seed } = useAccountContext();
   const { address } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const { addNotification } = useNotifications();
 
-  const isWithdrawDisabled = !address || !hasApprovedDeposit || !seed || !hasSomeRelayerAvailable;
+  // Find the first pool account with approved deposit and balance > 0 across ALL chains/pools
+  const firstPoolWithFunds = useMemo(() => {
+    for (const [key, accounts] of Object.entries(poolAccountsByChainScope)) {
+      const approvedWithBalance = accounts.find(
+        (acc) => acc.reviewStatus === ReviewStatus.APPROVED && acc.balance > 0n,
+      );
+      if (approvedWithBalance) {
+        const [chainIdStr, scope] = key.split('-');
+        const poolChainId = parseInt(chainIdStr, 10);
+        // Find the asset for this scope
+        const chainInfo = allPoolsChainData[poolChainId];
+        const poolInfo = chainInfo?.poolInfo.find((p) => p.scope.toString() === scope);
+        if (poolInfo) {
+          return {
+            chainId: poolChainId,
+            asset: poolInfo.asset,
+            chainName: chainInfo.name,
+          };
+        }
+      }
+    }
+    return null;
+  }, [poolAccountsByChainScope]);
+
+  const hasAnyApprovedDeposit = !!firstPoolWithFunds;
+  const isWithdrawDisabled = !address || !hasAnyApprovedDeposit || !seed || !hasSomeRelayerAvailable;
 
   const handleClick = () => {
+    if (firstPoolWithFunds) {
+      // Switch chain if needed
+      if (firstPoolWithFunds.chainId !== chainId) {
+        try {
+          switchChain({ chainId: firstPoolWithFunds.chainId });
+          addNotification('info', `Switching to ${firstPoolWithFunds.chainName}...`);
+        } catch (err) {
+          console.error('Failed to switch chain:', err);
+        }
+      }
+      // Set the selected asset to the pool with funds
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setSelectedAsset(firstPoolWithFunds.asset as any);
+    }
     setModalOpen(ModalType.WITHDRAW);
     setActionType(EventType.WITHDRAWAL);
   };
