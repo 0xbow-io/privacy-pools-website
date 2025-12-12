@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { TrendingUp as TrendingUpIcon, Close as CloseIcon } from '@mui/icons-material';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
   Box,
   Button,
-  FormControl,
   FormHelperText,
-  MenuItem,
-  Select,
   Stack,
   styled,
   TextField,
@@ -25,8 +23,9 @@ import { captureException, withScope } from '@sentry/nextjs';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { formatUnits, parseUnits, erc20Abi, encodeFunctionData } from 'viem';
 import { useAccount, usePublicClient, useSwitchChain } from 'wagmi';
-import { allPoolsChainData, getConfig, PoolInfo } from '~/config';
+import { allPoolsChainData, getConfig, chainData, PoolInfo } from '~/config';
 import { getConstants } from '~/config/constants';
+import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
 import {
@@ -82,6 +81,7 @@ export const DepositForm = () => {
     }
     return true;
   });
+  const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
   // Sentry error wrapper (consistent with hooks)
   const logErrorToSentry = useCallback(
@@ -555,6 +555,42 @@ export const DepositForm = () => {
     }
   };
 
+  // Handle chain+token selection from dropdown
+  const handleChainTokenSelect = (selectedChainId: number, selectedAsset: string) => {
+    // Find the selected pool from allPools
+    const selectedPool = allPools.find(
+      (p) => p.chainId === selectedChainId && p.asset.toLowerCase() === selectedAsset.toLowerCase(),
+    );
+
+    if (selectedPool) {
+      // If selecting a pool from a different chain, trigger a wallet chain switch
+      if (selectedPool.chainId !== chainId) {
+        try {
+          switchChain({ chainId: selectedPool.chainId });
+          addNotification('info', `Switching to ${selectedPool.chainName}...`);
+        } catch (err) {
+          // Fall back to instructing the user if automatic switch fails
+          logErrorToSentry(err, {
+            targetChainId: selectedPool.chainId,
+            targetChainName: selectedPool.chainName,
+            from: 'DepositForm Pool Select',
+          });
+          addNotification('error', `Please switch to ${selectedPool.chainName} to deposit to this pool`);
+        }
+      }
+
+      // Switch to the selected pool asset
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setSelectedAsset(selectedAsset as any);
+    }
+
+    // Reset alternative token selection
+    setSelectedAlternativeToken(null);
+    setSelectedToken('native');
+    // Reset amount
+    setInputAmount('');
+  };
+
   // Auto-select alternative token when switching to a yield pool that has the previous token as alternative
   useEffect(() => {
     if (isStakingEnabled && selectedPoolInfo?.alternativeTokens?.length) {
@@ -698,150 +734,47 @@ export const DepositForm = () => {
           </Stack>
 
           <TokenSelectorContainer>
-            <FormControl>
-              <TokenSelect
-                value={selectedPoolInfo ? `${chainId}-${selectedPoolInfo.asset}` : ''}
-                onChange={(e) => {
-                  const selectedValue = String(e.target.value);
-                  // Parse chainId-asset format
-                  const [selectedChainId, selectedAsset] = selectedValue.split('-');
-
-                  // Find the selected pool from allPools
-                  const selectedPool = allPools.find(
-                    (p) => p.chainId === parseInt(selectedChainId) && p.asset === selectedAsset,
-                  );
-
-                  if (selectedPool) {
-                    // If selecting a pool from a different chain, trigger a wallet chain switch
-                    if (selectedPool.chainId !== chainId) {
-                      try {
-                        switchChain({ chainId: selectedPool.chainId });
-                        addNotification('info', `Switching to ${selectedPool.chainName}...`);
-                      } catch (err) {
-                        // Fall back to instructing the user if automatic switch fails
-                        logErrorToSentry(err, {
-                          targetChainId: selectedPool.chainId,
-                          targetChainName: selectedPool.chainName,
-                          from: 'DepositForm Pool Select',
-                        });
-                        addNotification('error', `Please switch to ${selectedPool.chainName} to deposit to this pool`);
-                      }
-                    }
-
-                    // Switch to the selected pool asset
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    setSelectedAsset(selectedAsset as any);
-                  }
-
-                  // Reset alternative token selection
-                  setSelectedAlternativeToken(null);
-                  setSelectedToken('native');
-                  // Reset amount
-                  setInputAmount('');
-                }}
-                displayEmpty
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      // Parent owns the border/radius; list inside scrolls
-                      border: '1px solid #D9D9D9 !important',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      boxSizing: 'border-box',
-                      '& .MuiList-root': {
-                        padding: 0,
-                        minWidth: '350px',
-                        maxHeight: '400px',
-                        overflowY: 'auto',
-                        // Remove inner borders so Paper draws the frame
-                        border: 'none',
-                        borderRadius: 0,
-                        backgroundColor: 'transparent',
-                      },
-                      '& .MuiMenuItem-root': {
-                        paddingLeft: '16px',
-                        paddingRight: '16px',
-                        paddingTop: '12px',
-                        paddingBottom: '12px',
-                        position: 'relative',
-                        borderBottom: 'none',
-                        '&:not(:last-child)::after': {
-                          content: '""',
-                          position: 'absolute',
-                          bottom: 0,
-                          left: '16px',
-                          right: '16px',
-                          height: '1px',
-                          backgroundColor: '#D9D9D9',
-                        },
-                      },
-                    },
-                  },
-                }}
-                renderValue={(value) => {
-                  if (!value) return <Typography>Select Pool</Typography>;
-                  const [cId, asset] = String(value).split('-');
-                  const pool = allPools.find((p) => p.chainId === parseInt(cId) && p.asset === asset);
-                  return (
-                    <Stack direction='row' alignItems='center' gap='8px'>
-                      {pool?.icon ? (
-                        <Image src={pool.icon} alt={asset} width={20} height={20} />
-                      ) : (
-                        <Box width='20px' height='20px' />
-                      )}
-                      <Typography>{asset}</Typography>
-                    </Stack>
-                  );
-                }}
-              >
-                {allPools.map((pool) => {
-                  const isLoading = poolStatsQuery[0].isLoading;
-                  const tvlUSD = pool.totalFundsUSD ?? 0;
-
-                  const tvlFormatted = isLoading
-                    ? '...'
-                    : tvlUSD > 0
-                      ? (() => {
-                          if (tvlUSD >= 1000000) {
-                            return `$${(tvlUSD / 1000000).toFixed(1)}M`;
-                          } else if (tvlUSD >= 1000) {
-                            return `$${(tvlUSD / 1000).toFixed(1)}K`;
-                          } else {
-                            return `$${tvlUSD.toFixed(0)}`;
-                          }
-                        })()
-                      : '$0';
-
-                  return (
-                    <MenuItem key={`${pool.chainId}-${pool.asset}`} value={`${pool.chainId}-${pool.asset}`}>
-                      <Stack
-                        direction='row'
-                        alignItems='center'
-                        justifyContent='space-between'
-                        width='100%'
-                        gap='12px'
-                        px={1}
-                      >
-                        <Stack direction='row' alignItems='center' gap='8px' flex={1}>
-                          {pool.icon && <Image src={pool.icon} alt={pool.asset} width={32} height={32} />}
-                          <Stack direction='column' gap='2px'>
-                            <Typography fontSize='16px' fontWeight={500}>
-                              {pool.asset}
-                            </Typography>
-                            <Typography fontSize='12px' fontWeight={400} color='#999'>
-                              {pool.chainName}
-                            </Typography>
-                          </Stack>
-                        </Stack>
-                        <Typography fontSize='14px' fontWeight={400} color='#999' whiteSpace='nowrap'>
-                          {tvlFormatted}
-                        </Typography>
-                      </Stack>
-                    </MenuItem>
-                  );
-                })}
-              </TokenSelect>
-            </FormControl>
+            <TokenSelectorButton onClick={(e) => setTokenSelectorAnchor(e.currentTarget)}>
+              <Stack direction='row' alignItems='center' gap='8px'>
+                <Box sx={{ position: 'relative', width: 24, height: 24 }}>
+                  {selectedPoolInfo?.icon && (
+                    <Image src={selectedPoolInfo.icon} alt={selectedPoolInfo.asset} width={24} height={24} />
+                  )}
+                  {chainData[chainId]?.image && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        bottom: -2,
+                        right: -2,
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        overflow: 'hidden',
+                        border: '1px solid #fff',
+                        backgroundColor: '#fff',
+                      }}
+                    >
+                      <Image
+                        src={chainData[chainId].image}
+                        alt={chainData[chainId].name}
+                        width={12}
+                        height={12}
+                        style={{ display: 'block' }}
+                      />
+                    </Box>
+                  )}
+                </Box>
+                <Typography>{selectedPoolInfo?.asset || 'Select Pool'}</Typography>
+              </Stack>
+              <KeyboardArrowDownIcon sx={{ fontSize: 20, color: '#666' }} />
+            </TokenSelectorButton>
+            <ChainTokenSelectorDropdown
+              selectedChainId={chainId}
+              selectedAsset={selectedPoolInfo?.asset || ''}
+              onSelect={handleChainTokenSelect}
+              onClose={() => setTokenSelectorAnchor(null)}
+              anchorEl={tokenSelectorAnchor}
+            />
             <BalanceText onClick={handleUseMax} style={{ cursor: 'pointer' }}>
               Bal: {balanceUI} {displaySymbol}
             </BalanceText>
@@ -1017,26 +950,21 @@ const TokenSelectorContainer = styled(Stack)(() => ({
   minWidth: '150px',
 }));
 
-const TokenSelect = styled(Select)(({ theme }) => ({
+const TokenSelectorButton = styled('button')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
   backgroundColor: theme.palette.background.default,
   border: `1px solid ${theme.palette.grey[300]}`,
   borderRadius: '8px',
+  padding: '8px 12px',
   fontSize: '14px',
   fontWeight: 500,
-  '& .MuiSelect-select': {
-    padding: '8px 12px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  '& .MuiOutlinedInput-notchedOutline': {
-    border: 'none',
-  },
+  cursor: 'pointer',
+  minWidth: '140px',
   '&:hover': {
     borderColor: theme.palette.grey[400],
-  },
-  '&.Mui-focused': {
-    borderColor: theme.palette.primary.main,
   },
 }));
 

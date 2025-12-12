@@ -556,6 +556,26 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
     return tokens.filter((t) => t.asset.toLowerCase().includes(tokenSearchQuery.toLowerCase()));
   }, [selectedChainId, tokenSearchQuery]);
 
+  // Find chains that have the searched token when not found in current chain
+  const chainsWithSearchedToken = useMemo(() => {
+    if (!tokenSearchQuery.trim() || tokensForChain.length > 0) return [];
+
+    const matchingChains: { chainId: number; name: string }[] = [];
+    for (const [cId, chainInfo] of Object.entries(allPoolsChainData)) {
+      const chainIdNum = parseInt(cId);
+      if (chainIdNum === selectedChainId) continue; // Skip current chain
+
+      const hasToken = chainInfo.poolInfo.some((pool: PoolInfo) =>
+        pool.asset.toLowerCase().includes(tokenSearchQuery.toLowerCase()),
+      );
+
+      if (hasToken) {
+        matchingChains.push({ chainId: chainIdNum, name: chainInfo.name });
+      }
+    }
+    return matchingChains;
+  }, [tokenSearchQuery, tokensForChain.length, selectedChainId]);
+
   // Get current selection info
   const currentChain = chainData[chainId];
   const currentPool = currentChain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase());
@@ -683,7 +703,21 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
                     <span>{token.asset}</span>
                   </TokenItem>
                 ))}
-                {tokensForChain.length === 0 && <NoResultsText>No tokens found</NoResultsText>}
+                {tokensForChain.length === 0 && chainsWithSearchedToken.length === 0 && (
+                  <NoResultsText>No tokens found</NoResultsText>
+                )}
+                {tokensForChain.length === 0 && chainsWithSearchedToken.length > 0 && (
+                  <TokenAvailableOnOtherChains>
+                    This token is only available on{' '}
+                    {chainsWithSearchedToken.map((chain, index) => (
+                      <span key={chain.chainId}>
+                        <ChainLink onClick={() => handleChainSelect(chain.chainId)}>{chain.name}</ChainLink>
+                        {index < chainsWithSearchedToken.length - 2 && ', '}
+                        {index === chainsWithSearchedToken.length - 2 && ' and '}
+                      </span>
+                    ))}
+                  </TokenAvailableOnOtherChains>
+                )}
               </TokenList>
             </TokenColumn>
           </DropdownContent>
@@ -902,6 +936,25 @@ const NoResultsText = styled('div')(() => ({
   color: '#999',
   fontSize: '13px',
   textAlign: 'center',
+}));
+
+const TokenAvailableOnOtherChains = styled('div')(() => ({
+  padding: '16px',
+  color: '#666',
+  fontSize: '13px',
+  textAlign: 'center',
+  lineHeight: '1.5',
+}));
+
+const ChainLink = styled('span')(() => ({
+  color: '#000',
+  fontWeight: 600,
+  textDecoration: 'underline',
+  textUnderlineOffset: '2px',
+  cursor: 'pointer',
+  '&:hover': {
+    color: '#666',
+  },
 }));
 
 const PoolIconWrapper = styled('div')(() => ({

@@ -3,6 +3,7 @@
 import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Copy, Checkmark } from '@carbon/icons-react';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
   Box,
   Button,
@@ -10,8 +11,6 @@ import {
   CircularProgress,
   FormControl,
   FormControlLabel,
-  MenuItem,
-  Select,
   SelectChangeEvent,
   Stack,
   styled,
@@ -21,15 +20,15 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { useQueries } from '@tanstack/react-query';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
-import { useEnsAddress, useEnsAvatar, useEnsName } from 'wagmi';
-import { chainData } from '~/config';
+import { useEnsAddress, useEnsAvatar, useEnsName, useSwitchChain } from 'wagmi';
+import { chainData, allPoolsChainData } from '~/config';
+import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
-import { aspClient, getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
+import { getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -56,53 +55,9 @@ export const WithdrawForm = () => {
   const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const { setExtraGas } = useQuoteContext();
+  const { switchChain } = useSwitchChain();
 
-  const chain = chainData[chainId];
-  const aspUrl = chain.aspUrl;
-
-  // Fetch TVL for all pools
-  const poolTVLQueries = useQueries({
-    queries: chain.poolInfo.map((pool) => ({
-      queryKey: ['asp_pool_info', chainId, pool.scope.toString(), aspUrl],
-      queryFn: () => aspClient.fetchPoolInfo(aspUrl, chainId, pool.scope.toString()),
-      refetchInterval: 120000,
-      staleTime: 60000,
-      retryOnMount: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
-  });
-
-  // Build TVL map by asset
-  const tvlByAsset = useMemo(() => {
-    const map = new Map<string, { tvlUSD: number; isLoading: boolean }>();
-
-    chain.poolInfo.forEach((pool, index) => {
-      const query = poolTVLQueries[index];
-      const isLoading = query.isLoading;
-
-      if (query.data) {
-        const totalInPoolValue = BigInt(query.data.totalInPoolValue || 0);
-        const tvlInToken = Number(formatUnits(totalInPoolValue, pool.assetDecimals || 18));
-
-        let priceUSD = 1;
-        const assetLower = pool.asset.toLowerCase();
-        if (assetLower === 'eth' || assetLower === 'weth' || assetLower === 'wsteth' || assetLower === 'woeth') {
-          priceUSD = 2500;
-        } else if (assetLower === 'wbtc') {
-          priceUSD = 40000;
-        }
-
-        const tvlUSD = tvlInToken * priceUSD;
-        map.set(pool.asset, { tvlUSD, isLoading: false });
-      } else {
-        map.set(pool.asset, { tvlUSD: 0, isLoading });
-      }
-    });
-
-    return map;
-  }, [poolTVLQueries, chain.poolInfo]);
+  const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
   const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals ?? 18;
   const filteredPoolAccounts = poolAccounts.filter((pa) => pa.balance > 0n);
@@ -415,10 +370,32 @@ export const WithdrawForm = () => {
     setSelectedRelayer(newRelayer ? { name: newRelayer.name, url: newRelayer.url } : undefined);
   };
 
-  const handlePoolChange = (e: SelectChangeEvent<unknown>) => {
-    const selectedAsset = e.target.value as string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setSelectedAsset(selectedAsset as any);
+  // Handle chain+token selection from dropdown
+  const handleChainTokenSelect = (selectedChainId: number, selectedAsset: string) => {
+    // Find the selected pool from allPoolsChainData
+    const targetChainData = allPoolsChainData[selectedChainId];
+    if (!targetChainData) return;
+
+    const selectedPool = targetChainData.poolInfo.find((p) => p.asset.toLowerCase() === selectedAsset.toLowerCase());
+
+    if (selectedPool) {
+      // If selecting a pool from a different chain, trigger a wallet chain switch
+      if (selectedChainId !== chainId) {
+        try {
+          switchChain({ chainId: selectedChainId });
+          addNotification('info', `Switching to ${targetChainData.name}...`);
+        } catch (err) {
+          console.error('Failed to switch chain:', err);
+          addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
+        }
+      }
+
+      // Switch to the selected pool asset
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setSelectedAsset(selectedAsset as any);
+    }
+
+    // Reset amount and pool account
     setAmount('');
     setPoolAccount(undefined);
   };
@@ -444,40 +421,47 @@ export const WithdrawForm = () => {
 
       <Stack gap={2} width='100%' maxWidth='47rem' zIndex='1'>
         {/* Pool Selector */}
-        <FormControl fullWidth>
-          <PoolSelect value={selectedPoolInfo?.asset || ''} onChange={handlePoolChange} displayEmpty>
-            {chain.poolInfo.map((pool) => {
-              const poolTVLData = tvlByAsset.get(pool.asset);
-              const tvlUSD = poolTVLData?.tvlUSD || 0;
-              const isLoading = poolTVLData?.isLoading || false;
-
-              let tvlFormatted = '...';
-              if (!isLoading) {
-                if (tvlUSD >= 1_000_000) {
-                  tvlFormatted = `$${(tvlUSD / 1_000_000).toFixed(1)}M`;
-                } else if (tvlUSD >= 1_000) {
-                  tvlFormatted = `$${(tvlUSD / 1_000).toFixed(1)}K`;
-                } else {
-                  tvlFormatted = `$${tvlUSD.toFixed(0)}`;
-                }
-              }
-
-              return (
-                <MenuItem key={pool.asset} value={pool.asset}>
-                  <Stack direction='row' justifyContent='space-between' width='100%'>
-                    <Stack direction='row' alignItems='center' gap='8px'>
-                      {pool.icon && <Image src={pool.icon} alt={pool.asset} width={32} height={32} />}
-                      <Typography fontSize='16px' fontWeight={500}>
-                        {pool.asset}
-                      </Typography>
-                    </Stack>
-                    <Typography color='#999'>TVL: {tvlFormatted}</Typography>
-                  </Stack>
-                </MenuItem>
-              );
-            })}
-          </PoolSelect>
-        </FormControl>
+        <TokenSelectorButton onClick={(e) => setTokenSelectorAnchor(e.currentTarget)}>
+          <Stack direction='row' alignItems='center' gap='8px'>
+            <Box sx={{ position: 'relative', width: 24, height: 24 }}>
+              {selectedPoolInfo?.icon && (
+                <Image src={selectedPoolInfo.icon} alt={selectedPoolInfo.asset} width={24} height={24} />
+              )}
+              {chainData[chainId]?.image && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: -2,
+                    right: -2,
+                    width: 14,
+                    height: 14,
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    border: '1px solid #fff',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  <Image
+                    src={chainData[chainId].image}
+                    alt={chainData[chainId].name}
+                    width={12}
+                    height={12}
+                    style={{ display: 'block' }}
+                  />
+                </Box>
+              )}
+            </Box>
+            <Typography>{selectedPoolInfo?.asset || 'Select Pool'}</Typography>
+          </Stack>
+          <KeyboardArrowDownIcon sx={{ fontSize: 20, color: '#666' }} />
+        </TokenSelectorButton>
+        <ChainTokenSelectorDropdown
+          selectedChainId={chainId}
+          selectedAsset={selectedPoolInfo?.asset || ''}
+          onSelect={handleChainTokenSelect}
+          onClose={() => setTokenSelectorAnchor(null)}
+          anchorEl={tokenSelectorAnchor}
+        />
 
         <PoolAccountSelectorSection
           poolAccountName={poolAccount?.name?.toString()}
@@ -587,14 +571,20 @@ const DecorativeCircle = styled(Box)(() => {
   };
 });
 
-const PoolSelect = styled(Select)(() => ({
+const TokenSelectorButton = styled('button')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+  backgroundColor: theme.palette.background.default,
+  border: `1px solid ${theme.palette.grey[300]}`,
+  borderRadius: '8px',
+  padding: '12px 16px',
+  fontSize: '14px',
+  fontWeight: 500,
+  cursor: 'pointer',
   width: '100%',
-  '& .MuiSelect-select': {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  '& .MuiMenu-paper': {
-    minWidth: '288px',
+  '&:hover': {
+    borderColor: theme.palette.grey[400],
   },
 }));

@@ -12,6 +12,7 @@ export * from './AllPoolAccountsPreview';
 export * from './AllPoolsStats';
 export * from './UserPoolsStats';
 export * from './ChainFilterSelect';
+export * from './ChainTokenSelector';
 export * from './Modals';
 export * from './ActivityFull';
 export * from './ActivityPreview';
