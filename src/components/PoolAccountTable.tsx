@@ -26,7 +26,7 @@ import { formatDataNumber, formatTimestamp, getStatus } from '~/utils';
 
 export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
   const { PENDING_STATUS_MESSAGE: statusMessage } = getConstants();
-  const { setActionType, setPoolAccount, setAmount, setTarget } = usePoolAccountsContext();
+  const { setActionType, setPoolAccount } = usePoolAccountsContext();
   const {
     balanceBN: { symbol, decimals },
   } = useChainContext();
@@ -67,11 +67,9 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
     const foundAccount = poolAccounts.find((pa) => pa.label === poolAccount.label);
     if (!foundAccount) return;
 
-    setTarget(address);
     setPoolAccount(foundAccount);
-    setAmount(formatUnits(poolAccount.balance, decimals));
     setActionType(EventType.EXIT);
-    setModalOpen(ModalType.GENERATE_ZK_PROOF);
+    setModalOpen(ModalType.EXIT_CONFIRM);
     handleClose();
   };
 

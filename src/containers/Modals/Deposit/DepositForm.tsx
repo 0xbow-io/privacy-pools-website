@@ -10,7 +10,6 @@ import {
   FormHelperText,
   MenuItem,
   Select,
-  SelectChangeEvent,
   Stack,
   styled,
   TextField,
@@ -50,7 +49,7 @@ const { ASP_OPTIONS } = getConstants();
 export const DepositForm = () => {
   const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
-  const [asp, setAsp] = useState(ASP_OPTIONS[0]);
+  const [asp] = useState(ASP_OPTIONS[0]);
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
@@ -375,10 +374,6 @@ export const DepositForm = () => {
     }
 
     setInputAmount(normalizedInput);
-  };
-
-  const handleAspChange = (e: SelectChangeEvent<unknown>) => {
-    setAsp(e.target.value as string);
   };
 
   const handleUseMax = async () => {
@@ -855,17 +850,9 @@ export const DepositForm = () => {
         {isDepositDisabled && <FormHelperText error>{errorMessage}</FormHelperText>}
       </InputContainer>
 
-      {/* ASP Selector */}
+      {/* ASP Label */}
       <Stack gap='1.2rem' width='100%' alignItems='center'>
-        <FormControl fullWidth>
-          <SSelect id='asp-select' labelId='asp-select-label' value={asp} displayEmpty onChange={handleAspChange}>
-            {ASP_OPTIONS.map((value) => (
-              <MenuItem key={value} value={value}>
-                {value}
-              </MenuItem>
-            ))}
-          </SSelect>
-        </FormControl>
+        <AspLabel>{asp}</AspLabel>
 
         <Typography variant='body2' color='textSecondary'>
           {feeText}
@@ -993,16 +980,18 @@ export const ModalTitle = styled(Typography)(() => {
   };
 });
 
-const SSelect = styled(Select)(() => {
-  return {
-    width: '100%',
-    maxWidth: '32.8rem',
-    margin: '0 auto',
-    '& .MuiSelect-select': {
-      fontWeight: 500,
-    },
-  };
-});
+const AspLabel = styled(Typography)(({ theme }) => ({
+  width: '100%',
+  maxWidth: '32.8rem',
+  margin: '0 auto',
+  padding: '16px 14px',
+  border: `1px solid ${theme.palette.grey[400]}`,
+  borderRadius: '4px',
+  fontSize: '16px',
+  fontWeight: 500,
+  color: theme.palette.text.primary,
+  textAlign: 'center',
+}));
 
 export const ImageContainer = styled(Box)(({ theme }) => {
   return {

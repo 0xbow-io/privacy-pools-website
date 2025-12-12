@@ -3,13 +3,16 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Box, Button, Stack, styled, Theme, Typography } from '@mui/material';
+import { useQueries } from '@tanstack/react-query';
+import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
+import { allPoolsChainData, getConfig } from '~/config';
 import { ViewAllButton, ViewAllText } from '~/containers';
 import { useAccountContext, useAdvancedView } from '~/hooks';
 import { EventType, ReviewStatus } from '~/types';
-import { ROUTER } from '~/utils';
+import { aspClient, ROUTER } from '~/utils';
 
 export const ActivityPreview = () => {
   const { push } = useRouter();
@@ -17,7 +20,91 @@ export const ActivityPreview = () => {
   const { previewGlobalEvents, isLoading } = useAdvancedView();
   const { poolAccountsByChainScope } = useAccountContext();
 
-  const [view, setView] = useState<'global' | 'personal'>('global');
+  const [view, setView] = useState<'global' | 'personal' | 'stats'>('global');
+
+  // Get ASP endpoints for fetching global stats
+  const { ASP_ENDPOINT_TEST, ASP_ENDPOINT_NON_TEST } = getConfig().env;
+
+  // Fetch pools-stats from both ASP endpoints (test and non-test)
+  const poolStatsQuery = useQueries({
+    queries: [
+      {
+        queryKey: ['asp_pools_stats', 'test', ASP_ENDPOINT_TEST],
+        queryFn: () => aspClient.fetchPoolStats(ASP_ENDPOINT_TEST, 'all'),
+        refetchInterval: 120000,
+        staleTime: 60000,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+      {
+        queryKey: ['asp_pools_stats', 'non_test', ASP_ENDPOINT_NON_TEST],
+        queryFn: () => aspClient.fetchPoolStats(ASP_ENDPOINT_NON_TEST, 'all'),
+        refetchInterval: 120000,
+        staleTime: 60000,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+    ],
+  });
+
+  // Calculate global stats from all pools
+  const globalStats = useMemo(() => {
+    let totalTVL = 0;
+    let totalDeposits = 0;
+    let totalWithdrawals = 0;
+    let totalDepositedUsd = 0;
+
+    poolStatsQuery.forEach((query) => {
+      if (!query.data?.pools) return;
+
+      query.data.pools.forEach((poolStats) => {
+        // Get pool info to find decimals
+        const chainInfo = allPoolsChainData[poolStats.chainId];
+        const poolInfo = chainInfo?.poolInfo.find((p) => p.scope.toString() === poolStats.scope);
+        const decimals = poolInfo?.assetDecimals || 18;
+
+        // Parse USD value for TVL - the API returns USD values as strings
+        if (poolStats.totalInPoolValueUsd) {
+          const parsedUSD = parseFloat(poolStats.totalInPoolValueUsd.replace(/,/g, ''));
+          if (!isNaN(parsedUSD)) {
+            totalTVL += parsedUSD;
+          }
+        } else if (poolStats.totalInPoolValue && poolInfo?.isStableAsset) {
+          // For stablecoins without USD value, convert token value to USD (1:1)
+          totalTVL += Number(formatUnits(BigInt(poolStats.totalInPoolValue), decimals));
+        }
+
+        // Sum deposit counts
+        totalDeposits += poolStats.acceptedDepositsCount || 0;
+
+        // Sum total deposited USD for withdrawal calculation
+        if (poolStats.totalDepositsValueUsd) {
+          const parsedDepositUsd = parseFloat(poolStats.totalDepositsValueUsd.replace(/,/g, ''));
+          if (!isNaN(parsedDepositUsd)) {
+            totalDepositedUsd += parsedDepositUsd;
+          }
+        } else if (poolStats.totalDepositsValue && poolInfo?.isStableAsset) {
+          // For stablecoins without USD value, convert token value to USD (1:1)
+          totalDepositedUsd += Number(formatUnits(BigInt(poolStats.totalDepositsValue), decimals));
+        }
+      });
+    });
+
+    // Calculate withdrawals: total deposited - current TVL
+    totalWithdrawals = Math.max(0, totalDepositedUsd - totalTVL);
+
+    // Calculate average deposit size in USD
+    const averageDepositSize = totalDeposits > 0 ? totalTVL / totalDeposits : 0;
+
+    return {
+      tvl: totalTVL,
+      averageDepositSize,
+      totalDeposits,
+      totalWithdrawals,
+    };
+  }, [poolStatsQuery]);
 
   // Build ALL personal activity from all pools (not filtered by selectedPoolInfo)
   const allPersonalActivity = useMemo(() => {
@@ -105,15 +192,52 @@ export const ActivityPreview = () => {
             >
               Personal
             </SButton>
+
+            {/* Stats tab hidden for now
+            <Divider />
+
+            <SButton variant='text' onClick={() => setView('stats')} active={String(view === 'stats')}>
+              Stats
+            </SButton>
+            */}
           </Stack>
         </Box>
 
-        <ViewAllButton onClick={handleNavigateToPoolAccounts} disabled={!historyData?.length}>
-          <ViewAllText>View All</ViewAllText>
-        </ViewAllButton>
+        {view !== 'stats' && (
+          <ViewAllButton onClick={handleNavigateToPoolAccounts} disabled={!historyData?.length}>
+            <ViewAllText>View All</ViewAllText>
+          </ViewAllButton>
+        )}
       </Section>
 
-      <ActivityTable records={historyData} isLoading={isLoading} view={view} size='small' />
+      {view === 'stats' ? (
+        <StatsContainer>
+          <StatsGrid>
+            <StatItem>
+              <StatLabel>Current TVL</StatLabel>
+              <StatValue>${globalStats.tvl.toLocaleString('en-US', { maximumFractionDigits: 0 })}</StatValue>
+            </StatItem>
+            <StatItem>
+              <StatLabel>Average Deposit Size</StatLabel>
+              <StatValue>
+                ${globalStats.averageDepositSize.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              </StatValue>
+            </StatItem>
+            <StatItem>
+              <StatLabel>Total Deposits</StatLabel>
+              <StatValue>{globalStats.totalDeposits.toLocaleString('en-US')}</StatValue>
+            </StatItem>
+            <StatItem>
+              <StatLabel>Total Withdrawals</StatLabel>
+              <StatValue>
+                ${globalStats.totalWithdrawals.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              </StatValue>
+            </StatItem>
+          </StatsGrid>
+        </StatsContainer>
+      ) : (
+        <ActivityTable records={historyData} isLoading={isLoading} view={view} size='small' />
+      )}
     </ActivityContainer>
   );
 };
@@ -154,4 +278,41 @@ const SButton = styled(Button)<{ active: string; theme?: Theme }>(({ theme, acti
   '&.MuiButtonBase-root.MuiButton-root:hover': {
     background: theme.palette.grey[50],
   },
+}));
+
+const StatsContainer = styled(Box)(({ theme }) => ({
+  borderTop: `1px solid ${theme.palette.grey[600]}`,
+  padding: '24px 16px',
+}));
+
+const StatsGrid = styled(Box)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, 1fr)',
+  gap: '24px',
+  [theme.breakpoints.down('md')]: {
+    gridTemplateColumns: 'repeat(2, 1fr)',
+  },
+  [theme.breakpoints.down('sm')]: {
+    gridTemplateColumns: '1fr',
+  },
+}));
+
+const StatItem = styled(Box)(() => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+}));
+
+const StatLabel = styled(Typography)(() => ({
+  fontWeight: 400,
+  fontSize: '12px',
+  lineHeight: '100%',
+  color: '#4D4D4D',
+}));
+
+const StatValue = styled(Typography)(() => ({
+  fontWeight: 700,
+  fontSize: '24px',
+  lineHeight: '31px',
+  color: '#000000',
 }));

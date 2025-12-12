@@ -2,6 +2,7 @@ import { NewsletterSubscriptionModal } from '~/components';
 import { ActivityDetails } from './ActivityDetails';
 import { ConnectModal } from './Connect';
 import { DepositModal } from './Deposit';
+import { ExitConfirmModal } from './ExitConfirm';
 import { GeneratingModal } from './GeneratingZkProof';
 import { PoolDetails } from './PoolDetails';
 import { ProcessingwModal } from './Processing';
@@ -22,6 +23,7 @@ export const Modals = () => {
       <GeneratingModal />
       <ConnectModal />
       <NewsletterSubscriptionModal />
+      <ExitConfirmModal />
     </>
   );
 };

@@ -41,7 +41,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const chain = chainData[parsedChainId];
 
   // Activity view state - default to 'personal' if address exists
-  const [activityView, setActivityView] = useState<'global' | 'personal'>(address ? 'personal' : 'global');
+  const [activityView, setActivityView] = useState<'global' | 'personal' | 'stats'>(address ? 'personal' : 'global');
 
   // Fetch pool info for this specific pool
   const poolScope = useMemo(() => {
@@ -103,6 +103,39 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const myFundsUsd = useMemo(() => {
     return myFundsToken * (price || 0);
   }, [myFundsToken, price]);
+
+  // Calculate pool-specific stats for the Stats tab
+  const poolActivityStats = useMemo(() => {
+    // TVL in USD
+    let tvl = 0;
+    if (currentPoolStats?.totalInPoolValueUsd) {
+      const parsedUSD = parseFloat(currentPoolStats.totalInPoolValueUsd.replace(/,/g, ''));
+      if (!isNaN(parsedUSD)) {
+        tvl = parsedUSD;
+      }
+    }
+
+    // Total deposits count
+    const totalDeposits = currentPoolStats?.acceptedDepositsCount || 0;
+
+    // Average deposit size in USD
+    const averageDepositSize = totalDeposits > 0 ? tvl / totalDeposits : 0;
+
+    // Total withdrawals (approximation: total deposited - current TVL)
+    let totalWithdrawals = 0;
+    if (currentPoolStats?.totalDepositsValueUsd && currentPoolStats?.totalInPoolValueUsd) {
+      const totalDepositedUsd = parseFloat(currentPoolStats.totalDepositsValueUsd.replace(/,/g, '')) || 0;
+      const currentUsd = parseFloat(currentPoolStats.totalInPoolValueUsd.replace(/,/g, '')) || 0;
+      totalWithdrawals = Math.max(0, totalDepositedUsd - currentUsd);
+    }
+
+    return {
+      tvl,
+      averageDepositSize,
+      totalDeposits,
+      totalWithdrawals,
+    };
+  }, [currentPoolStats]);
 
   const myPoolAccountsCount = useMemo(() => {
     if (!isLogged || !poolScope) return 0;
@@ -276,7 +309,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             >
               {localPreviewPoolAccounts.length > 0 && (
                 <ViewAllButton onClick={handleShowEmptyPools} disabled={!poolsByAssetAndChain?.length}>
-                  <ViewAllText>{hideEmptyPools ? 'Show' : 'Hide'} empty pools</ViewAllText>
+                  <ViewAllText>{hideEmptyPools ? 'Show' : 'Hide'} empty accounts</ViewAllText>
                 </ViewAllButton>
               )}
 
@@ -429,16 +462,59 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
                 >
                   Personal
                 </ActivityButton>
+
+                {/* Stats tab hidden for now
+                <ActivityDivider />
+
+                <ActivityButton
+                  variant='text'
+                  onClick={() => setActivityView('stats')}
+                  active={String(activityView === 'stats')}
+                >
+                  Stats
+                </ActivityButton>
+                */}
               </Stack>
 
-              <ViewAllButton onClick={handleNavigateToActivity} disabled={!activityData?.length}>
-                <ViewAllText>View All</ViewAllText>
-              </ViewAllButton>
+              {activityView !== 'stats' && (
+                <ViewAllButton onClick={handleNavigateToActivity} disabled={!activityData?.length}>
+                  <ViewAllText>View All</ViewAllText>
+                </ViewAllButton>
+              )}
             </Stack>
           </Box>
         </ActivitySection>
 
-        <ActivityTable records={activityData} isLoading={activityLoading} view={activityView} size='small' />
+        {activityView === 'stats' ? (
+          <ActivityStatsContainer>
+            <ActivityStatsGrid>
+              <ActivityStatItem>
+                <ActivityStatLabel>Current TVL</ActivityStatLabel>
+                <ActivityStatValue>
+                  ${poolActivityStats.tvl.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </ActivityStatValue>
+              </ActivityStatItem>
+              <ActivityStatItem>
+                <ActivityStatLabel>Average Deposit Size</ActivityStatLabel>
+                <ActivityStatValue>
+                  ${poolActivityStats.averageDepositSize.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </ActivityStatValue>
+              </ActivityStatItem>
+              <ActivityStatItem>
+                <ActivityStatLabel>Total Deposits</ActivityStatLabel>
+                <ActivityStatValue>{poolActivityStats.totalDeposits.toLocaleString('en-US')}</ActivityStatValue>
+              </ActivityStatItem>
+              <ActivityStatItem>
+                <ActivityStatLabel>Total Withdrawals</ActivityStatLabel>
+                <ActivityStatValue>
+                  ${poolActivityStats.totalWithdrawals.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </ActivityStatValue>
+              </ActivityStatItem>
+            </ActivityStatsGrid>
+          </ActivityStatsContainer>
+        ) : (
+          <ActivityTable records={activityData} isLoading={activityLoading} view={activityView} size='small' />
+        )}
       </ActivityContainer>
     </PoolPageContainer>
   );
@@ -976,6 +1052,43 @@ const ActivityButton = styled(Button)<{ active: string }>(({ theme, active }) =>
   '&.MuiButtonBase-root.MuiButton-root:hover': {
     background: theme.palette.grey[50],
   },
+}));
+
+const ActivityStatsContainer = styled(Box)(({ theme }) => ({
+  borderTop: `1px solid ${theme.palette.grey[600]}`,
+  padding: '24px 16px',
+}));
+
+const ActivityStatsGrid = styled(Box)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, 1fr)',
+  gap: '24px',
+  [theme.breakpoints.down('md')]: {
+    gridTemplateColumns: 'repeat(2, 1fr)',
+  },
+  [theme.breakpoints.down('sm')]: {
+    gridTemplateColumns: '1fr',
+  },
+}));
+
+const ActivityStatItem = styled(Box)(() => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+}));
+
+const ActivityStatLabel = styled(Typography)(() => ({
+  fontWeight: 400,
+  fontSize: '12px',
+  lineHeight: '100%',
+  color: '#4D4D4D',
+}));
+
+const ActivityStatValue = styled(Typography)(() => ({
+  fontWeight: 700,
+  fontSize: '24px',
+  lineHeight: '31px',
+  color: '#000000',
 }));
 
 const STypography = styled(Typography)(({ theme }) => ({
