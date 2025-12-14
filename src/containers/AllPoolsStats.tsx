@@ -711,14 +711,15 @@ const ChainIconOverlay = styled('div')(() => ({
   position: 'absolute',
   bottom: -4,
   right: -4,
-  width: '14px',
-  height: '14px',
+  width: '18px',
+  height: '18px',
   borderRadius: '50%',
   backgroundColor: '#fff',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: '0 0 2px rgba(0,0,0,0.2)',
+  border: '1px solid #fff',
+  overflow: 'hidden',
 }));
 
 const PoolName = styled(Typography)(({ theme }) => ({
