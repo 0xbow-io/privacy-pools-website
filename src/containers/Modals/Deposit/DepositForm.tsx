@@ -28,14 +28,7 @@ import { getConstants } from '~/config/constants';
 import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
-import {
-  formatDataNumber,
-  getUsdBalance,
-  calculateAspFee,
-  calculateInitialDeposit,
-  entrypointAbi,
-  aspClient,
-} from '~/utils';
+import { formatDataNumber, calculateInitialDeposit, entrypointAbi, aspClient } from '~/utils';
 import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
 import type { PoolStats } from '~/utils/aspClient';
 import { getBestYieldOpportunity, formatAPY } from '~/utils/poolUtils';
@@ -296,10 +289,6 @@ export const DepositForm = () => {
   const balanceUI = formatDataNumber(effectiveBalanceBN, decimals, 3, false, true, false);
   // const balanceFormatted = formatEther(BigInt(balanceBN));
 
-  const fee = calculateAspFee(parseUnits(amount, decimals), vettingFeeBPS);
-  const feeFormatted = formatDataNumber(fee, decimals);
-  const feeUSD = getUsdBalance(currentPrice, formatUnits(fee, decimals), decimals);
-  const feeText = `Fee ${feeFormatted} ${displaySymbol} ~ ${feeUSD} USD`;
   const stakingNote =
     isStakingEnabled && selectedAlternativeToken && sUSDSPreview
       ? ` (Will receive ${formatUnits(sUSDSPreview, decimals)} ${selectedPoolInfo?.asset})`
@@ -783,15 +772,10 @@ export const DepositForm = () => {
         {isDepositDisabled && <FormHelperText error>{errorMessage}</FormHelperText>}
       </InputContainer>
 
-      {/* ASP Label */}
-      <Stack gap='1.2rem' width='100%' alignItems='center'>
-        <AspLabel>{asp}</AspLabel>
-
-        <Typography variant='body2' color='textSecondary'>
-          {feeText}
-          {stakingNote}
-        </Typography>
-      </Stack>
+      {/* ASP Fee Info */}
+      <Typography variant='body2' color='textSecondary' sx={{ textAlign: 'center' }}>
+        {asp} protection fee {(Number(vettingFeeBPS) / 100).toFixed(1)}%{stakingNote}
+      </Typography>
 
       <Button
         disabled={isDepositDisabled}
@@ -912,19 +896,6 @@ export const ModalTitle = styled(Typography)(() => {
     textAlign: 'center',
   };
 });
-
-const AspLabel = styled(Typography)(({ theme }) => ({
-  width: '100%',
-  maxWidth: '32.8rem',
-  margin: '0 auto',
-  padding: '16px 14px',
-  border: `1px solid ${theme.palette.grey[400]}`,
-  borderRadius: '4px',
-  fontSize: '16px',
-  fontWeight: 500,
-  color: theme.palette.text.primary,
-  textAlign: 'center',
-}));
 
 export const ImageContainer = styled(Box)(({ theme }) => {
   return {
