@@ -11,7 +11,7 @@ import { PoolAccountTable, ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { allPoolsChainData, ChainAssets, chainData, PoolInfo } from '~/config';
 import { Section, PAContainer, ActionMenu } from '~/containers';
-import { useAuthContext, useGoTo, useModal, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
+import { useAuthContext, useGoTo, useModal, useAccountContext, useChainContext } from '~/hooks';
 import { EventType, ModalType, ReviewStatus } from '~/types';
 import { ROUTER, aspClient } from '~/utils';
 
@@ -31,7 +31,6 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const accountContext = useAccountContext();
   const { poolsByAssetAndChain, amountPoolAsset, hideEmptyPools, toggleHideEmptyPools, poolAccountsByChainScope } =
     accountContext;
-  const { previewGlobalEvents, isLoading: activityLoading } = useAdvancedView();
   const { setModalOpen } = useModal();
   const { isLogged, isConnected, isAuthorized } = useAuthContext();
   const goTo = useGoTo();
@@ -70,6 +69,18 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     enabled: !!poolScope && !!aspUrl,
     refetchInterval: 120000,
     staleTime: 60000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  // Fetch pool-specific events for the activity feed
+  const { data: poolEventsData, isLoading: poolEventsLoading } = useQuery({
+    queryKey: ['pool_events', parsedChainId, poolScope, aspUrl],
+    queryFn: () => aspClient.fetchAllEvents(aspUrl, parsedChainId, poolScope || '', 1, 6),
+    enabled: !!poolScope && !!aspUrl,
+    refetchInterval: 60000,
+    staleTime: 30000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -284,7 +295,30 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
   // Update activity view to 'personal' when address becomes available
 
-  const activityData = activityView === 'global' ? previewGlobalEvents : localPreviewPersonalActivity;
+  // Transform pool events to match the format expected by ActivityTable
+  const poolActivityEvents = useMemo(() => {
+    if (!poolEventsData?.events) return [];
+    return poolEventsData.events.map((event) => ({
+      type: event.type,
+      amount: event.amount,
+      address: event.address,
+      txHash: event.txHash,
+      timestamp: event.timestamp,
+      reviewStatus: event.reviewStatus,
+      // Add pool info for consistency with global events format
+      pool: {
+        scope: poolScope || '',
+        chainId: parsedChainId,
+        chainName: chain?.name || '',
+        tokenSymbol: symbol,
+        tokenAddress: '',
+        poolAddress: '',
+        denomination: String(assetDecimals || decimals),
+      },
+    }));
+  }, [poolEventsData, poolScope, parsedChainId, chain?.name, symbol, assetDecimals, decimals]);
+
+  const activityData = activityView === 'global' ? poolActivityEvents : localPreviewPersonalActivity;
 
   return (
     <PoolPageContainer>
@@ -526,7 +560,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             </ActivityStatsGrid>
           </ActivityStatsContainer>
         ) : (
-          <ActivityTable records={activityData} isLoading={activityLoading} view={activityView} size='small' />
+          <ActivityTable records={activityData} isLoading={poolEventsLoading} view={activityView} size='small' />
         )}
       </ActivityContainer>
     </PoolPageContainer>
