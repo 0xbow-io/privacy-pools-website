@@ -51,12 +51,13 @@ export const WithdrawForm = () => {
     relayersData,
     price: currentPrice,
     setSelectedAsset,
+    setChainId,
   } = useChainContext();
 
   const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const { setExtraGas } = useQuoteContext();
-  const { switchChain } = useSwitchChain();
+  const { switchChainAsync } = useSwitchChain();
 
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
@@ -407,7 +408,7 @@ export const WithdrawForm = () => {
   };
 
   // Handle chain+token selection from dropdown
-  const handleChainTokenSelect = (selectedChainId: number, selectedAsset: string) => {
+  const handleChainTokenSelect = async (selectedChainId: number, selectedAsset: string) => {
     // Find the selected pool from allPoolsChainData
     const targetChainData = allPoolsChainData[selectedChainId];
     if (!targetChainData) return;
@@ -418,11 +419,15 @@ export const WithdrawForm = () => {
       // If selecting a pool from a different chain, trigger a wallet chain switch
       if (selectedChainId !== chainId) {
         try {
-          switchChain({ chainId: selectedChainId });
           addNotification('info', `Switching to ${targetChainData.name}...`);
+          await switchChainAsync({ chainId: selectedChainId });
+          // Update the app's chain context to match the wallet's chain
+          setChainId(selectedChainId);
+          addNotification('success', `Switched to ${targetChainData.name}`);
         } catch (err) {
           console.error('Failed to switch chain:', err);
           addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
+          return; // Don't proceed with asset selection if chain switch failed
         }
       }
 

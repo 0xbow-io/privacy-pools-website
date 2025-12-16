@@ -106,7 +106,7 @@ export const ModalHeader = styled(Box)(() => {
     right: '1.2rem',
     display: 'flex',
     flexDirection: 'column',
-    zIndex: 2,
+    zIndex: 1,
     div: {
       display: 'flex',
       flexDirection: 'row',

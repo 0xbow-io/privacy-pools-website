@@ -44,7 +44,7 @@ export const DepositForm = () => {
   const [asp] = useState(ASP_OPTIONS[0]);
   const { address } = useAccount();
   const publicClient = usePublicClient();
-  const { switchChain } = useSwitchChain();
+  const { switchChainAsync } = useSwitchChain();
   const isStakingEnabled = useStakingFeature();
   const {
     balanceBN: { symbol, formatted: balanceFormatted, decimals },
@@ -54,6 +54,7 @@ export const DepositForm = () => {
     chainId,
     chain,
     setSelectedAsset,
+    setChainId,
   } = useChainContext();
   const {
     amount,
@@ -545,7 +546,7 @@ export const DepositForm = () => {
   };
 
   // Handle chain+token selection from dropdown
-  const handleChainTokenSelect = (selectedChainId: number, selectedAsset: string) => {
+  const handleChainTokenSelect = async (selectedChainId: number, selectedAsset: string) => {
     // Find the selected pool from allPools
     const selectedPool = allPools.find(
       (p) => p.chainId === selectedChainId && p.asset.toLowerCase() === selectedAsset.toLowerCase(),
@@ -555,8 +556,11 @@ export const DepositForm = () => {
       // If selecting a pool from a different chain, trigger a wallet chain switch
       if (selectedPool.chainId !== chainId) {
         try {
-          switchChain({ chainId: selectedPool.chainId });
           addNotification('info', `Switching to ${selectedPool.chainName}...`);
+          await switchChainAsync({ chainId: selectedPool.chainId });
+          // Update the app's chain context to match the wallet's chain
+          setChainId(selectedPool.chainId);
+          addNotification('success', `Switched to ${selectedPool.chainName}`);
         } catch (err) {
           // Fall back to instructing the user if automatic switch fails
           logErrorToSentry(err, {
@@ -565,6 +569,7 @@ export const DepositForm = () => {
             from: 'DepositForm Pool Select',
           });
           addNotification('error', `Please switch to ${selectedPool.chainName} to deposit to this pool`);
+          return; // Don't proceed with asset selection if chain switch failed
         }
       }
 
@@ -773,7 +778,7 @@ export const DepositForm = () => {
       </InputContainer>
 
       {/* ASP Fee Info */}
-      <Typography variant='body2' color='textSecondary' sx={{ textAlign: 'center' }}>
+      <Typography variant='body2' color='textSecondary' sx={{ textAlign: 'center', zIndex: 0 }}>
         {asp} protection fee {(Number(vettingFeeBPS) / 100).toFixed(1)}%{stakingNote}
       </Typography>
 
@@ -781,7 +786,7 @@ export const DepositForm = () => {
         disabled={isDepositDisabled}
         onClick={handleDeposit}
         data-testid='confirm-deposit-button'
-        sx={{ zIndex: 1 }}
+        sx={{ zIndex: 0 }}
       >
         Deposit
       </Button>

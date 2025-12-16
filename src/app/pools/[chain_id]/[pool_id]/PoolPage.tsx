@@ -9,8 +9,8 @@ import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { PoolAccountTable, ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { allPoolsChainData, ChainAssets, chainData, PoolInfo } from '~/config';
-import { Section, PAContainer, ActionMenu } from '~/containers';
+import { ChainAssets, chainData } from '~/config';
+import { Section, PAContainer, ActionMenu, ChainTokenSelectorDropdown } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useChainContext } from '~/hooks';
 import { EventType, ModalType, ReviewStatus } from '~/types';
 import { ROUTER, aspClient } from '~/utils';
@@ -596,96 +596,29 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string }) => {
   const router = useRouter();
   const { setSelectedAsset } = useChainContext();
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedChainId, setSelectedChainId] = useState<number>(chainId);
-  const [chainSearchQuery, setChainSearchQuery] = useState('');
-  const [tokenSearchQuery, setTokenSearchQuery] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Get available chains that have pools, filtered by search
-  const availableChains = useMemo(() => {
-    const chains = Object.entries(allPoolsChainData).map(([cId, chainInfo]) => ({
-      chainId: parseInt(cId),
-      name: chainInfo.name,
-      image: chainInfo.image,
-    }));
-
-    if (!chainSearchQuery.trim()) return chains;
-    return chains.filter((c) => c.name.toLowerCase().includes(chainSearchQuery.toLowerCase()));
-  }, [chainSearchQuery]);
-
-  // Get tokens for the selected chain, filtered by search
-  const tokensForChain = useMemo(() => {
-    const chainInfo = allPoolsChainData[selectedChainId];
-    if (!chainInfo) return [];
-    const tokens = chainInfo.poolInfo.map((pool: PoolInfo) => ({
-      asset: pool.asset,
-      icon: pool.icon,
-      scope: pool.scope.toString(),
-    }));
-
-    if (!tokenSearchQuery.trim()) return tokens;
-    return tokens.filter((t) => t.asset.toLowerCase().includes(tokenSearchQuery.toLowerCase()));
-  }, [selectedChainId, tokenSearchQuery]);
-
-  // Find chains that have the searched token when not found in current chain
-  const chainsWithSearchedToken = useMemo(() => {
-    if (!tokenSearchQuery.trim() || tokensForChain.length > 0) return [];
-
-    const matchingChains: { chainId: number; name: string }[] = [];
-    for (const [cId, chainInfo] of Object.entries(allPoolsChainData)) {
-      const chainIdNum = parseInt(cId);
-      if (chainIdNum === selectedChainId) continue; // Skip current chain
-
-      const hasToken = chainInfo.poolInfo.some((pool: PoolInfo) =>
-        pool.asset.toLowerCase().includes(tokenSearchQuery.toLowerCase()),
-      );
-
-      if (hasToken) {
-        matchingChains.push({ chainId: chainIdNum, name: chainInfo.name });
-      }
-    }
-    return matchingChains;
-  }, [tokenSearchQuery, tokensForChain.length, selectedChainId]);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Get current selection info
   const currentChain = chainData[chainId];
   const currentPool = currentChain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase());
 
   const handleToggle = () => {
-    setIsOpen(!isOpen);
-    if (!isOpen) {
-      setSelectedChainId(chainId); // Reset to current chain when opening
-      setChainSearchQuery('');
-      setTokenSearchQuery('');
+    if (anchorEl) {
+      setAnchorEl(null);
+    } else {
+      setAnchorEl(buttonRef.current);
     }
   };
 
-  const handleChainSelect = (newChainId: number) => {
-    setSelectedChainId(newChainId);
-    setTokenSearchQuery(''); // Clear token search when changing chain
-  };
-
-  const handleTokenSelect = (asset: string) => {
+  const handleSelect = (newChainId: number, asset: string) => {
     setSelectedAsset(asset as ChainAssets);
-    router.push(`/pools/${selectedChainId}/${asset.toLowerCase()}`);
-    setIsOpen(false);
+    router.push(`/pools/${newChainId}/${asset.toLowerCase()}`);
   };
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   return (
-    <PoolSelectorContainer ref={dropdownRef}>
-      <PoolSelectorButton onClick={handleToggle}>
+    <PoolSelectorContainer>
+      <PoolSelectorButton ref={buttonRef} onClick={handleToggle}>
         {currentPool?.icon && (
           <PoolIconWrapper>
             <Image src={currentPool.icon} alt={currentPool.asset} width={24} height={24} />
@@ -698,7 +631,7 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
         <Typography variant='subtitle1' fontWeight='bold' lineHeight='1' sx={{ ml: '4px', whiteSpace: 'nowrap' }}>
           Pool
         </Typography>
-        <DropdownArrow open={isOpen}>
+        <DropdownArrow open={!!anchorEl}>
           <svg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'>
             <path
               d='M1 1.5L6 6.5L11 1.5'
@@ -711,109 +644,16 @@ const PoolAssetSelect = ({ chainId, poolId }: { chainId: number; poolId: string 
         </DropdownArrow>
       </PoolSelectorButton>
 
-      {isOpen && (
-        <PoolSelectorDropdown>
-          <DropdownContent>
-            {/* Chain selector (left side) */}
-            <ChainColumn>
-              <SearchContainer>
-                <SearchIconSvg />
-                <SearchInput
-                  type='text'
-                  placeholder='Search Chains'
-                  value={chainSearchQuery}
-                  onChange={(e) => setChainSearchQuery(e.target.value)}
-                />
-              </SearchContainer>
-              <ChainList showScrollbar={availableChains.length >= 7}>
-                {availableChains.map((chain) => (
-                  <ChainItem
-                    key={chain.chainId}
-                    selected={chain.chainId === selectedChainId}
-                    onClick={() => handleChainSelect(chain.chainId)}
-                  >
-                    <Image src={chain.image} alt={chain.name} width={24} height={24} />
-                    <span>{chain.name}</span>
-                    {chain.chainId === selectedChainId && (
-                      <CheckIcon>
-                        <svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
-                          <path
-                            d='M13.5 4.5L6 12L2.5 8.5'
-                            stroke='black'
-                            strokeWidth='1.5'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                          />
-                        </svg>
-                      </CheckIcon>
-                    )}
-                  </ChainItem>
-                ))}
-                {availableChains.length === 0 && <NoResultsText>No chains found</NoResultsText>}
-              </ChainList>
-            </ChainColumn>
-
-            {/* Token selector (right side) */}
-            <TokenColumn>
-              <SearchContainer>
-                <SearchIconSvg />
-                <SearchInput
-                  type='text'
-                  placeholder='Search Tokens'
-                  value={tokenSearchQuery}
-                  onChange={(e) => setTokenSearchQuery(e.target.value)}
-                />
-              </SearchContainer>
-              <TokenList showScrollbar={tokensForChain.length >= 7}>
-                {tokensForChain.map((token) => (
-                  <TokenItem
-                    key={token.asset}
-                    onClick={() => handleTokenSelect(token.asset)}
-                    selected={selectedChainId === chainId && token.asset.toLowerCase() === poolId.toLowerCase()}
-                  >
-                    {token.icon && <Image src={token.icon} alt={token.asset} width={24} height={24} />}
-                    <span>{token.asset}</span>
-                  </TokenItem>
-                ))}
-                {tokensForChain.length === 0 && chainsWithSearchedToken.length === 0 && (
-                  <NoResultsText>No tokens found</NoResultsText>
-                )}
-                {tokensForChain.length === 0 && chainsWithSearchedToken.length > 0 && (
-                  <TokenAvailableOnOtherChains>
-                    This token is only available on{' '}
-                    {chainsWithSearchedToken.map((chain, index) => (
-                      <span key={chain.chainId}>
-                        <ChainLink onClick={() => handleChainSelect(chain.chainId)}>{chain.name}</ChainLink>
-                        {index < chainsWithSearchedToken.length - 2 && ', '}
-                        {index === chainsWithSearchedToken.length - 2 && ' and '}
-                      </span>
-                    ))}
-                  </TokenAvailableOnOtherChains>
-                )}
-              </TokenList>
-            </TokenColumn>
-          </DropdownContent>
-        </PoolSelectorDropdown>
-      )}
+      <ChainTokenSelectorDropdown
+        selectedChainId={chainId}
+        selectedAsset={currentPool?.asset || ''}
+        onSelect={handleSelect}
+        onClose={() => setAnchorEl(null)}
+        anchorEl={anchorEl}
+      />
     </PoolSelectorContainer>
   );
 };
-
-// Search icon component
-const SearchIconSvg = () => (
-  <SearchIcon>
-    <svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
-      <path
-        d='M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z'
-        stroke='#999'
-        strokeWidth='1.5'
-        strokeLinecap='round'
-        strokeLinejoin='round'
-      />
-      <path d='M14 14L11 11' stroke='#999' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' />
-    </svg>
-  </SearchIcon>
-);
 
 const BackButton = styled(IconButton)(() => ({
   padding: '11px 15px 11px 11px',
@@ -859,174 +699,6 @@ const DropdownArrow = styled('span', {
   marginLeft: '4px',
   transition: 'transform 0.2s',
   transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-}));
-
-const PoolSelectorDropdown = styled('div')(({ theme }) => ({
-  position: 'absolute',
-  top: '100%',
-  left: 0,
-  marginTop: '4px',
-  backgroundColor: '#fff',
-  border: '1px solid #000',
-  zIndex: 1000,
-  minWidth: '500px',
-  height: '380px',
-  overflow: 'hidden',
-  [theme.breakpoints.down('sm')]: {
-    position: 'fixed',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    top: 'auto',
-    minWidth: 'calc(100vw - 32px)',
-    maxWidth: '500px',
-  },
-}));
-
-const DropdownContent = styled('div')(() => ({
-  display: 'flex',
-  height: '100%',
-}));
-
-const ChainColumn = styled('div')(() => ({
-  width: '200px',
-  display: 'flex',
-  flexDirection: 'column',
-  borderRight: '1px solid #E6E6E6',
-  height: '100%',
-}));
-
-const TokenColumn = styled('div')(() => ({
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100%',
-}));
-
-const SearchContainer = styled('div')(() => ({
-  display: 'flex',
-  alignItems: 'center',
-  padding: '12px 16px',
-  borderBottom: '1px solid #E6E6E6',
-  gap: '8px',
-}));
-
-const SearchIcon = styled('div')(() => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0,
-}));
-
-const SearchInput = styled('input')(() => ({
-  flex: 1,
-  border: 'none',
-  outline: 'none',
-  fontSize: '14px',
-  '&::placeholder': {
-    color: '#999',
-  },
-}));
-
-const ChainList = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'showScrollbar',
-})<{ showScrollbar?: boolean }>(({ showScrollbar = true }) => ({
-  flex: 1,
-  overflowY: 'auto',
-  '&::-webkit-scrollbar': {
-    width: showScrollbar ? '4px' : '0px',
-  },
-  '&::-webkit-scrollbar-thumb': {
-    background: '#E6E6E6',
-    borderRadius: '4px',
-  },
-  scrollbarWidth: showScrollbar ? 'thin' : 'none',
-}));
-
-const ChainItem = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'selected',
-})<{ selected: boolean }>(({ selected }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  padding: '12px 16px',
-  cursor: 'pointer',
-  backgroundColor: selected ? '#F5F5F5' : 'transparent',
-  fontSize: '13px',
-  fontWeight: selected ? 600 : 400,
-  '&:hover': {
-    backgroundColor: '#F5F5F5',
-  },
-  '& span': {
-    flex: 1,
-  },
-}));
-
-const CheckIcon = styled('div')(() => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0,
-}));
-
-const TokenList = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'showScrollbar',
-})<{ showScrollbar?: boolean }>(({ showScrollbar = true }) => ({
-  flex: 1,
-  overflowY: 'auto',
-  '&::-webkit-scrollbar': {
-    width: showScrollbar ? '4px' : '0px',
-  },
-  '&::-webkit-scrollbar-thumb': {
-    background: '#E6E6E6',
-    borderRadius: '4px',
-  },
-  scrollbarWidth: showScrollbar ? 'thin' : 'none',
-}));
-
-const TokenItem = styled('div', {
-  shouldForwardProp: (prop) => prop !== 'selected',
-})<{ selected: boolean }>(({ selected }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  padding: '12px 16px',
-  cursor: 'pointer',
-  backgroundColor: selected ? '#F5F5F5' : 'transparent',
-  fontSize: '14px',
-  fontWeight: selected ? 600 : 400,
-  borderBottom: '1px solid #E6E6E6',
-  '&:hover': {
-    backgroundColor: '#F5F5F5',
-  },
-  '&:last-child': {
-    borderBottom: 'none',
-  },
-}));
-
-const NoResultsText = styled('div')(() => ({
-  padding: '16px',
-  color: '#999',
-  fontSize: '13px',
-  textAlign: 'center',
-}));
-
-const TokenAvailableOnOtherChains = styled('div')(() => ({
-  padding: '16px',
-  color: '#666',
-  fontSize: '13px',
-  textAlign: 'center',
-  lineHeight: '1.5',
-}));
-
-const ChainLink = styled('span')(() => ({
-  color: '#000',
-  fontWeight: 600,
-  textDecoration: 'underline',
-  textUnderlineOffset: '2px',
-  cursor: 'pointer',
-  '&:hover': {
-    color: '#666',
-  },
 }));
 
 const PoolIconWrapper = styled('div')(() => ({

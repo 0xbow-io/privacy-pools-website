@@ -87,6 +87,7 @@ export interface PoolInfo {
 export interface ChainData {
   [chainId: number]: {
     name: string;
+    mobileName?: string; // Shorter name for mobile displays
     symbol: string;
     decimals: number;
     image: string;
@@ -321,6 +322,7 @@ const mainnetChainData: ChainData = {
   // Optimism
   [optimism.id]: {
     name: optimism.name,
+    mobileName: 'Optimism',
     symbol: optimism.nativeCurrency.symbol,
     decimals: optimism.nativeCurrency.decimals,
     image: optimismIcon.src,
@@ -379,6 +381,7 @@ const mainnetChainData: ChainData = {
   // BSC
   [bsc.id]: {
     name: bsc.name,
+    mobileName: 'BSC',
     symbol: bsc.nativeCurrency.symbol,
     decimals: bsc.nativeCurrency.decimals,
     image: bscIcon.src,
@@ -408,6 +411,7 @@ const mainnetChainData: ChainData = {
   // Arbitrum
   [arbitrum.id]: {
     name: arbitrum.name,
+    mobileName: 'Arbitrum',
     symbol: arbitrum.nativeCurrency.symbol,
     decimals: arbitrum.nativeCurrency.decimals,
     image: arbitrumIcon.src,

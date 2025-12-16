@@ -40,7 +40,7 @@ const Container = styled(Stack)(({
     gap: '1.2rem',
     width: '100%',
     justifyContent: 'center',
-    zIndex: 1,
+    zIndex: 0,
     alignItems: 'center',
 
     a: {

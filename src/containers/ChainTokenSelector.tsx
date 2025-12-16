@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { styled } from '@mui/material';
+import { createPortal } from 'react-dom';
 import { allPoolsChainData, PoolInfo } from '~/config';
 
 export interface ChainInfo {
@@ -63,17 +64,35 @@ export const ChainTokenSelectorDropdown = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose, anchorEl]);
 
+  // Track if mobile for display purposes
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 600);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Get available chains that have pools, filtered by search
   const availableChains = useMemo(() => {
-    const chains = Object.entries(allPoolsChainData).map(([cId, chainInfo]) => ({
-      chainId: parseInt(cId),
-      name: chainInfo.name,
-      image: chainInfo.image,
-    }));
+    const chains = Object.entries(allPoolsChainData).map(([cId, chainInfo]) => {
+      const displayName = isMobile && chainInfo.mobileName ? chainInfo.mobileName : chainInfo.name;
+      return {
+        chainId: parseInt(cId),
+        name: displayName,
+        fullName: chainInfo.name,
+        image: chainInfo.image,
+      };
+    });
 
     if (!chainSearchQuery.trim()) return chains;
-    return chains.filter((c) => c.name.toLowerCase().includes(chainSearchQuery.toLowerCase()));
-  }, [chainSearchQuery]);
+    return chains.filter(
+      (c) =>
+        c.name.toLowerCase().includes(chainSearchQuery.toLowerCase()) ||
+        c.fullName.toLowerCase().includes(chainSearchQuery.toLowerCase()),
+    );
+  }, [chainSearchQuery, isMobile]);
 
   // Get tokens for the hovered chain, filtered by search
   const tokensForChain = useMemo(() => {
@@ -125,14 +144,25 @@ export const ChainTokenSelectorDropdown = ({
   // Position dropdown below the anchor element
   const rect = anchorEl.getBoundingClientRect();
 
-  return (
+  // Use portal to render outside modal stacking context
+  return createPortal(
     <DropdownContainer
       ref={dropdownRef}
-      style={{
-        top: rect.bottom + 4,
-        left: rect.left,
-        minWidth: Math.max(rect.width, 500),
-      }}
+      style={
+        isMobile
+          ? {
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'calc(100vw - 32px)',
+              maxWidth: '500px',
+            }
+          : {
+              top: rect.bottom + 4,
+              left: rect.left,
+              minWidth: Math.max(rect.width, 500),
+            }
+      }
     >
       <DropdownContent>
         {/* Chain selector (left side) */}
@@ -216,7 +246,8 @@ export const ChainTokenSelectorDropdown = ({
           </TokenList>
         </TokenColumn>
       </DropdownContent>
-    </DropdownContainer>
+    </DropdownContainer>,
+    document.body,
   );
 };
 
@@ -238,24 +269,32 @@ const SearchIconSvg = () => (
 
 const DropdownContainer = styled('div')(() => ({
   position: 'fixed',
-  backgroundColor: '#fff',
+  backgroundColor: '#ffffff',
   border: '1px solid #000',
-  zIndex: 1300,
+  zIndex: 9999,
   height: '380px',
   overflow: 'hidden',
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
 }));
 
 const DropdownContent = styled('div')(() => ({
   display: 'flex',
   height: '100%',
+  backgroundColor: '#ffffff',
 }));
 
 const ChainColumn = styled('div')(() => ({
   width: '200px',
+  minWidth: '150px',
   display: 'flex',
   flexDirection: 'column',
   borderRight: '1px solid #E6E6E6',
   height: '100%',
+  backgroundColor: '#ffffff',
+  '@media (max-width: 600px)': {
+    width: '45%',
+    minWidth: 'unset',
+  },
 }));
 
 const TokenColumn = styled('div')(() => ({
@@ -263,6 +302,11 @@ const TokenColumn = styled('div')(() => ({
   display: 'flex',
   flexDirection: 'column',
   height: '100%',
+  backgroundColor: '#ffffff',
+  '@media (max-width: 600px)': {
+    flex: 'unset',
+    width: '55%',
+  },
 }));
 
 const SearchContainer = styled('div')(() => ({
@@ -271,6 +315,7 @@ const SearchContainer = styled('div')(() => ({
   padding: '12px 16px',
   borderBottom: '1px solid #E6E6E6',
   gap: '8px',
+  backgroundColor: '#ffffff',
 }));
 
 const SearchIcon = styled('div')(() => ({
