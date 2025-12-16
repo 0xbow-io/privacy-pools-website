@@ -20,13 +20,26 @@ interface PoolPageProps {
   poolId: string;
 }
 
+// Format large numbers compactly (e.g., 5,550,000 -> 5.55M)
+const formatCompactNumber = (num: number, decimals = 2): string => {
+  if (num >= 1_000_000_000) {
+    return (num / 1_000_000_000).toFixed(decimals).replace(/\.?0+$/, '') + 'B';
+  }
+  if (num >= 1_000_000) {
+    return (num / 1_000_000).toFixed(decimals).replace(/\.?0+$/, '') + 'M';
+  }
+  if (num >= 100_000) {
+    return (num / 1_000).toFixed(1).replace(/\.?0+$/, '') + 'K';
+  }
+  return Math.round(num).toLocaleString('en-US');
+};
+
 export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const { push } = useRouter();
   const { address } = useAccount();
   const { setChainId, setSelectedAsset, price } = useChainContext();
   const {
-    balanceBN: { symbol, decimals },
-    selectedPoolInfo: { assetDecimals },
+    balanceBN: { symbol },
   } = useChainContext();
   const accountContext = useAccountContext();
   const { poolsByAssetAndChain, amountPoolAsset, hideEmptyPools, toggleHideEmptyPools, poolAccountsByChainScope } =
@@ -43,10 +56,14 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const [activityView, setActivityView] = useState<'global' | 'personal' | 'stats'>(address ? 'personal' : 'global');
 
   // Fetch pool info for this specific pool
-  const poolScope = useMemo(() => {
-    const matchedPool = chain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase());
-    return matchedPool?.scope.toString();
+  const currentPoolInfo = useMemo(() => {
+    return chain?.poolInfo.find((p) => p.asset.toLowerCase() === poolId.toLowerCase());
   }, [poolId, chain]);
+
+  const poolScope = currentPoolInfo?.scope.toString();
+
+  // Use decimals directly from the current pool config to avoid stale context values
+  const poolDecimals = currentPoolInfo?.assetDecimals || 18;
 
   // Get the ASP URL for this chain
   const aspUrl = chainData[parsedChainId]?.aspUrl;
@@ -104,24 +121,24 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     return poolStatsData.pools.find((pool) => pool.scope === poolScope);
   }, [poolStatsData, poolScope]);
 
-  // Calculate stats - token amounts
+  // Calculate stats - token amounts (use poolDecimals directly to avoid stale context)
   const acceptedFundsToken = useMemo(() => {
     if (currentPoolStats?.acceptedDepositsValue) {
-      return Number(formatUnits(BigInt(currentPoolStats.acceptedDepositsValue), assetDecimals || decimals));
+      return Number(formatUnits(BigInt(currentPoolStats.acceptedDepositsValue), poolDecimals));
     }
     if (!poolData?.totalInPoolValue) return 0;
-    return Number(formatUnits(BigInt(poolData.totalInPoolValue), assetDecimals || decimals));
-  }, [currentPoolStats, poolData, assetDecimals, decimals]);
+    return Number(formatUnits(BigInt(poolData.totalInPoolValue), poolDecimals));
+  }, [currentPoolStats, poolData, poolDecimals]);
 
   const pendingFundsToken = useMemo(() => {
     if (!currentPoolStats?.pendingDepositsValue) return 0;
-    return Number(formatUnits(BigInt(currentPoolStats.pendingDepositsValue), assetDecimals || decimals));
-  }, [currentPoolStats, assetDecimals, decimals]);
+    return Number(formatUnits(BigInt(currentPoolStats.pendingDepositsValue), poolDecimals));
+  }, [currentPoolStats, poolDecimals]);
 
   const myFundsToken = useMemo(() => {
     if (!isLogged) return 0;
-    return Number(formatUnits(amountPoolAsset, assetDecimals || decimals));
-  }, [isLogged, amountPoolAsset, assetDecimals, decimals]);
+    return Number(formatUnits(amountPoolAsset, poolDecimals));
+  }, [isLogged, amountPoolAsset, poolDecimals]);
 
   const myFundsUsd = useMemo(() => {
     return myFundsToken * (price || 0);
@@ -336,30 +353,30 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>Accepted Funds</StatLabel>
               <StatValue>
-                {Math.round(acceptedFundsToken).toLocaleString('en-US')} {symbol}
+                {formatCompactNumber(acceptedFundsToken)} {symbol}
               </StatValue>
-              <StatSubtext>${Math.round(acceptedFundsUsd).toLocaleString('en-US')}</StatSubtext>
+              <StatSubtext>${formatCompactNumber(acceptedFundsUsd)}</StatSubtext>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>Pending Funds</StatLabel>
               <StatValue>
-                {Math.round(pendingFundsToken).toLocaleString('en-US')} {symbol}
+                {formatCompactNumber(pendingFundsToken)} {symbol}
               </StatValue>
-              <StatSubtext>${Math.round(pendingFundsUsd).toLocaleString('en-US')}</StatSubtext>
+              <StatSubtext>${formatCompactNumber(pendingFundsUsd)}</StatSubtext>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>Total Deposits</StatLabel>
-              <StatValue>{totalDepositsCount.toLocaleString('en-US')}</StatValue>
+              <StatValue>{formatCompactNumber(totalDepositsCount)}</StatValue>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>My Funds</StatLabel>
               <StatValue>
-                {Math.round(myFundsToken).toLocaleString('en-US')} {symbol}
+                {formatCompactNumber(myFundsToken)} {symbol}
               </StatValue>
-              <StatSubtext>${Math.round(myFundsUsd).toLocaleString('en-US')}</StatSubtext>
+              <StatSubtext>${formatCompactNumber(myFundsUsd)}</StatSubtext>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4} isLast>
