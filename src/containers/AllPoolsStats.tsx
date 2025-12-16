@@ -510,7 +510,7 @@ export const AllPoolsStats = () => {
             </Typography>
           </Stack>
 
-          <Stack direction='row' alignItems='center' gap={2}>
+          <FilterRow>
             <SortSelect
               value={sortBy}
               onChange={handleSortChange}
@@ -577,7 +577,7 @@ export const AllPoolsStats = () => {
                 ),
               }}
             />
-          </Stack>
+          </FilterRow>
         </HeaderSection>
       </Section>
 
@@ -615,6 +615,18 @@ const HeaderSection = styled(Stack)(({ theme }) => ({
   },
 }));
 
+const FilterRow = styled(Stack)(({ theme }) => ({
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: theme.spacing(2),
+  [theme.breakpoints.down('sm')]: {
+    width: '100%',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: theme.spacing(1),
+  },
+}));
+
 const SortSelect = styled(Select)(({ theme }) => ({
   minWidth: '150px',
   fontWeight: 400,
@@ -645,6 +657,7 @@ const SearchField = styled(TextField)(({ theme }) => ({
     backgroundColor: theme.palette.background.paper,
   },
   [theme.breakpoints.down('sm')]: {
+    minWidth: 'unset',
     width: '100%',
   },
 }));
