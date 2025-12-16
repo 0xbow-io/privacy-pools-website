@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
 import { Copy, Checkmark } from '@carbon/icons-react';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
@@ -41,6 +42,8 @@ export const WithdrawForm = () => {
   const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
   const theme = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const {
     balanceBN: { symbol, decimals: balanceDecimals },
@@ -452,6 +455,11 @@ export const WithdrawForm = () => {
       // Switch to the selected pool asset
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setSelectedAsset(selectedAsset as any);
+
+      // Update URL if on a pool page
+      if (pathname?.startsWith('/pools/')) {
+        router.push(`/pools/${selectedChainId}/${selectedAsset.toLowerCase()}`);
+      }
     }
 
     // Reset amount and pool account

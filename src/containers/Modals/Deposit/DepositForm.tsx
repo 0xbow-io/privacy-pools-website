@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
 import { TrendingUp as TrendingUpIcon, Close as CloseIcon } from '@mui/icons-material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
@@ -41,6 +42,8 @@ const { ASP_OPTIONS } = getConstants();
 export const DepositForm = () => {
   const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
+  const router = useRouter();
+  const pathname = usePathname();
   const [asp] = useState(ASP_OPTIONS[0]);
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -576,6 +579,11 @@ export const DepositForm = () => {
       // Switch to the selected pool asset
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setSelectedAsset(selectedAsset as any);
+
+      // Update URL if on a pool page
+      if (pathname?.startsWith('/pools/')) {
+        router.push(`/pools/${selectedChainId}/${selectedAsset.toLowerCase()}`);
+      }
     }
 
     // Reset alternative token selection
