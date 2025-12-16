@@ -297,6 +297,9 @@ export const useExit = () => {
         const errorMessage = getDefaultErrorMessage(error?.shortMessage || error?.message);
         addNotification('error', errorMessage);
         console.error('Error calling exit', error);
+
+        // Close the modal when transaction fails or is rejected
+        setModalOpen(ModalType.NONE);
       }
       setIsClosable(true);
       setIsLoading(false);

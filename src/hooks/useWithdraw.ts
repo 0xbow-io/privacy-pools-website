@@ -517,6 +517,9 @@ export const useWithdraw = () => {
 
           addNotification('error', errorMessage);
           console.error('Error withdrawing', error);
+
+          // Close the modal when withdrawal fails
+          setModalOpen(ModalType.WITHDRAW);
         }
         // TEST MODE
       } else {
