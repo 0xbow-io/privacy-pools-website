@@ -23,12 +23,13 @@ import {
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useEnsAddress, useEnsAvatar, useEnsName, useSwitchChain } from 'wagmi';
 import { chainData, allPoolsChainData } from '~/config';
+import { getAspEndpointForChain } from '~/config/env';
 import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
-import { getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
+import { aspClient, getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -67,6 +68,10 @@ export const WithdrawForm = () => {
   const [isLoadingMinAmount, setIsLoadingMinAmount] = useState(false);
   const [targetAddressHasError, setTargetAddressHasError] = useState(false);
   const [receiveGasToken, setReceiveGasToken] = useState(false);
+
+  // Anonymity set state
+  const [anonymitySet, setAnonymitySet] = useState<number | null>(null);
+  const [isLoadingAnonymitySet, setIsLoadingAnonymitySet] = useState(false);
 
   // ENS-related state
   const [inputValue, setInputValue] = useState<string>(target);
@@ -232,6 +237,37 @@ export const WithdrawForm = () => {
       fetchMinWithdrawAmount();
     }
   }, [amount, fetchMinWithdrawAmount, minWithdrawAmount, isLoadingMinAmount]);
+
+  // Fetch anonymity set when amount changes
+  useEffect(() => {
+    const fetchAnonymitySet = async () => {
+      if (!amountBN || amountBN <= 0n || !selectedPoolInfo?.scope || !chainId) {
+        setAnonymitySet(null);
+        return;
+      }
+
+      setIsLoadingAnonymitySet(true);
+      try {
+        const aspUrl = getAspEndpointForChain(chainId);
+        const response = await aspClient.fetchDepositsLargerThan(
+          aspUrl,
+          chainId,
+          selectedPoolInfo.scope,
+          amountBN.toString(),
+        );
+        setAnonymitySet(response.eligibleDeposits);
+      } catch (error) {
+        console.error('Failed to fetch anonymity set:', error);
+        setAnonymitySet(null);
+      } finally {
+        setIsLoadingAnonymitySet(false);
+      }
+    };
+
+    // Debounce the fetch to avoid too many requests while typing
+    const timeoutId = setTimeout(fetchAnonymitySet, 500);
+    return () => clearTimeout(timeoutId);
+  }, [amountBN, selectedPoolInfo?.scope, chainId]);
 
   const isValidAmount = useMemo(() => {
     return amountBN > 0n && amountBN <= (poolAccount?.balance ?? 0n);
@@ -512,6 +548,8 @@ export const WithdrawForm = () => {
           poolAccountName={poolAccount?.name?.toString()}
           balanceUSD={balanceUSD}
           currentPrice={currentPrice}
+          anonymitySet={anonymitySet}
+          isLoadingAnonymitySet={isLoadingAnonymitySet}
         />
 
         <RelayerSelectorSection

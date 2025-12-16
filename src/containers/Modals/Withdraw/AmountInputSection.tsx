@@ -13,6 +13,8 @@ interface AmountInputSectionProps {
   poolAccountName: string | undefined;
   balanceUSD: string;
   currentPrice: number;
+  anonymitySet?: number | null;
+  isLoadingAnonymitySet?: boolean;
 }
 
 export const AmountInputSection = ({
@@ -24,6 +26,8 @@ export const AmountInputSection = ({
   symbol,
   poolAccountName,
   currentPrice,
+  anonymitySet,
+  isLoadingAnonymitySet,
 }: AmountInputSectionProps) => {
   const [selectedPercentage, setSelectedPercentage] = useState<number | null>(null);
 
@@ -83,6 +87,16 @@ export const AmountInputSection = ({
         </Stack>
       </InputContainer>
 
+      {amount && !errorMessage && (
+        <AnonymitySetText>
+          {isLoadingAnonymitySet
+            ? 'Loading anonymity set...'
+            : anonymitySet !== null && anonymitySet !== undefined
+              ? `Your anonymity set is ${anonymitySet}`
+              : null}
+        </AnonymitySetText>
+      )}
+
       {errorMessage && (
         <FormHelperText error sx={{ marginTop: '8px' }}>
           {errorMessage}
@@ -131,6 +145,13 @@ const BalanceText = styled(Typography)(() => ({
   fontSize: '14px',
   color: '#999999',
   textAlign: 'right',
+}));
+
+const AnonymitySetText = styled(Typography)(() => ({
+  fontWeight: 400,
+  fontSize: '14px',
+  color: '#666666',
+  marginTop: '8px',
 }));
 
 const PercentButton = styled(Button, {

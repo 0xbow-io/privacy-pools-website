@@ -34,6 +34,17 @@ interface PoolStatsResponse {
   [scope: string]: PoolStats | PoolStats[] | undefined;
 }
 
+// Define type for deposits-larger-than response
+interface DepositsLargerThanResponse {
+  eligibleDeposits: number;
+  totalDeposits: number;
+  percentage: number;
+  amount: string;
+  scope: string;
+  rank: number;
+  uniqueAmountsAbove: number;
+}
+
 const { ITEMS_PER_PAGE } = getConstants();
 
 const fetchWithHeaders = async <T>(url: string, headers?: Record<string, string>): Promise<T> => {
@@ -79,7 +90,12 @@ const aspClient = {
 
   fetchGlobalEvents: (aspUrl: string, page = 1, perPage = ITEMS_PER_PAGE) =>
     fetchWithHeaders<GlobalEventsResponse>(`${aspUrl}/global/public/events?page=${page}&perPage=${perPage}`),
+
+  fetchDepositsLargerThan: (aspUrl: string, chainId: number, scope: string, amount: string) =>
+    fetchWithHeaders<DepositsLargerThanResponse>(`${aspUrl}/${chainId}/public/deposits-larger-than?amount=${amount}`, {
+      'X-Pool-Scope': scope,
+    }),
 };
 
 export { aspClient };
-export type { PoolStats, PoolStatsResponse };
+export type { PoolStats, PoolStatsResponse, DepositsLargerThanResponse };
