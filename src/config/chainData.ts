@@ -45,7 +45,7 @@ export type ChainAssets =
   | 'frxUSD'
   | 'WOETH'
   | 'BNB'
-  | 'yUSDN';
+  | 'yUSND';
 
 export interface AlternativeTokenConfig {
   tokenAddress: Address;
@@ -449,7 +449,7 @@ const mainnetChainData: ChainData = {
         deploymentBlock: 411197625n,
         entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
         maxDeposit: parseEther('10000'),
-        asset: 'yUSDN',
+        asset: 'yUSND',
         assetDecimals: 18,
         icon: yusndIcon.src,
         color: '#28A0F0',
