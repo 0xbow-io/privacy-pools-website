@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Button } from '@mui/material';
+import { Button, Typography } from '@mui/material';
 import { BaseModal } from '~/components';
 import { useModal, usePoolAccountsContext } from '~/hooks';
 import { EventType, ModalType } from '~/types';
@@ -37,6 +37,12 @@ export const SuccessModal = () => {
         <Button onClick={closeModal} data-testid='go-to-dashboard-button'>
           Go to Dashboard
         </Button>
+
+        {actionType === EventType.DEPOSIT && (
+          <Typography variant='caption' color='text.secondary' sx={{ textAlign: 'center', fontSize: '1.1rem' }}>
+            * On rare occasions deposits take longer to get reviewed but you can exit anytime.
+          </Typography>
+        )}
       </ModalContainer>
     </BaseModal>
   );
