@@ -7,7 +7,6 @@ import { Box, Grid, Stack, styled, Typography } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { usePublicClient } from 'wagmi';
-import { InfoTooltip } from '~/components/InfoTooltip';
 import { chainData, PoolInfo } from '~/config';
 import { useAccountContext } from '~/hooks';
 import { ReviewStatus, type PoolResponse } from '~/types';
@@ -286,20 +285,12 @@ const PoolCard = ({
       <StatsRow>
         <StatColumn>
           <StatLabel>My balance</StatLabel>
-          <Stack direction='row' alignItems='center' gap='4px'>
-            <BalanceValue>{myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</BalanceValue>
-            <InfoTooltip
-              message={`$${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-              iconWidth={16}
-              iconHeight={16}
-            />
-          </Stack>
+          <BalanceValue>{myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</BalanceValue>
+          <StatSubtext>${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</StatSubtext>
         </StatColumn>
         <StatColumn align='right'>
           <StatLabel>Pending</StatLabel>
-          <Stack direction='row' alignItems='center' gap='4px'>
-            <PendingValue>{pendingTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</PendingValue>
-          </Stack>
+          <PendingValue>{pendingTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</PendingValue>
         </StatColumn>
       </StatsRow>
     </PoolCardContainer>
@@ -419,6 +410,14 @@ const StatLabel = styled(Typography)(() => ({
   fontSize: '12px',
   lineHeight: '100%',
   color: '#4D4D4D',
+}));
+
+const StatSubtext = styled(Typography)(() => ({
+  fontWeight: 400,
+  fontSize: '12px',
+  lineHeight: '100%',
+  color: '#4D4D4D',
+  marginTop: '4px',
 }));
 
 const BalanceValue = styled(Typography)(() => ({

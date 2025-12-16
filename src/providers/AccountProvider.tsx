@@ -216,8 +216,10 @@ export const AccountProvider = ({ children }: Props) => {
       }
 
       try {
-        // Fetch deposits for each scope from its respective ASP endpoint
+        // Fetch deposits and MT leaves for each scope from its respective ASP endpoint
         const allDeposits: DepositsByLabelResponse = [];
+        // Store MT leaves per scope for accurate leaf checks
+        const mtLeavesByScope: Record<string, string[]> = {};
 
         for (const scopeKey of allScopeKeys) {
           const accountsForScope = poolAccountsByChainScopeToProcess[scopeKey];
@@ -237,8 +239,14 @@ export const AccountProvider = ({ children }: Props) => {
           const labels = accountsForScope.map((a) => a.label.toString());
 
           try {
-            const deposits = await aspClient.fetchDepositsByLabel(chainInfo.aspUrl, chainId, scope, labels);
+            // Fetch both deposits and MT leaves for this scope
+            const [deposits, mtLeavesResponse] = await Promise.all([
+              aspClient.fetchDepositsByLabel(chainInfo.aspUrl, chainId, scope, labels),
+              aspClient.fetchMtLeaves(chainInfo.aspUrl, chainId, scope),
+            ]);
             allDeposits.push(...deposits);
+            // Store the ASP leaves for this scope
+            mtLeavesByScope[scopeKey] = mtLeavesResponse.aspLeaves || [];
           } catch (err) {
             console.error(`Error fetching deposits for scope ${scopeKey}:`, err);
           }
@@ -252,6 +260,8 @@ export const AccountProvider = ({ children }: Props) => {
 
             const scopeLabels = accountsForScope.map((a) => a.label.toString());
             const scopeDeposits = allDeposits.filter((d) => scopeLabels.includes(d.label));
+            // Get the MT leaves for THIS specific scope (not the currently selected chain)
+            const scopeAspLeaves = mtLeavesByScope[scopeKey] || [];
 
             if (scopeDeposits.length > 0) {
               // Update the scope in poolAccountsByChainScope
@@ -273,7 +283,8 @@ export const AccountProvider = ({ children }: Props) => {
                     };
                   }
 
-                  const aspLeaf = mtLeavesData?.aspLeaves?.find((leaf) => leaf.toString() === entry.label.toString());
+                  // Use the MT leaves for THIS scope, not the globally selected chain
+                  const aspLeaf = scopeAspLeaves.find((leaf) => leaf.toString() === entry.label.toString());
                   let reviewStatus = deposit.reviewStatus;
 
                   // The deposit is approved but the leaves are not yet updated
@@ -309,7 +320,7 @@ export const AccountProvider = ({ children }: Props) => {
         setHasProcessedInitialDeposits(true);
       }
     },
-    [mtLeavesData],
+    [],
   );
 
   const handleLoadAccount = useCallback(
