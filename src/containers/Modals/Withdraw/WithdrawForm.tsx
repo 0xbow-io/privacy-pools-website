@@ -252,7 +252,7 @@ export const WithdrawForm = () => {
         const response = await aspClient.fetchDepositsLargerThan(
           aspUrl,
           chainId,
-          selectedPoolInfo.scope,
+          selectedPoolInfo.scope.toString(),
           amountBN.toString(),
         );
         setAnonymitySet(response.eligibleDeposits);

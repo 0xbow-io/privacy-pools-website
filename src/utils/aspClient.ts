@@ -45,6 +45,41 @@ interface DepositsLargerThanResponse {
   uniqueAmountsAbove: number;
 }
 
+// Define type for time-based statistics
+interface TimeBasedStats {
+  tvl: string;
+  tvlUsd: string;
+  avgDepositSize: string;
+  avgDepositSizeUsd: string;
+  totalDepositsCount: number;
+  totalDepositsValue: string;
+  totalDepositsValueUsd: string;
+  totalWithdrawalsCount: number;
+  totalWithdrawalsValue: string;
+  totalWithdrawalsValueUsd: string;
+}
+
+// Define type for pool statistics response
+interface PoolStatisticsResponse {
+  pool: {
+    scope: string;
+    chainId: string;
+    tokenSymbol: string;
+    tokenAddress: string;
+    tokenDecimals: number;
+    allTime: TimeBasedStats;
+    last24h: TimeBasedStats;
+  };
+  cacheTimestamp: string;
+}
+
+// Define type for global statistics response
+interface GlobalStatisticsResponse {
+  allTime: TimeBasedStats;
+  last24h: TimeBasedStats;
+  cacheTimestamp: string;
+}
+
 const { ITEMS_PER_PAGE } = getConstants();
 
 const fetchWithHeaders = async <T>(url: string, headers?: Record<string, string>): Promise<T> => {
@@ -95,7 +130,22 @@ const aspClient = {
     fetchWithHeaders<DepositsLargerThanResponse>(`${aspUrl}/${chainId}/public/deposits-larger-than?amount=${amount}`, {
       'X-Pool-Scope': scope,
     }),
+
+  fetchPoolStatistics: (aspUrl: string, chainId: number, scope: string) =>
+    fetchWithHeaders<PoolStatisticsResponse>(`${aspUrl}/${chainId}/public/pool-statistics`, {
+      'X-Pool-Scope': scope,
+    }),
+
+  fetchGlobalStatistics: (aspUrl: string) =>
+    fetchWithHeaders<GlobalStatisticsResponse>(`${aspUrl}/global/public/statistics`),
 };
 
 export { aspClient };
-export type { PoolStats, PoolStatsResponse, DepositsLargerThanResponse };
+export type {
+  PoolStats,
+  PoolStatsResponse,
+  DepositsLargerThanResponse,
+  PoolStatisticsResponse,
+  GlobalStatisticsResponse,
+  TimeBasedStats,
+};

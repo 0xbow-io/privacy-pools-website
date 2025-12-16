@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Box, Button, Stack, styled, Theme, Typography } from '@mui/material';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { ActivityTable } from '~/components';
@@ -47,6 +47,17 @@ export const ActivityPreview = () => {
         refetchOnReconnect: false,
       },
     ],
+  });
+
+  // Fetch global statistics for the Stats tab (All Time + Last 24h)
+  const { data: globalStatisticsData } = useQuery({
+    queryKey: ['global_statistics', ASP_ENDPOINT_NON_TEST],
+    queryFn: () => aspClient.fetchGlobalStatistics(ASP_ENDPOINT_NON_TEST),
+    refetchInterval: 60000,
+    staleTime: 30000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Calculate global stats from all pools
@@ -193,13 +204,11 @@ export const ActivityPreview = () => {
               Personal
             </SButton>
 
-            {/* Stats tab hidden for now
             <Divider />
 
             <SButton variant='text' onClick={() => setView('stats')} active={String(view === 'stats')}>
               Stats
             </SButton>
-            */}
           </Stack>
         </Box>
 
@@ -212,28 +221,85 @@ export const ActivityPreview = () => {
 
       {view === 'stats' ? (
         <StatsContainer>
-          <StatsGrid>
-            <StatItem>
-              <StatLabel>Current TVL</StatLabel>
-              <StatValue>${globalStats.tvl.toLocaleString('en-US', { maximumFractionDigits: 0 })}</StatValue>
-            </StatItem>
-            <StatItem>
-              <StatLabel>Average Deposit Size</StatLabel>
-              <StatValue>
-                ${globalStats.averageDepositSize.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-              </StatValue>
-            </StatItem>
-            <StatItem>
-              <StatLabel>Total Deposits</StatLabel>
-              <StatValue>{globalStats.totalDeposits.toLocaleString('en-US')}</StatValue>
-            </StatItem>
-            <StatItem>
-              <StatLabel>Total Withdrawals</StatLabel>
-              <StatValue>
-                ${globalStats.totalWithdrawals.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-              </StatValue>
-            </StatItem>
-          </StatsGrid>
+          <StatsColumnsContainer>
+            {/* All Time Column */}
+            <StatsColumn>
+              <StatsColumnHeader>All Time</StatsColumnHeader>
+              <StatsGrid>
+                <StatItem>
+                  <StatLabel>Current TVL</StatLabel>
+                  <StatValue>
+                    $
+                    {(globalStatisticsData?.allTime?.tvlUsd
+                      ? parseFloat(globalStatisticsData.allTime.tvlUsd)
+                      : globalStats.tvl
+                    ).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  </StatValue>
+                </StatItem>
+                <StatItem>
+                  <StatLabel>Avg Deposit Size</StatLabel>
+                  <StatValue>
+                    $
+                    {(globalStatisticsData?.allTime?.avgDepositSizeUsd
+                      ? parseFloat(globalStatisticsData.allTime.avgDepositSizeUsd)
+                      : globalStats.averageDepositSize
+                    ).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  </StatValue>
+                </StatItem>
+                <StatItem>
+                  <StatLabel>Total Deposits</StatLabel>
+                  <StatValue>
+                    {(globalStatisticsData?.allTime?.totalDepositsCount ?? globalStats.totalDeposits).toLocaleString(
+                      'en-US',
+                    )}
+                  </StatValue>
+                </StatItem>
+                <StatItem>
+                  <StatLabel>Total Withdrawals</StatLabel>
+                  <StatValue>
+                    {(globalStatisticsData?.allTime?.totalWithdrawalsCount || 0).toLocaleString('en-US')}
+                  </StatValue>
+                </StatItem>
+              </StatsGrid>
+            </StatsColumn>
+
+            {/* Last 24h Column */}
+            <StatsColumn>
+              <StatsColumnHeader>Last 24h</StatsColumnHeader>
+              <StatsGrid>
+                <StatItem>
+                  <StatLabel>TVL Change</StatLabel>
+                  <StatValue>
+                    $
+                    {parseFloat(globalStatisticsData?.last24h?.tvlUsd || '0').toLocaleString('en-US', {
+                      maximumFractionDigits: 0,
+                    })}
+                  </StatValue>
+                </StatItem>
+                <StatItem>
+                  <StatLabel>Avg Deposit Size</StatLabel>
+                  <StatValue>
+                    $
+                    {parseFloat(globalStatisticsData?.last24h?.avgDepositSizeUsd || '0').toLocaleString('en-US', {
+                      maximumFractionDigits: 0,
+                    })}
+                  </StatValue>
+                </StatItem>
+                <StatItem>
+                  <StatLabel>Total Deposits</StatLabel>
+                  <StatValue>
+                    {(globalStatisticsData?.last24h?.totalDepositsCount || 0).toLocaleString('en-US')}
+                  </StatValue>
+                </StatItem>
+                <StatItem>
+                  <StatLabel>Total Withdrawals</StatLabel>
+                  <StatValue>
+                    {(globalStatisticsData?.last24h?.totalWithdrawalsCount || 0).toLocaleString('en-US')}
+                  </StatValue>
+                </StatItem>
+              </StatsGrid>
+            </StatsColumn>
+          </StatsColumnsContainer>
         </StatsContainer>
       ) : (
         <ActivityTable records={historyData} isLoading={isLoading} view={view} size='small' />
@@ -285,13 +351,37 @@ const StatsContainer = styled(Box)(({ theme }) => ({
   padding: '24px 16px',
 }));
 
+const StatsColumnsContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'row',
+  gap: '32px',
+  [theme.breakpoints.down('md')]: {
+    flexDirection: 'column',
+    gap: '24px',
+  },
+}));
+
+const StatsColumn = styled(Box)(() => ({
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '16px',
+}));
+
+const StatsColumnHeader = styled(Typography)(() => ({
+  fontWeight: 700,
+  fontSize: '14px',
+  lineHeight: '100%',
+  color: '#000000',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  marginBottom: '8px',
+}));
+
 const StatsGrid = styled(Box)(({ theme }) => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
+  gridTemplateColumns: 'repeat(2, 1fr)',
   gap: '24px',
-  [theme.breakpoints.down('md')]: {
-    gridTemplateColumns: 'repeat(2, 1fr)',
-  },
   [theme.breakpoints.down('sm')]: {
     gridTemplateColumns: '1fr',
   },

@@ -86,6 +86,18 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     refetchOnReconnect: false,
   });
 
+  // Fetch pool statistics for the Stats tab (All Time + Last 24h)
+  const { data: poolStatisticsData } = useQuery({
+    queryKey: ['pool_statistics', parsedChainId, poolScope, aspUrl],
+    queryFn: () => aspClient.fetchPoolStatistics(aspUrl, parsedChainId, poolScope || ''),
+    enabled: !!poolScope && !!aspUrl,
+    refetchInterval: 60000,
+    staleTime: 30000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
   // Get the current pool's stats from the pools array
   const currentPoolStats = useMemo(() => {
     if (!poolStatsData?.pools || !poolScope) return null;
@@ -125,39 +137,6 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
   const totalDepositsCount = useMemo(() => {
     return currentPoolStats?.totalDepositsCount || 0;
-  }, [currentPoolStats]);
-
-  // Calculate pool-specific stats for the Stats tab
-  const poolActivityStats = useMemo(() => {
-    // TVL in USD
-    let tvl = 0;
-    if (currentPoolStats?.totalInPoolValueUsd) {
-      const parsedUSD = parseFloat(currentPoolStats.totalInPoolValueUsd.replace(/,/g, ''));
-      if (!isNaN(parsedUSD)) {
-        tvl = parsedUSD;
-      }
-    }
-
-    // Total deposits count
-    const totalDeposits = currentPoolStats?.acceptedDepositsCount || 0;
-
-    // Average deposit size in USD
-    const averageDepositSize = totalDeposits > 0 ? tvl / totalDeposits : 0;
-
-    // Total withdrawals (approximation: total deposited - current TVL)
-    let totalWithdrawals = 0;
-    if (currentPoolStats?.totalDepositsValueUsd && currentPoolStats?.totalInPoolValueUsd) {
-      const totalDepositedUsd = parseFloat(currentPoolStats.totalDepositsValueUsd.replace(/,/g, '')) || 0;
-      const currentUsd = parseFloat(currentPoolStats.totalInPoolValueUsd.replace(/,/g, '')) || 0;
-      totalWithdrawals = Math.max(0, totalDepositedUsd - currentUsd);
-    }
-
-    return {
-      tvl,
-      averageDepositSize,
-      totalDeposits,
-      totalWithdrawals,
-    };
   }, [currentPoolStats]);
 
   const myPoolAccountsCount = useMemo(() => {
@@ -295,28 +274,8 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
   // Update activity view to 'personal' when address becomes available
 
-  // Transform pool events to match the format expected by ActivityTable
-  const poolActivityEvents = useMemo(() => {
-    if (!poolEventsData?.events) return [];
-    return poolEventsData.events.map((event) => ({
-      type: event.type,
-      amount: event.amount,
-      address: event.address,
-      txHash: event.txHash,
-      timestamp: event.timestamp,
-      reviewStatus: event.reviewStatus,
-      // Add pool info for consistency with global events format
-      pool: {
-        scope: poolScope || '',
-        chainId: parsedChainId,
-        chainName: chain?.name || '',
-        tokenSymbol: symbol,
-        tokenAddress: '',
-        poolAddress: '',
-        denomination: String(assetDecimals || decimals),
-      },
-    }));
-  }, [poolEventsData, poolScope, parsedChainId, chain?.name, symbol, assetDecimals, decimals]);
+  // Pool events are already in the correct format from the API
+  const poolActivityEvents = poolEventsData?.events || [];
 
   const activityData = activityView === 'global' ? poolActivityEvents : localPreviewPersonalActivity;
 
@@ -510,7 +469,6 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
                   Personal
                 </ActivityButton>
 
-                {/* Stats tab hidden for now
                 <ActivityDivider />
 
                 <ActivityButton
@@ -520,7 +478,6 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
                 >
                   Stats
                 </ActivityButton>
-                */}
               </Stack>
 
               {activityView !== 'stats' && (
@@ -534,30 +491,81 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
         {activityView === 'stats' ? (
           <ActivityStatsContainer>
-            <ActivityStatsGrid>
-              <ActivityStatItem>
-                <ActivityStatLabel>Current TVL</ActivityStatLabel>
-                <ActivityStatValue>
-                  ${poolActivityStats.tvl.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                </ActivityStatValue>
-              </ActivityStatItem>
-              <ActivityStatItem>
-                <ActivityStatLabel>Average Deposit Size</ActivityStatLabel>
-                <ActivityStatValue>
-                  ${poolActivityStats.averageDepositSize.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                </ActivityStatValue>
-              </ActivityStatItem>
-              <ActivityStatItem>
-                <ActivityStatLabel>Total Deposits</ActivityStatLabel>
-                <ActivityStatValue>{poolActivityStats.totalDeposits.toLocaleString('en-US')}</ActivityStatValue>
-              </ActivityStatItem>
-              <ActivityStatItem>
-                <ActivityStatLabel>Total Withdrawals</ActivityStatLabel>
-                <ActivityStatValue>
-                  ${poolActivityStats.totalWithdrawals.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                </ActivityStatValue>
-              </ActivityStatItem>
-            </ActivityStatsGrid>
+            <StatsColumnsContainer>
+              {/* All Time Column */}
+              <ActivityStatsColumn>
+                <StatsColumnHeader>All Time</StatsColumnHeader>
+                <ActivityStatsGrid>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>Current TVL</ActivityStatLabel>
+                    <ActivityStatValue>
+                      $
+                      {parseFloat(poolStatisticsData?.pool?.allTime?.tvlUsd || '0').toLocaleString('en-US', {
+                        maximumFractionDigits: 0,
+                      })}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>Avg Deposit Size</ActivityStatLabel>
+                    <ActivityStatValue>
+                      $
+                      {parseFloat(poolStatisticsData?.pool?.allTime?.avgDepositSizeUsd || '0').toLocaleString('en-US', {
+                        maximumFractionDigits: 0,
+                      })}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>Total Deposits</ActivityStatLabel>
+                    <ActivityStatValue>
+                      {(poolStatisticsData?.pool?.allTime?.totalDepositsCount || 0).toLocaleString('en-US')}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>Total Withdrawals</ActivityStatLabel>
+                    <ActivityStatValue>
+                      {(poolStatisticsData?.pool?.allTime?.totalWithdrawalsCount || 0).toLocaleString('en-US')}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                </ActivityStatsGrid>
+              </ActivityStatsColumn>
+
+              {/* Last 24h Column */}
+              <ActivityStatsColumn>
+                <StatsColumnHeader>Last 24h</StatsColumnHeader>
+                <ActivityStatsGrid>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>TVL Change</ActivityStatLabel>
+                    <ActivityStatValue>
+                      $
+                      {parseFloat(poolStatisticsData?.pool?.last24h?.tvlUsd || '0').toLocaleString('en-US', {
+                        maximumFractionDigits: 0,
+                      })}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>Avg Deposit Size</ActivityStatLabel>
+                    <ActivityStatValue>
+                      $
+                      {parseFloat(poolStatisticsData?.pool?.last24h?.avgDepositSizeUsd || '0').toLocaleString('en-US', {
+                        maximumFractionDigits: 0,
+                      })}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>Total Deposits</ActivityStatLabel>
+                    <ActivityStatValue>
+                      {(poolStatisticsData?.pool?.last24h?.totalDepositsCount || 0).toLocaleString('en-US')}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                  <ActivityStatItem>
+                    <ActivityStatLabel>Total Withdrawals</ActivityStatLabel>
+                    <ActivityStatValue>
+                      {(poolStatisticsData?.pool?.last24h?.totalWithdrawalsCount || 0).toLocaleString('en-US')}
+                    </ActivityStatValue>
+                  </ActivityStatItem>
+                </ActivityStatsGrid>
+              </ActivityStatsColumn>
+            </StatsColumnsContainer>
           </ActivityStatsContainer>
         ) : (
           <ActivityTable records={activityData} isLoading={poolEventsLoading} view={activityView} size='small' />
@@ -1143,13 +1151,37 @@ const ActivityStatsContainer = styled(Box)(({ theme }) => ({
   padding: '24px 16px',
 }));
 
+const StatsColumnsContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'row',
+  gap: '32px',
+  [theme.breakpoints.down('md')]: {
+    flexDirection: 'column',
+    gap: '24px',
+  },
+}));
+
+const ActivityStatsColumn = styled(Box)(() => ({
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '16px',
+}));
+
+const StatsColumnHeader = styled(Typography)(() => ({
+  fontWeight: 700,
+  fontSize: '14px',
+  lineHeight: '100%',
+  color: '#000000',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  marginBottom: '8px',
+}));
+
 const ActivityStatsGrid = styled(Box)(({ theme }) => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
+  gridTemplateColumns: 'repeat(2, 1fr)',
   gap: '24px',
-  [theme.breakpoints.down('md')]: {
-    gridTemplateColumns: 'repeat(2, 1fr)',
-  },
   [theme.breakpoints.down('sm')]: {
     gridTemplateColumns: '1fr',
   },
