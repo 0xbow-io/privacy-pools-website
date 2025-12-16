@@ -114,8 +114,8 @@ const mainnetChainData: ChainData = {
     image: mainnetIcon.src,
     explorerUrl: mainnet.blockExplorers.default.url,
     relayers: [
-      { name: 'Fast Relay', url: 'https://fastrelay.xyz' },
       { name: 'Test relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' },
+      //{ name: 'Fast Relay', url: 'https://fastrelay.xyz' },
     ],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
