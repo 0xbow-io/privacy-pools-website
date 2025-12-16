@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { usePathname } from 'next/navigation';
 import { Button, styled } from '@mui/material';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { allPoolsChainData } from '~/config';
@@ -9,6 +10,7 @@ import { useChainContext } from '~/hooks/context/useChainContext';
 import { EventType, ModalType, ReviewStatus } from '~/types';
 
 export const WithdrawAssetSelect: React.FC = () => {
+  const pathname = usePathname();
   const { hasSomeRelayerAvailable, chainId, setSelectedAsset } = useChainContext();
   const { setModalOpen } = useModal();
   const { setActionType } = usePoolAccountsContext();
@@ -16,6 +18,9 @@ export const WithdrawAssetSelect: React.FC = () => {
   const { address } = useAccount();
   const { switchChain } = useSwitchChain();
   const { addNotification } = useNotifications();
+
+  // Check if we're on a pool page (e.g., /pools/42161/usdc)
+  const isOnPoolPage = pathname?.startsWith('/pools/');
 
   // Find the first pool account with approved deposit and balance > 0 across ALL chains/pools
   const firstPoolWithFunds = useMemo(() => {
@@ -45,7 +50,9 @@ export const WithdrawAssetSelect: React.FC = () => {
   const isWithdrawDisabled = !address || !hasAnyApprovedDeposit || !seed || !hasSomeRelayerAvailable;
 
   const handleClick = () => {
-    if (firstPoolWithFunds) {
+    // Only auto-switch to firstPoolWithFunds when NOT on a pool page.
+    // On pool pages, the PoolPage component already sets the correct asset.
+    if (!isOnPoolPage && firstPoolWithFunds) {
       // Switch chain if needed
       if (firstPoolWithFunds.chainId !== chainId) {
         try {

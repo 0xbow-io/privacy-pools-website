@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
 import { Copy, Checkmark } from '@carbon/icons-react';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
@@ -28,7 +29,7 @@ import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
-import { ModalType } from '~/types';
+import { ModalType, ReviewStatus } from '~/types';
 import { aspClient, getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
@@ -41,6 +42,8 @@ export const WithdrawForm = () => {
   const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
   const theme = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const {
     balanceBN: { symbol, decimals: balanceDecimals },
@@ -62,7 +65,25 @@ export const WithdrawForm = () => {
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
   const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals ?? 18;
-  const filteredPoolAccounts = poolAccounts.filter((pa) => pa.balance > 0n);
+
+  // Filter pool accounts by current chain, pool scope, and balance > 0
+  const filteredPoolAccounts = useMemo(() => {
+    return poolAccounts.filter(
+      (pa) => pa.balance > 0n && pa.chainId === chainId && pa.scope === selectedPoolInfo?.scope,
+    );
+  }, [poolAccounts, chainId, selectedPoolInfo?.scope]);
+
+  // Auto-select the first pool account when filtered list changes and no account is selected
+  useEffect(() => {
+    const currentAccountStillValid = poolAccount && filteredPoolAccounts.some((pa) => pa.name === poolAccount.name);
+    if (!currentAccountStillValid && filteredPoolAccounts.length > 0) {
+      // Find first approved account
+      const firstApproved = filteredPoolAccounts.find((pa) => pa.reviewStatus === ReviewStatus.APPROVED);
+      if (firstApproved) {
+        setPoolAccount(firstApproved);
+      }
+    }
+  }, [filteredPoolAccounts, poolAccount, setPoolAccount]);
 
   // New state for minimum withdrawal amount and warning
   const [minWithdrawAmount, setMinWithdrawAmount] = useState<bigint | null>(null);
@@ -434,6 +455,11 @@ export const WithdrawForm = () => {
       // Switch to the selected pool asset
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setSelectedAsset(selectedAsset as any);
+
+      // Update URL if on a pool page
+      if (pathname?.startsWith('/pools/')) {
+        router.push(`/pools/${selectedChainId}/${selectedAsset.toLowerCase()}`);
+      }
     }
 
     // Reset amount and pool account
