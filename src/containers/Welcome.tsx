@@ -240,6 +240,7 @@ export const Welcome = () => {
                   or I have already downloaded my seedphrase before
                 </Typography>
               }
+              sx={{ position: 'relative', zIndex: 1 }}
             />
 
             <Button
