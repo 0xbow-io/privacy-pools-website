@@ -66,7 +66,7 @@ export const WithdrawForm = () => {
   // Filter pool accounts by current chain, pool scope, and balance > 0
   const filteredPoolAccounts = useMemo(() => {
     return poolAccounts.filter(
-      (pa) => pa.balance > 0n && pa.chainId === chainId && pa.scope === selectedPoolInfo?.scope?.toString(),
+      (pa) => pa.balance > 0n && pa.chainId === chainId && pa.scope === selectedPoolInfo?.scope,
     );
   }, [poolAccounts, chainId, selectedPoolInfo?.scope]);
 
