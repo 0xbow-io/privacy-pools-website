@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import SearchIcon from '@mui/icons-material/Search';
@@ -290,6 +290,97 @@ const PoolCard = ({
         </PrivacyScoreBar> */}
       </PoolStatsBottom>
     </PoolCardContainer>
+  );
+};
+
+const FundsOnlyCard = ({ pool, hasBorderTop }: { pool: PoolCardData; hasBorderTop?: boolean }) => {
+  const router = useRouter();
+
+  const totalFundsUSD = pool.totalFundsUSD ?? 0;
+  const totalFundsDisplay = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(totalFundsUSD);
+
+  const handleClick = () => {
+    router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
+  };
+
+  return (
+    <SinglePoolCardContainer onClick={handleClick} hasBorderTop={hasBorderTop}>
+      <PoolHeader>
+        <Stack direction='row' alignItems='center' gap={1}>
+          <IconWrapper>
+            {pool.icon && <Image src={pool.icon} alt={pool.asset} width={24} height={24} />}
+            {pool.chainIcon && (
+              <ChainIconOverlay>
+                <Image src={pool.chainIcon} alt={pool.chainName} width={14} height={14} />
+              </ChainIconOverlay>
+            )}
+          </IconWrapper>
+          <Stack direction='row' alignItems='center' gap={1}>
+            <PoolName variant='body1'>{pool.asset} Pool</PoolName>
+            <ChainName variant='body1'>{pool.chainName}</ChainName>
+          </Stack>
+        </Stack>
+      </PoolHeader>
+
+      <PoolStats>
+        <StatLabel>Total funds</StatLabel>
+      </PoolStats>
+
+      <PoolStatsBottom>
+        <Stack direction='row' alignItems='center' gap='4px'>
+          <TotalFundsValue>{totalFundsDisplay}</TotalFundsValue>
+          <InfoTooltip message='Total funds in the pool' iconWidth={14} iconHeight={14} />
+        </Stack>
+      </PoolStatsBottom>
+    </SinglePoolCardContainer>
+  );
+};
+
+const GrowthOnlyCard = ({ pool, hasBorderTop }: { pool: PoolCardData; hasBorderTop?: boolean }) => {
+  const router = useRouter();
+
+  const hasGrowth = pool.growthPercentage !== undefined && pool.growthPercentage !== 0;
+  const isPositiveGrowth = (pool.growthPercentage || 0) > 0;
+
+  const handleClick = () => {
+    router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
+  };
+
+  return (
+    <GrowthOnlyCardContainer onClick={handleClick} hasBorderTop={hasBorderTop}>
+      {hasGrowth ? (
+        <GrowthIndicator positive={isPositiveGrowth}>
+          {isPositiveGrowth ? (
+            <svg width='16' height='17' viewBox='0 0 16 17' fill='none' xmlns='http://www.w3.org/2000/svg'>
+              <path
+                d='M10 4.25V5.25H13.2929L9 9.54295L6.8535 7.3965C6.80709 7.35005 6.75199 7.3132 6.69133 7.28806C6.63067 7.26292 6.56566 7.24998 6.5 7.24998C6.43434 7.24998 6.36933 7.26292 6.30867 7.28806C6.24801 7.3132 6.19291 7.35005 6.1465 7.3965L1 12.5429L1.70705 13.25L6.5 8.45705L8.6465 10.6035C8.69291 10.6499 8.74801 10.6868 8.80867 10.7119C8.86932 10.7371 8.93434 10.75 9 10.75C9.06566 10.75 9.13068 10.7371 9.19133 10.7119C9.25199 10.6868 9.30709 10.6499 9.3535 10.6035L14 5.95705V9.25H15V4.25H10Z'
+                fill='#7D9C40'
+              />
+            </svg>
+          ) : (
+            <svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
+              <path
+                d='M10 12V11H13.2929L9 6.70705L6.8535 8.8535C6.80709 8.89995 6.75199 8.9368 6.69133 8.96194C6.63067 8.98708 6.56566 9.00002 6.5 9.00002C6.43434 9.00002 6.36933 8.98708 6.30867 8.96194C6.24801 8.9368 6.19291 8.89995 6.1465 8.8535L1 3.70705L1.70705 3L6.5 7.79295L8.6465 5.6465C8.69291 5.60005 8.74801 5.5632 8.80867 5.53806C8.86932 5.51292 8.93434 5.49998 9 5.49998C9.06566 5.49998 9.13068 5.51292 9.19133 5.53806C9.25199 5.5632 9.30709 5.60005 9.3535 5.6465L14 10.293L14 7H15L15 12H10Z'
+                fill='#BA6B5D'
+              />
+            </svg>
+          )}
+          <GrowthPercentage positive={isPositiveGrowth}>
+            {Math.abs(pool.growthPercentage || 0).toFixed(1)}%
+          </GrowthPercentage>
+          <GrowthTimeframe>past 24h</GrowthTimeframe>
+        </GrowthIndicator>
+      ) : (
+        <Typography variant='body2' color='text.secondary'>
+          No change
+        </Typography>
+      )}
+    </GrowthOnlyCardContainer>
   );
 };
 
@@ -583,11 +674,31 @@ export const AllPoolsStats = () => {
 
       <PoolsGridContainer>
         <PoolsGrid container spacing={0}>
-          {filteredPools.map((pool, index) => (
-            <Grid item xs={12} sm={6} key={`${pool.chainId}-${pool.scope}-${index}`}>
-              <PoolCard pool={pool} isLeftColumn={index % 2 === 0} isFirstRow={index < 2} />
-            </Grid>
-          ))}
+          {filteredPools.map((pool, index, arr) => {
+            const isOdd = arr.length % 2 === 1;
+            const isLast = index === arr.length - 1;
+
+            // If odd count and this is the last pool, show it with growth card beside it
+            if (isOdd && isLast) {
+              const needsBorderTop = arr.length > 2;
+              return (
+                <React.Fragment key={`${pool.chainId}-${pool.scope}-${index}`}>
+                  <Grid item xs={12} sm={6}>
+                    <FundsOnlyCard pool={pool} hasBorderTop={needsBorderTop} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <GrowthOnlyCard pool={pool} hasBorderTop={needsBorderTop} />
+                  </Grid>
+                </React.Fragment>
+              );
+            }
+
+            return (
+              <Grid item xs={12} sm={6} key={`${pool.chainId}-${pool.scope}-${index}`}>
+                <PoolCard pool={pool} isLeftColumn={index % 2 === 0} isFirstRow={index < 2} />
+              </Grid>
+            );
+          })}
         </PoolsGrid>
       </PoolsGridContainer>
 
@@ -682,11 +793,7 @@ const PoolCardContainer = styled(Box, {
   alignItems: 'flex-start',
   padding: '20px',
   gap: '8px',
-  // Left column gets left border (outer edge) and right border (middle divider)
-  // Right column gets right border (outer edge)
-  //  borderLeft: isLeftColumn ? `1px solid ${theme.palette.grey[600]}` : 'none',
   borderRight: isLeftColumn ? `1px solid ${theme.palette.grey[600]}` : 'none',
-  // Add top border for rows after the first to separate them
   borderTop: !isFirstRow ? `1px solid ${theme.palette.grey[600]}` : 'none',
   backgroundColor: theme.palette.background.paper,
   minHeight: '131px',
@@ -700,6 +807,47 @@ const PoolCardContainer = styled(Box, {
     borderRight: 'none',
     borderLeft: 'none',
     borderTop: !(isLeftColumn && isFirstRow) ? `1px solid ${theme.palette.grey[600]}` : 'none',
+  },
+}));
+
+const SinglePoolCardContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'hasBorderTop',
+})<{ hasBorderTop?: boolean }>(({ theme, hasBorderTop }) => ({
+  boxSizing: 'border-box',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  padding: '20px',
+  gap: '8px',
+  backgroundColor: theme.palette.background.paper,
+  minHeight: '131px',
+  width: '100%',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s ease',
+  borderTop: hasBorderTop ? `1px solid ${theme.palette.grey[600]}` : 'none',
+  '&:hover': {
+    backgroundColor: theme.palette.grey[50],
+  },
+}));
+
+const GrowthOnlyCardContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'hasBorderTop',
+})<{ hasBorderTop?: boolean }>(({ theme, hasBorderTop }) => ({
+  boxSizing: 'border-box',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  justifyContent: 'flex-start',
+  padding: '20px',
+  gap: '8px',
+  backgroundColor: theme.palette.background.paper,
+  minHeight: '131px',
+  width: '100%',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s ease',
+  borderTop: hasBorderTop ? `1px solid ${theme.palette.grey[600]}` : 'none',
+  '&:hover': {
+    backgroundColor: theme.palette.grey[50],
   },
 }));
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Box, Grid, Stack, styled, Typography } from '@mui/material';
@@ -206,16 +206,36 @@ export const UserPoolsStats = ({ selectedChainIds = [] }: UserPoolsStatsProps) =
   return (
     <PoolsGridContainer>
       <PoolsGrid container spacing={0}>
-        {userPools.map((pool, index) => (
-          <Grid item xs={12} sm={userPools.length === 1 ? 12 : 6} key={`${pool.chainId}-${pool.scope}-${index}`}>
-            <PoolCard
-              pool={pool}
-              isLeftColumn={index % 2 === 0}
-              isFirstRow={index < 2}
-              price={priceMap.get(pool.asset) ?? 0}
-            />
-          </Grid>
-        ))}
+        {userPools.map((pool, index, arr) => {
+          const isOdd = arr.length % 2 === 1;
+          const isLast = index === arr.length - 1;
+
+          // If odd count and this is the last pool, show it with pending card beside it
+          if (isOdd && isLast) {
+            const needsBorderTop = arr.length > 2;
+            return (
+              <React.Fragment key={`${pool.chainId}-${pool.scope}-${index}`}>
+                <Grid item xs={12} sm={6}>
+                  <BalanceOnlyCard pool={pool} price={priceMap.get(pool.asset) ?? 0} hasBorderTop={needsBorderTop} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <PendingOnlyCard pool={pool} hasBorderTop={needsBorderTop} />
+                </Grid>
+              </React.Fragment>
+            );
+          }
+
+          return (
+            <Grid item xs={12} sm={6} key={`${pool.chainId}-${pool.scope}-${index}`}>
+              <PoolCard
+                pool={pool}
+                isLeftColumn={index % 2 === 0}
+                isFirstRow={index < 2}
+                price={priceMap.get(pool.asset) ?? 0}
+              />
+            </Grid>
+          );
+        })}
       </PoolsGrid>
     </PoolsGridContainer>
   );
@@ -297,6 +317,98 @@ const PoolCard = ({
   );
 };
 
+const BalanceOnlyCard = ({
+  pool,
+  price,
+  hasBorderTop,
+}: {
+  pool: PoolCardData;
+  price: number;
+  hasBorderTop?: boolean;
+}) => {
+  const router = useRouter();
+  const { poolAccountsByChainScope } = useAccountContext();
+
+  const dataKey = pool.originalKey || `${pool.chainId}-${pool.scope}`;
+  const poolAccounts = poolAccountsByChainScope[dataKey] || [];
+
+  const myBalance = poolAccounts.reduce((sum, pa) => sum + BigInt(pa.balance || 0), BigInt(0));
+  const myBalanceFormatted = formatUnits(myBalance, pool.decimals);
+  const myBalanceTokenAmount = Number(myBalanceFormatted);
+  const myBalanceUsd = myBalanceTokenAmount * price;
+
+  const handleClick = () => {
+    router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
+  };
+
+  return (
+    <SinglePoolCardContainer onClick={handleClick} hasBorderTop={hasBorderTop}>
+      <PoolHeader>
+        <Stack direction='row' alignItems='center' gap={1}>
+          {pool.icon && (
+            <IconWrapper>
+              <Image src={pool.icon} alt={pool.asset} width={24} height={24} />
+              {pool.chainIcon && (
+                <ChainIconOverlay>
+                  <Image src={pool.chainIcon} alt={pool.chainName} width={14} height={14} />
+                </ChainIconOverlay>
+              )}
+            </IconWrapper>
+          )}
+          <Stack direction='column' gap='2px'>
+            <PoolName variant='body1'>{pool.asset} Pool</PoolName>
+            <ChainName variant='caption'>{pool.chainName}</ChainName>
+          </Stack>
+        </Stack>
+      </PoolHeader>
+
+      <StatsRow>
+        <StatColumn>
+          <StatLabel>My balance</StatLabel>
+          <BalanceValue>{myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</BalanceValue>
+          <StatSubtext>${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</StatSubtext>
+        </StatColumn>
+      </StatsRow>
+    </SinglePoolCardContainer>
+  );
+};
+
+const PendingOnlyCard = ({ pool, hasBorderTop }: { pool: PoolCardData; hasBorderTop?: boolean }) => {
+  const router = useRouter();
+  const { poolAccountsByChainScope, hasProcessedInitialDeposits } = useAccountContext();
+
+  const dataKey = pool.originalKey || `${pool.chainId}-${pool.scope}`;
+  const poolAccounts = poolAccountsByChainScope[dataKey] || [];
+
+  const pending = hasProcessedInitialDeposits
+    ? poolAccounts.reduce(
+        (sum, pa) => (pa.reviewStatus === ReviewStatus.PENDING ? sum + BigInt(pa.balance || 0) : sum),
+        BigInt(0),
+      )
+    : BigInt(0);
+
+  const pendingFormatted = formatUnits(pending, pool.decimals);
+  const pendingTokenAmount = Number(pendingFormatted);
+
+  const handleClick = () => {
+    router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
+  };
+
+  return (
+    <SinglePoolCardContainer onClick={handleClick} hasBorderTop={hasBorderTop}>
+      {/* Empty header spacer to align with BalanceOnlyCard */}
+      <Box sx={{ height: '36px', marginBottom: '12px' }} />
+
+      <StatsRow>
+        <StatColumn align='right'>
+          <StatLabel>Pending</StatLabel>
+          <PendingValue>{pendingTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</PendingValue>
+        </StatColumn>
+      </StatsRow>
+    </SinglePoolCardContainer>
+  );
+};
+
 const PoolsGridContainer = styled(Box)(({ theme }) => ({
   width: '100%',
   borderTop: `1px solid ${theme.palette.grey[600]}`,
@@ -331,6 +443,26 @@ const PoolCardContainer = styled(Box, {
     borderRight: 'none',
     borderLeft: 'none',
     borderTop: !(isLeftColumn && isFirstRow) ? `1px solid ${theme.palette.grey[600]}` : 'none',
+  },
+}));
+
+const SinglePoolCardContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'hasBorderTop',
+})<{ hasBorderTop?: boolean }>(({ theme, hasBorderTop }) => ({
+  boxSizing: 'border-box',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  padding: '20px',
+  gap: '8px',
+  backgroundColor: theme.palette.background.paper,
+  minHeight: '131px',
+  width: '100%',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s ease',
+  borderTop: hasBorderTop ? `1px solid ${theme.palette.grey[600]}` : 'none',
+  '&:hover': {
+    backgroundColor: theme.palette.grey[50],
   },
 }));
 
