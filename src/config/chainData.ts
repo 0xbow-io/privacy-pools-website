@@ -10,7 +10,7 @@ import arbitrumIcon from '~/assets/icons/arbitrum.svg';
 import daiIcon from '~/assets/icons/dai.svg';
 import frxusdIcon from '~/assets/icons/frxusd.svg';
 import mainnetIcon from '~/assets/icons/mainnet_color.svg';
-// import optimismIcon from '~/assets/icons/optimism.svg';
+import optimismIcon from '~/assets/icons/optimism.svg';
 import susdsIcon from '~/assets/icons/susds.svg';
 import usd1Icon from '~/assets/icons/usd1.svg';
 import usdcIcon from '~/assets/icons/usdc.svg';
@@ -20,6 +20,7 @@ import usdtIcon from '~/assets/icons/usdt.svg';
 import wbtcIcon from '~/assets/icons/wbtc.svg';
 import woethIcon from '~/assets/icons/woeth.svg';
 import wstethIcon from '~/assets/icons/wsteth.svg';
+import yusndIcon from '~/assets/icons/yusnd.svg';
 
 const { ALCHEMY_KEY, IS_TESTNET, SHOW_TEST_CHAINS } = getEnv();
 
@@ -43,7 +44,8 @@ export type ChainAssets =
   | 'USD1'
   | 'frxUSD'
   | 'WOETH'
-  | 'BNB';
+  | 'BNB'
+  | 'yUSDN';
 
 export interface AlternativeTokenConfig {
   tokenAddress: Address;
@@ -111,7 +113,10 @@ const mainnetChainData: ChainData = {
     decimals: mainnet.nativeCurrency.decimals,
     image: mainnetIcon.src,
     explorerUrl: mainnet.blockExplorers.default.url,
-    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
+    relayers: [
+      { name: 'Fast Relay', url: 'https://fastrelay.xyz' },
+      { name: 'Test relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' },
+    ],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id),
@@ -435,6 +440,36 @@ const mainnetChainData: ChainData = {
         color: '#28A0F0',
         isStableAsset: false,
         isNativeToken: true,
+      },
+      {
+        chainId: arbitrum.id,
+        address: '0xA63e0bdc3A193d1E6e7c9bE72CB502BE4B7fC244',
+        assetAddress: '0x252b965400862d94bda35fecf7ee0f204a53cc36',
+        scope: 17956916590686670424333894019045881907336686995242105023718942216595734953511n,
+        deploymentBlock: 411197625n,
+        entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
+        maxDeposit: parseEther('10000'),
+        asset: 'yUSDN',
+        assetDecimals: 18,
+        icon: yusndIcon.src,
+        color: '#28A0F0',
+        isStableAsset: true,
+        isNativeToken: false,
+      },
+      {
+        chainId: arbitrum.id,
+        address: '0x3706e38af05bf0158BCdbB46239f8289980b093f',
+        assetAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+        scope: 19314316433070648921215665277427138450050666275686107272761703472573535400848n,
+        deploymentBlock: 411197154n,
+        entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
+        maxDeposit: parseEther('10000'),
+        asset: 'USDC',
+        assetDecimals: 6,
+        icon: usdcIcon.src,
+        color: '#2775CA',
+        isStableAsset: true,
+        isNativeToken: false,
       },
     ],
   },
