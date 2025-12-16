@@ -104,6 +104,18 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     return myFundsToken * (price || 0);
   }, [myFundsToken, price]);
 
+  const acceptedFundsUsd = useMemo(() => {
+    return acceptedFundsToken * (price || 0);
+  }, [acceptedFundsToken, price]);
+
+  const pendingFundsUsd = useMemo(() => {
+    return pendingFundsToken * (price || 0);
+  }, [pendingFundsToken, price]);
+
+  const totalDepositsCount = useMemo(() => {
+    return currentPoolStats?.totalDepositsCount || 0;
+  }, [currentPoolStats]);
+
   // Calculate pool-specific stats for the Stats tab
   const poolActivityStats = useMemo(() => {
     // TVL in USD
@@ -328,27 +340,28 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
         {/* Stats Section */}
         <StatsContainer>
           <Grid container>
-            <StatsColumn item xs={12} sm={3}>
+            <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>Accepted Funds</StatLabel>
               <StatValue>
                 {Math.round(acceptedFundsToken).toLocaleString('en-US')} {symbol}
               </StatValue>
-              <StatChange>
-                <TrendIcon>↗</TrendIcon> 8.5% past 24h
-              </StatChange>
+              <StatSubtext>${Math.round(acceptedFundsUsd).toLocaleString('en-US')}</StatSubtext>
             </StatsColumn>
 
-            <StatsColumn item xs={12} sm={3}>
+            <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>Pending Funds</StatLabel>
               <StatValue>
                 {Math.round(pendingFundsToken).toLocaleString('en-US')} {symbol}
               </StatValue>
-              <StatChange>
-                <TrendIcon>↗</TrendIcon> 8.5% past 24h
-              </StatChange>
+              <StatSubtext>${Math.round(pendingFundsUsd).toLocaleString('en-US')}</StatSubtext>
             </StatsColumn>
 
-            <StatsColumn item xs={12} sm={3}>
+            <StatsColumn item xs={12} sm={2.4}>
+              <StatLabel>Total Deposits</StatLabel>
+              <StatValue>{totalDepositsCount.toLocaleString('en-US')}</StatValue>
+            </StatsColumn>
+
+            <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>My Funds</StatLabel>
               <StatValue>
                 {Math.round(myFundsToken).toLocaleString('en-US')} {symbol}
@@ -356,7 +369,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
               <StatSubtext>${Math.round(myFundsUsd).toLocaleString('en-US')}</StatSubtext>
             </StatsColumn>
 
-            <StatsColumn item xs={12} sm={3} isLast>
+            <StatsColumn item xs={12} sm={2.4} isLast>
               <StatLabel>My Pool Accounts</StatLabel>
               <StatValue>{myPoolAccountsCount}</StatValue>
             </StatsColumn>
@@ -968,9 +981,7 @@ const PoolIconWrapper = styled('div')(() => ({
 
 const ChainNameText = styled('span')(({ theme }) => ({
   color: theme.palette.grey[400],
-  fontWeight: 600,
-  //textDecoration: 'underline',
-  //textUnderlineOffset: '0.3rem',
+  fontWeight: 400,
   lineHeight: '1.25',
 }));
 
@@ -1026,25 +1037,11 @@ const StatValue = styled(Typography)(({ theme }) => ({
   },
 }));
 
-const StatChange = styled(Typography)(() => ({
-  fontWeight: 400,
-  fontSize: '12px',
-  lineHeight: '100%',
-  color: '#7D9C40',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '4px',
-}));
-
 const StatSubtext = styled(Typography)(() => ({
   fontWeight: 400,
   fontSize: '12px',
   lineHeight: '100%',
   color: '#4D4D4D',
-}));
-
-const TrendIcon = styled('span')(() => ({
-  fontSize: '14px',
 }));
 
 const ConnectContainer = styled(Box)(({ theme }) => ({
