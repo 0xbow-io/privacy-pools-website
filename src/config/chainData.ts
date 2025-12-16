@@ -113,10 +113,7 @@ const mainnetChainData: ChainData = {
     decimals: mainnet.nativeCurrency.decimals,
     image: mainnetIcon.src,
     explorerUrl: mainnet.blockExplorers.default.url,
-    relayers: [
-      // { name: 'Test relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' },
-      { name: 'Fast Relay', url: 'https://fastrelay.xyz' },
-    ],
+    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id),
@@ -421,10 +418,7 @@ const mainnetChainData: ChainData = {
     decimals: arbitrum.nativeCurrency.decimals,
     image: arbitrumIcon.src,
     explorerUrl: arbitrum.blockExplorers.default.url,
-    relayers: [
-      { name: 'Test relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' },
-      // { name: 'Fast Relay', url: 'https://fastrelay.xyz' },
-    ],
+    relayers: [{ name: 'Fast Relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=42161`,
     rpcUrl: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
