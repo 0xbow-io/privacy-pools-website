@@ -38,9 +38,6 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   const { push } = useRouter();
   const { address } = useAccount();
   const { setChainId, setSelectedAsset, price } = useChainContext();
-  const {
-    balanceBN: { symbol },
-  } = useChainContext();
   const accountContext = useAccountContext();
   const { poolsByAssetAndChain, amountPoolAsset, hideEmptyPools, toggleHideEmptyPools, poolAccountsByChainScope } =
     accountContext;
@@ -353,7 +350,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>Accepted Funds</StatLabel>
               <StatValue>
-                {formatCompactNumber(acceptedFundsToken)} {symbol}
+                {formatCompactNumber(acceptedFundsToken)} {currentPoolInfo?.asset}
               </StatValue>
               <StatSubtext>${formatCompactNumber(acceptedFundsUsd)}</StatSubtext>
             </StatsColumn>
@@ -361,7 +358,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>Pending Funds</StatLabel>
               <StatValue>
-                {formatCompactNumber(pendingFundsToken)} {symbol}
+                {formatCompactNumber(pendingFundsToken)} {currentPoolInfo?.asset}
               </StatValue>
               <StatSubtext>${formatCompactNumber(pendingFundsUsd)}</StatSubtext>
             </StatsColumn>
@@ -374,7 +371,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
             <StatsColumn item xs={12} sm={2.4}>
               <StatLabel>My Funds</StatLabel>
               <StatValue>
-                {formatCompactNumber(myFundsToken)} {symbol}
+                {formatCompactNumber(myFundsToken)} {currentPoolInfo?.asset}
               </StatValue>
               <StatSubtext>${formatCompactNumber(myFundsUsd)}</StatSubtext>
             </StatsColumn>
