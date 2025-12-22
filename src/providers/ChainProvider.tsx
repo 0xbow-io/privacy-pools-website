@@ -89,6 +89,14 @@ export const ChainProvider = ({ children }: Props) => {
     return chain.poolInfo.find((pool) => pool.asset.toLowerCase() === selectedAsset.toLowerCase()) ?? chain.poolInfo[0];
   }, [chain, selectedAsset]);
 
+  // Use pool-specific relayers if available, otherwise fall back to chain defaults
+  const activeRelayers = useMemo(() => {
+    if (selectedPoolInfo?.relayersOverride && selectedPoolInfo.relayersOverride.length > 0) {
+      return selectedPoolInfo.relayersOverride;
+    }
+    return chain.relayers;
+  }, [selectedPoolInfo, chain.relayers]);
+
   console.log(
     `fetching data for chainId: ${chainId}, selectedAsset: ${selectedAsset}, token: ${selectedAsset === DEFAULT_ASSET ? undefined : selectedPoolInfo.assetAddress}`,
   );
@@ -127,7 +135,7 @@ export const ChainProvider = ({ children }: Props) => {
   }, [addNotification, chain, selectedAsset, selectedPoolInfo, publicClient]);
 
   const feesQueries = useQueries({
-    queries: chain.relayers.map((relayer) => ({
+    queries: activeRelayers.map((relayer) => ({
       queryKey: ['relayerFees', relayer.url, chainId, selectedPoolInfo?.assetAddress],
       queryFn: () => {
         if (!selectedPoolInfo?.assetAddress) {
@@ -145,15 +153,15 @@ export const ChainProvider = ({ children }: Props) => {
     () =>
       feesQueries
         .map((query, index) => ({
-          name: chain.relayers[index].name,
-          url: chain.relayers[index].url,
+          name: activeRelayers[index].name,
+          url: activeRelayers[index].url,
           fees: query.data?.feeBPS,
           relayerAddress: query.data?.feeReceiverAddress,
           isSelectable:
             !query.error && query.data?.feeBPS !== undefined && query.data?.feeReceiverAddress !== undefined,
         }))
         .sort((a, b) => (Number(a.fees) ?? Infinity) - (Number(b.fees) ?? Infinity)),
-    [feesQueries, chain.relayers],
+    [feesQueries, activeRelayers],
   );
 
   const hasSomeRelayerAvailable = useMemo(() => {
@@ -206,7 +214,7 @@ export const ChainProvider = ({ children }: Props) => {
       chainId,
       selectedRelayer,
       setSelectedRelayer: handleSetSelectedRelayer,
-      relayers: chain.relayers,
+      relayers: activeRelayers,
       relayersData,
       isLoadingRelayers: allQueriesAreLoading,
       hasSomeRelayerAvailable,
@@ -225,6 +233,7 @@ export const ChainProvider = ({ children }: Props) => {
       chainId,
       selectedRelayer,
       handleSetSelectedRelayer,
+      activeRelayers,
       relayersData,
       allQueriesAreLoading,
       hasSomeRelayerAvailable,

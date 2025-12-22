@@ -84,6 +84,10 @@ export interface PoolInfo {
     source: string; // Description of yield source (e.g., "Savings USDS staking rewards")
   };
   priceConversion?: PriceConversionConfig; // Custom price conversion config
+  relayersOverride?: {
+    name: string;
+    url: string;
+  }[]; // Pool-specific relayers that override chain defaults
 }
 
 export interface ChainData {

@@ -21,6 +21,7 @@ interface RelayerSelectorSectionProps {
 }
 
 export const RelayerSelectorSection = ({
+  selectedRelayer,
   isQuoteLoading,
   quoteError,
   feeText,
@@ -29,7 +30,7 @@ export const RelayerSelectorSection = ({
 }: RelayerSelectorSectionProps) => {
   return (
     <Stack gap='1.2rem' width='100%' alignItems='center'>
-      <RelayerLabel>Fast Relay</RelayerLabel>
+      <RelayerLabel>{selectedRelayer?.name || 'Fast Relay'}</RelayerLabel>
 
       {/* Fee Details */}
       <Stack direction='column' alignItems='flex-start' gap={0.5} width='100%'>
