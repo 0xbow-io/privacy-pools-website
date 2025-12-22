@@ -84,6 +84,7 @@ export const DataSection = () => {
     feeBPS: quoteFeesBPS,
     baseFeeBPS: quoteBaseFeeBPS,
     extraGasAmountETH: quoteExtraGasAmountETH,
+    relayTxCostETH: quoteRelayTxCostETH,
     quoteCommitment,
   } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
@@ -305,6 +306,7 @@ export const DataSection = () => {
                     feeBPS={quoteFeesBPS}
                     baseFeeBPS={quoteBaseFeeBPS}
                     extraGasAmountETH={quoteState.extraGas ? quoteExtraGasAmountETH : null}
+                    relayTxCostETH={quoteRelayTxCostETH}
                     amount={amount}
                   />
                 </FeeBreakdownContainer>

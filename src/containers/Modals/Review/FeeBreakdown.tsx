@@ -10,6 +10,7 @@ interface FeeBreakdownProps {
   feeBPS: number;
   baseFeeBPS: number;
   extraGasAmountETH?: string | null;
+  relayTxCostETH?: string | null;
   amount: string;
 }
 
@@ -54,7 +55,7 @@ export const formatFeeDisplay = (
   return { displayText, fullPrecision, usdValue: usdFormatted };
 };
 
-export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: FeeBreakdownProps) => {
+export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCostETH, amount }: FeeBreakdownProps) => {
   const {
     balanceBN: { symbol, decimals },
     price,
@@ -88,17 +89,20 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
   const totalFeeAmount = (BigInt(feeBPS) * amountBN) / 10000n;
   const baseFeeAmount = (BigInt(baseFeeBPS) * amountBN) / 10000n;
 
-  // For relaying costs, we need to subtract extra gas amount if it exists
-  const relayingCostAmount = totalFeeAmount - baseFeeAmount;
-
-  // If extraGasAmountETH exists, we need to account for it in the relaying cost
-  // The extraGasAmountETH is in wei, we need to convert it to the token's base unit if showing in tokens
-  // For now, we'll show the relaying cost as the difference between total and base fee
-
   // Format fees for display
   const totalFee = formatFeeDisplay(totalFeeAmount, symbol, decimals, price, isStableAsset);
   const baseFee = formatFeeDisplay(baseFeeAmount, symbol, decimals, price, isStableAsset);
-  const relayingCost = formatFeeDisplay(relayingCostAmount, symbol, decimals, price, isStableAsset);
+
+  // Calculate actual blockchain fee from relayTxCostETH (in wei)
+  // This is the real gas cost, not the BPS-based calculation
+  const blockchainFeeETH = relayTxCostETH ? parseFloat(formatUnits(BigInt(relayTxCostETH), 18)) : null;
+  const blockchainFeeETHFormatted = blockchainFeeETH
+    ? (() => {
+        const formatted = blockchainFeeETH.toFixed(10).replace(/\.?0+$/, '');
+        return formatted.includes('.') ? formatted : `${formatted}.00`;
+      })()
+    : null;
+  const blockchainFeeUSD = blockchainFeeETH ? (blockchainFeeETH * price).toFixed(2) : null;
 
   // Extra gas amount (convert from wei to ETH)
   const extraGasETH = extraGasAmountETH ? parseFloat(formatUnits(BigInt(extraGasAmountETH), 18)) : null;
@@ -164,27 +168,28 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, amount }: 
           </Tooltip>
         </FeeRow>
 
-        {/* Blockchain Fee */}
+        {/* Blockchain Fee - shows actual gas cost from relayer */}
         <FeeRow>
           <FeeLabel>Blockchain Fee:</FeeLabel>
-          <Tooltip
-            title={
-              <TooltipContent>
-                <div>Full precision: {relayingCost.fullPrecision}</div>
-                <div>Formula: Total - Relayer Fee</div>
-                <div>
-                  Calculation: {feeBPS} BPS - {baseFeeBPS} BPS = {feeBPS - baseFeeBPS} BPS
-                </div>
-                <div>
-                  Amount: ({feeBPS - baseFeeBPS}/10000) × {amount} = {relayingCost.fullPrecision}
-                </div>
-                <div>This covers blockchain gas costs and operational expenses</div>
-              </TooltipContent>
-            }
-            placement='top'
-          >
-            <FeeValue>{relayingCost.displayText}</FeeValue>
-          </Tooltip>
+          {blockchainFeeETH && blockchainFeeUSD ? (
+            <Tooltip
+              title={
+                <TooltipContent>
+                  <div>Amount: {blockchainFeeETHFormatted} ETH</div>
+                  <div>USD Value: ~${blockchainFeeUSD}</div>
+                  <div>Estimated gas cost based on recent similar transactions.</div>
+                  <div>Actual cost may vary slightly depending on network conditions.</div>
+                </TooltipContent>
+              }
+              placement='top'
+            >
+              <FeeValue>
+                {blockchainFeeETHFormatted} ETH (~${blockchainFeeUSD})
+              </FeeValue>
+            </Tooltip>
+          ) : (
+            <FeeValue>Calculating...</FeeValue>
+          )}
         </FeeRow>
 
         {/* Gas token received (only show if extraGasAmountETH exists) */}

@@ -30,6 +30,7 @@ interface UseRequestQuoteReturn {
   feeBPS: number | null;
   baseFeeBPS: number | null;
   extraGasAmountETH: string | null;
+  relayTxCostETH: string | null;
   isQuoteValid: boolean;
   countdown: number;
   isQuoteLoading: boolean;
@@ -105,6 +106,7 @@ export const useRequestQuote = ({
         Number(newQuoteData.feeBPS),
         Number(newQuoteData.baseFeeBPS),
         newQuoteData.detail?.extraGasFundAmount?.eth || null,
+        newQuoteData.detail?.relayTxCost?.eth || null,
         remainingTime,
       );
     } catch (err) {
@@ -232,6 +234,7 @@ export const useRequestQuote = ({
     feeBPS: quoteState.feeBPS,
     baseFeeBPS: quoteState.baseFeeBPS,
     extraGasAmountETH: quoteState.extraGasAmountETH,
+    relayTxCostETH: quoteState.relayTxCostETH,
     isQuoteValid,
     countdown: quoteState.countdown,
     isQuoteLoading,

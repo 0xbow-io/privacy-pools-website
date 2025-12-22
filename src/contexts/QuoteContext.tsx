@@ -8,6 +8,7 @@ interface QuoteState {
   feeBPS: number | null;
   baseFeeBPS: number | null;
   extraGasAmountETH: string | null;
+  relayTxCostETH: string | null;
   countdown: number;
   isExpired: boolean;
   extraGas: boolean;
@@ -20,6 +21,7 @@ interface QuoteContextType {
     feeBPS: number,
     baseFeeBPS: number,
     extraGasAmountETH: string | null,
+    relayTxCostETH: string | null,
     countdown: number,
   ) => void;
   updateCountdown: (countdown: number) => void;
@@ -36,6 +38,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     feeBPS: null,
     baseFeeBPS: null,
     extraGasAmountETH: null,
+    relayTxCostETH: null,
     countdown: 0,
     isExpired: false,
     extraGas: false,
@@ -47,6 +50,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       feeBPS: number,
       baseFeeBPS: number,
       extraGasAmountETH: string | null,
+      relayTxCostETH: string | null,
       countdown: number,
     ) => {
       setQuoteState((prev) => ({
@@ -54,6 +58,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
         feeBPS,
         baseFeeBPS,
         extraGasAmountETH,
+        relayTxCostETH,
         countdown,
         isExpired: false,
         extraGas: prev.extraGas, // Preserve current extraGas setting
@@ -76,6 +81,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       feeBPS: null,
       baseFeeBPS: null,
       extraGasAmountETH: null,
+      relayTxCostETH: null,
       countdown: 0,
       isExpired: false,
       extraGas: prev.extraGas, // Preserve extraGas setting when resetting quote
