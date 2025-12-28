@@ -4,7 +4,7 @@ import { useEffect, useMemo, useCallback, useRef } from 'react';
 import { Address } from 'viem';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { QuoteRequestBody, QuoteResponse, FeeCommitment } from '~/types';
-import { calculateRemainingTime, debounce } from '~/utils';
+import { calculateRemainingTime } from '~/utils';
 
 let globalTimerInstanceActive = false;
 
@@ -36,6 +36,8 @@ interface UseRequestQuoteReturn {
   isQuoteLoading: boolean;
   quoteError: Error | null;
   isExpired: boolean;
+  quotedAmount: string | null;
+  canRequestQuote: boolean;
   requestNewQuote: () => Promise<void>;
 }
 
@@ -55,7 +57,6 @@ export const useRequestQuote = ({
   const { quoteState, setQuoteData, updateCountdown, resetQuote, markAsExpired } = useQuoteContext();
   const isFetchingRef = useRef(false);
   const previousExtraGasRef = useRef(quoteState.extraGas);
-  const previousAmountRef = useRef(amountBN);
   const expiredNotificationSentRef = useRef<string | null>(null);
   const executeFetchAndSetQuoteRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const timerIdRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -71,13 +72,13 @@ export const useRequestQuote = ({
     addNotificationRef.current = addNotification;
   }, [updateCountdown, markAsExpired, addNotification]);
 
-  const canRequestQuote = useMemo(() => {
+  const canRequestQuote = useMemo((): boolean => {
     return (
       isValidAmount &&
-      recipient &&
+      !!recipient &&
       isRecipientAddressValid &&
       isRelayerSelected &&
-      assetAddress &&
+      !!assetAddress &&
       chainId !== undefined &&
       amountBN > 0n
     );
@@ -89,10 +90,11 @@ export const useRequestQuote = ({
     }
 
     isFetchingRef.current = true;
+    const requestedAmount = amountBN.toString();
     try {
       const quoteInput = {
         chainId,
-        amount: amountBN.toString(),
+        amount: requestedAmount,
         asset: assetAddress,
         recipient,
         extraGas: quoteState.extraGas,
@@ -110,6 +112,7 @@ export const useRequestQuote = ({
         newQuoteData.detail?.extraGasFundAmount?.eth || null,
         newQuoteData.detail?.relayTxCost?.eth || null,
         remainingTime,
+        requestedAmount,
       );
     } catch (err) {
       const errorMessage = `Failed to get quote: ${err instanceof Error ? err.message : 'Unknown error'}`;
@@ -137,21 +140,12 @@ export const useRequestQuote = ({
     executeFetchAndSetQuoteRef.current = executeFetchAndSetQuote;
   }, [executeFetchAndSetQuote]);
 
-  // Create a stable debounced refetch function for amount changes
-  const debouncedRefetchForAmount = useMemo(() => {
-    return debounce(() => {
-      executeFetchAndSetQuoteRef.current();
-    }, 500);
-  }, []);
-
-  // Effect to fetch quote initially or when relevant inputs change
+  // Reset quote when form becomes invalid
   useEffect(() => {
-    if (canRequestQuote && !quoteState.quoteCommitment && !quoteState.isExpired) {
-      executeFetchAndSetQuote();
-    } else if (!canRequestQuote) {
+    if (!canRequestQuote) {
       resetQuote();
     }
-  }, [canRequestQuote, executeFetchAndSetQuote, resetQuote, quoteState.quoteCommitment, quoteState.isExpired]);
+  }, [canRequestQuote, resetQuote]);
 
   // Effect to refetch quote when extraGas changes (only if we already have a quote)
   useEffect(() => {
@@ -165,24 +159,6 @@ export const useRequestQuote = ({
       previousExtraGasRef.current = quoteState.extraGas;
     }
   }, [quoteState.extraGas, canRequestQuote, quoteState.quoteCommitment, quoteState.isExpired, executeFetchAndSetQuote]);
-
-  // Effect to refetch quote when amount changes (debounced to avoid requests while typing)
-  useEffect(() => {
-    // Only refetch if we already have a quote and amount actually changed
-    if (
-      canRequestQuote &&
-      quoteState.quoteCommitment &&
-      !quoteState.isExpired &&
-      previousAmountRef.current !== amountBN
-    ) {
-      previousAmountRef.current = amountBN;
-      debouncedRefetchForAmount();
-    }
-
-    return () => {
-      debouncedRefetchForAmount.cancel();
-    };
-  }, [amountBN, canRequestQuote, quoteState.quoteCommitment, quoteState.isExpired, debouncedRefetchForAmount]);
 
   const startTimer = useCallback((quoteId: string, initialCountdown: number) => {
     if (timerIdRef.current || globalTimerInstanceActive) {
@@ -272,6 +248,8 @@ export const useRequestQuote = ({
     isQuoteLoading,
     quoteError,
     isExpired: quoteState.isExpired,
+    quotedAmount: quoteState.quotedAmount,
+    canRequestQuote,
     requestNewQuote,
   };
 };

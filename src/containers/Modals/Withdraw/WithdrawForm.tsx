@@ -59,7 +59,7 @@ export const WithdrawForm = () => {
 
   const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
-  const { setExtraGas } = useQuoteContext();
+  const { setExtraGas, requestQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
 
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
@@ -476,9 +476,11 @@ export const WithdrawForm = () => {
   const handleWithdraw = useCallback(() => {
     // Set extraGas based on checkbox state
     setExtraGas(receiveGasToken);
-    // Go directly to Review screen - quote will be requested there
+    // Signal that a quote should be requested when Review screen opens
+    requestQuote();
+    // Go to Review screen
     setModalOpen(ModalType.REVIEW);
-  }, [setModalOpen, setExtraGas, receiveGasToken]);
+  }, [setModalOpen, setExtraGas, receiveGasToken, requestQuote]);
 
   return (
     <ModalContainer>

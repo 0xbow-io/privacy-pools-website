@@ -15,4 +15,3 @@ export * from './seedPhrase';
 export * from './walletSeed';
 export * from './clipboard';
 export * from './eip7702';
-export * from './debounce';

@@ -12,6 +12,8 @@ interface QuoteState {
   countdown: number;
   isExpired: boolean;
   extraGas: boolean;
+  quotedAmount: string | null; // The amount used when the quote was requested
+  pendingQuoteRequest: boolean; // Flag to trigger quote request when Review screen opens
 }
 
 interface QuoteContextType {
@@ -23,11 +25,14 @@ interface QuoteContextType {
     extraGasAmountETH: string | null,
     relayTxCostETH: string | null,
     countdown: number,
+    quotedAmount: string,
   ) => void;
   updateCountdown: (countdown: number) => void;
   resetQuote: () => void;
   markAsExpired: () => void;
   setExtraGas: (extraGas: boolean) => void;
+  requestQuote: () => void;
+  clearPendingQuoteRequest: () => void;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
@@ -42,6 +47,8 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     countdown: 0,
     isExpired: false,
     extraGas: false,
+    quotedAmount: null,
+    pendingQuoteRequest: false,
   });
 
   const setQuoteData = useCallback(
@@ -52,6 +59,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       extraGasAmountETH: string | null,
       relayTxCostETH: string | null,
       countdown: number,
+      quotedAmount: string,
     ) => {
       setQuoteState((prev) => ({
         quoteCommitment: commitment,
@@ -62,6 +70,8 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
         countdown,
         isExpired: false,
         extraGas: prev.extraGas, // Preserve current extraGas setting
+        quotedAmount,
+        pendingQuoteRequest: false, // Clear pending request when quote is set
       }));
     },
     [],
@@ -85,6 +95,8 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       countdown: 0,
       isExpired: false,
       extraGas: prev.extraGas, // Preserve extraGas setting when resetting quote
+      quotedAmount: null,
+      pendingQuoteRequest: prev.pendingQuoteRequest, // Preserve pending request state
     }));
   }, []);
 
@@ -103,6 +115,20 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const requestQuote = useCallback(() => {
+    setQuoteState((prev) => ({
+      ...prev,
+      pendingQuoteRequest: true,
+    }));
+  }, []);
+
+  const clearPendingQuoteRequest = useCallback(() => {
+    setQuoteState((prev) => ({
+      ...prev,
+      pendingQuoteRequest: false,
+    }));
+  }, []);
+
   return (
     <QuoteContext.Provider
       value={{
@@ -112,6 +138,8 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
         resetQuote,
         markAsExpired,
         setExtraGas,
+        requestQuote,
+        clearPendingQuoteRequest,
       }}
     >
       {children}
