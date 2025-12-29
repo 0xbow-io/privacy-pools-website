@@ -12,6 +12,7 @@ import {
   Checkbox,
   FormControlLabel,
   keyframes,
+  CircularProgress,
 } from '@mui/material';
 import { captureException } from '@sentry/nextjs';
 import { useAccount, useSignTypedData } from 'wagmi';
@@ -29,6 +30,7 @@ export const Welcome = () => {
   const [hasMnemonicDownloaded, setHasMnemonicDownloaded] = useState(false);
   const [acknowledgedRisks, setAcknowledgedRisks] = useState(false);
   const [isProceeding, setIsProceeding] = useState(false);
+  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
   const { address, connector } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
   const { setModalOpen } = useModal();
@@ -109,6 +111,29 @@ export const Welcome = () => {
 
       const mnemonic = await deriveMnemonicFromWalletSignature(signature1, address, version);
 
+      // Check if this wallet has already downloaded seedphrase before
+      const previouslyDownloaded =
+        localStorage.getItem('seedphraseDownloaded')?.toLowerCase() === address.toLowerCase();
+
+      if (previouslyDownloaded) {
+        // Skip download screen, proceed directly to account
+        setIsGenerating(false);
+        setIsLoadingAccount(true);
+        try {
+          await loadAccount(mnemonic);
+          setSeed(mnemonic);
+          localStorage.setItem('signupMethod', 'wallet');
+          localStorage.setItem('walletSeedVersion', version);
+          login(mnemonic);
+        } catch (loadErr) {
+          console.error(loadErr);
+          captureException(loadErr, { tags: { stage: 'load_returning_wallet' } });
+          addNotification('error', 'Failed to load account. Please try again.');
+          setIsLoadingAccount(false);
+        }
+        return;
+      }
+
       // Store generated mnemonic and version, then show download screen
       setGeneratedMnemonic(mnemonic);
       setGeneratedVersion(version);
@@ -124,7 +149,7 @@ export const Welcome = () => {
   };
 
   const handleDownloadMnemonic = () => {
-    if (!generatedMnemonic) return;
+    if (!generatedMnemonic || !address) return;
 
     // Create downloadable text file
     const blob = new Blob([generatedMnemonic], { type: 'text/plain' });
@@ -136,6 +161,9 @@ export const Welcome = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    // Store that this wallet has downloaded seedphrase
+    localStorage.setItem('seedphraseDownloaded', address.toLowerCase());
 
     setHasMnemonicDownloaded(true);
     addNotification('success', 'Seedphrase downloaded! Keep this file safe and secure.');
@@ -224,24 +252,24 @@ export const Welcome = () => {
               {hasMnemonicDownloaded ? 'Seedphrase Downloaded ✓' : 'Download Seedphrase'}
             </Button>
 
-            <Divider sx={{ my: 1 }}>Or</Divider>
+            {!hasMnemonicDownloaded && (
+              <>
+                <Divider sx={{ my: 1 }}>Or</Divider>
 
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={acknowledgedRisks}
-                  onChange={(e) => setAcknowledgedRisks(e.target.checked)}
-                  disabled={hasMnemonicDownloaded}
+                <FormControlLabel
+                  control={
+                    <Checkbox checked={acknowledgedRisks} onChange={(e) => setAcknowledgedRisks(e.target.checked)} />
+                  }
+                  label={
+                    <Typography variant='body2' sx={{ fontSize: '1em' }}>
+                      I understand the risks and will download my seedphrase later from the account menu (not
+                      recommended) or I have already downloaded my seedphrase before
+                    </Typography>
+                  }
+                  sx={{ position: 'relative', zIndex: 1 }}
                 />
-              }
-              label={
-                <Typography variant='body2' sx={{ fontSize: '1em' }}>
-                  I understand the risks and will download my seedphrase later from the account menu (not recommended)
-                  or I have already downloaded my seedphrase before
-                </Typography>
-              }
-              sx={{ position: 'relative', zIndex: 1 }}
-            />
+              </>
+            )}
 
             <Button
               variant='contained'
@@ -312,11 +340,18 @@ export const Welcome = () => {
           variant='contained'
           color='primary'
           onClick={() => handleGenerateWithWallet()}
-          disabled={isGenerating || isWalletSigningDisabled}
+          disabled={isGenerating || isWalletSigningDisabled || isLoadingAccount}
           fullWidth
           sx={{ maxWidth: '42rem' }}
         >
-          Continue with Wallet
+          {isLoadingAccount ? (
+            <>
+              <CircularProgress size={20} sx={{ mr: 1 }} color='inherit' />
+              Your Account Is Loading...
+            </>
+          ) : (
+            'Continue with Wallet'
+          )}
         </Button>
         <Divider sx={{ width: '100%', maxWidth: '42rem' }}>Or</Divider>
 
