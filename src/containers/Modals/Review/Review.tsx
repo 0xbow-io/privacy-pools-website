@@ -97,12 +97,13 @@ export const ReviewModal = () => {
       deposit();
     } else if (actionType === EventType.WITHDRAWAL) {
       const currentAmountStr = amountBN.toString();
-      // Check if quote amount matches current amount
-      if (quotedAmount !== currentAmountStr) {
-        // Amount changed, need to refetch quote
+      // Check if quote is valid and matches current amount
+      const needsNewQuote = quotedAmount !== currentAmountStr || !isQuoteValid || isExpired;
+      if (needsNewQuote) {
+        // Quote invalid or amount changed, need to refetch
         await requestNewQuote();
         // Don't proceed - user will need to click confirm again with the new quote
-        addNotification('warning', 'Quote refreshed due to amount change. Please review and confirm.');
+        addNotification('warning', 'Quote refreshed. Please review and confirm.');
         return;
       }
       setIsConfirmClicked(true);
@@ -113,7 +114,17 @@ export const ReviewModal = () => {
       // Open proof generation modal for exits
       setModalOpen(ModalType.GENERATE_ZK_PROOF);
     }
-  }, [actionType, amountBN, quotedAmount, requestNewQuote, addNotification, deposit, setModalOpen]);
+  }, [
+    actionType,
+    amountBN,
+    quotedAmount,
+    isQuoteValid,
+    isExpired,
+    requestNewQuote,
+    addNotification,
+    deposit,
+    setModalOpen,
+  ]);
 
   const handleRequestNewQuote = async () => {
     await requestNewQuote();
