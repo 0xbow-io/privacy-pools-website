@@ -452,9 +452,16 @@ export const DepositForm = () => {
       }
     } else {
       // For ERC20 tokens or alternative tokens, gas is paid in ETH so we can use full balance
+      // But we need to account for the vetting fee that gets added on top of the input amount
       const balanceAsBN = parseUnits(effectiveBalance, decimals);
       const maxAllowedBN = balanceAsBN > BigInt(maxDeposit) ? BigInt(maxDeposit) : balanceAsBN;
-      const maxAmountFormatted = formatUnits(maxAllowedBN, decimals);
+
+      // Calculate max input that, when fees are added, equals the balance
+      // Formula: maxInput = balance * (10000 - vettingFeeBPS) / 10000
+      // This ensures: calculateInitialDeposit(maxInput) <= balance
+      const maxInputAmount = (maxAllowedBN * (10000n - vettingFeeBPS)) / 10000n;
+
+      const maxAmountFormatted = formatUnits(maxInputAmount, decimals);
       const [i, d = ''] = maxAmountFormatted.split('.');
       const limited = d ? `${i}.${d.slice(0, 5)}` : i;
       setInputAmount(limited);
