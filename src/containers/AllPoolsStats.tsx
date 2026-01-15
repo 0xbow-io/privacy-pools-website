@@ -18,9 +18,11 @@ import {
 } from '@mui/material';
 import { useQueries } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
+import { ChainFilterSelect } from '~/components/ChainFilterSelect';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { allPoolsChainData, getConfig, PoolInfo } from '~/config';
 import { PAContainer, Section } from '~/containers';
+import { useChainContext } from '~/hooks';
 import type { PoolResponse } from '~/types';
 import { aspClient } from '~/utils';
 import type { PoolStats } from '~/utils/aspClient';
@@ -387,6 +389,7 @@ const GrowthOnlyCard = ({ pool, hasBorderTop }: { pool: PoolCardData; hasBorderT
 type SortOption = 'most-popular' | 'most-private' | 'most-deposits' | 'most-uniform';
 
 export const AllPoolsStats = () => {
+  const { selectedChainIds, setSelectedChainIds, allPoolsChains } = useChainContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('most-popular');
   const [sortSelectOpen, setSortSelectOpen] = useState(false);
@@ -491,9 +494,14 @@ export const AllPoolsStats = () => {
     return pools;
   }, [poolStatsMap]);
 
-  // Filter and sort pools based on search query and sort option
+  // Filter and sort pools based on search query, chain filter, and sort option
   const filteredPools = useMemo(() => {
     let pools = allPools;
+
+    // Filter by selected chains
+    if (selectedChainIds.length > 0) {
+      pools = pools.filter((pool) => selectedChainIds.includes(pool.chainId));
+    }
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -578,7 +586,7 @@ export const AllPoolsStats = () => {
     });
 
     return sortedPools;
-  }, [allPools, searchQuery, sortBy]);
+  }, [allPools, searchQuery, sortBy, selectedChainIds]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -592,13 +600,18 @@ export const AllPoolsStats = () => {
     <PAContainer>
       <Section width='100%'>
         <HeaderSection>
-          <Stack direction='row' alignItems='center' gap={1}>
+          <Stack direction='row' alignItems='center' gap={2}>
             <Typography variant='h6' fontWeight='bold'>
               All Pools
             </Typography>
             <Typography variant='caption' fontWeight='bold' color='text.secondary'>
               ({filteredPools.length})
             </Typography>
+            <ChainFilterSelect
+              chains={allPoolsChains}
+              selectedChainIds={selectedChainIds}
+              onChange={setSelectedChainIds}
+            />
           </Stack>
 
           <FilterRow>
@@ -718,7 +731,6 @@ const HeaderSection = styled(Stack)(({ theme }) => ({
   justifyContent: 'space-between',
   alignItems: 'center',
   width: '100%',
-  marginBottom: theme.spacing(2),
   [theme.breakpoints.down('sm')]: {
     flexDirection: 'column',
     alignItems: 'flex-start',

@@ -4,6 +4,12 @@ import { getConfig, PoolInfo } from '~/config';
 const url = `https://api.g.alchemy.com/prices/v1/${getConfig().env.ALCHEMY_KEY}/tokens/by-symbol?`;
 const options = { method: 'GET', headers: { accept: 'application/json' } };
 
+// Fallback prices for stablecoins not supported by Alchemy API
+// These are USD-pegged stablecoins that should be ~$1
+const STABLECOIN_FALLBACK_PRICES: Record<string, number> = {
+  USND: 1.0, // Nerite USD - redeemable for $1 worth of collateral
+};
+
 /**
  * Fetches token price, with support for custom price conversions
  * @param tokenSymbol The token symbol to fetch price for
@@ -34,7 +40,12 @@ export const fetchTokenPrice = async (
       // Get the price of the underlying asset
       const underlyingResponse = await fetch(`${url}symbols=${underlyingAsset}`, options);
       const underlyingJson = await underlyingResponse.json();
-      const underlyingPrice = underlyingJson.data?.[0]?.prices?.[0]?.value;
+      let underlyingPrice = underlyingJson.data?.[0]?.prices?.[0]?.value;
+
+      // Use fallback price for stablecoins not supported by Alchemy
+      if (!underlyingPrice && STABLECOIN_FALLBACK_PRICES[underlyingAsset]) {
+        underlyingPrice = STABLECOIN_FALLBACK_PRICES[underlyingAsset];
+      }
 
       if (!underlyingPrice) {
         throw new Error(`Could not fetch price for underlying asset ${underlyingAsset}`);

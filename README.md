@@ -53,7 +53,6 @@ cp .env.example .env
 | `NEXT_PUBLIC_PROJECT_ID`           | ProjectID from [WalletConnect](https://cloud.walletconnect.com) | `abc123def456` |
 | `NEXT_PUBLIC_ALCHEMY_KEY`          | API key from [Alchemy](https://www.alchemy.com) | `AbC123dEf456gHi789` |
 | `NEXT_PUBLIC_ASP_ENDPOINT`         | ASP service endpoint URL                       | `https://aspendpoint.com` |
-| `ASP_JWT_SECRET`                   | JWT secret for ASP authentication              | `your-jwt-secret`         |
 | `HYPERSYNC_KEY`                    | API key from Hypersync                         | `your-hypersync-key`      |
 
 **Application Settings**
