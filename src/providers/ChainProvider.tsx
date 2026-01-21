@@ -125,6 +125,9 @@ export const ChainProvider = ({ children }: Props) => {
     address,
     chainId,
     token: selectedPoolInfo.isNativeToken ? undefined : selectedPoolInfo.assetAddress, //selectedAsset === DEFAULT_ASSET ? undefined : selectedPoolInfo.assetAddress,
+    query: {
+      refetchInterval: 10_000, // Refetch every 10 seconds
+    },
   });
 
   console.log(`User balance for asset ${selectedAsset} on chain ${chainId}:`, userBalance);
