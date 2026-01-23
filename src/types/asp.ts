@@ -98,3 +98,23 @@ export type MtLeavesResponse = {
 export type LeafIndexResponse = {
   index: number;
 };
+
+// Brevis ASP API response types
+export type BrevisAspLeavesResponse = {
+  err: unknown | null;
+  aspLeaves: string[]; // List of hex-encoded strings (called asp_leaves in proto)
+};
+
+export type BrevisAspRootResponse = {
+  err: unknown | null;
+  aspMerkleTreeRoot: string; // Hex-encoded string (called asp_merkle_tree_root in proto)
+};
+
+// Extended response types that include Brevis data for BSC chain
+export type ExtendedMtLeavesResponse = MtLeavesResponse & {
+  brevisAspLeaves?: string[]; // ASP leaves from Brevis (for BSC chain)
+};
+
+export type ExtendedMtRootResponse = MtRootResponse & {
+  brevisAspMerkleTreeRoot?: string; // ASP root from Brevis (for BSC chain)
+};

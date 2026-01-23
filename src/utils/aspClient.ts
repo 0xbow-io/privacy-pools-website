@@ -1,4 +1,5 @@
 import { getConstants } from '~/config/constants';
+import { getEnv } from '~/config/env';
 import {
   MtRootResponse,
   PoolResponse,
@@ -6,6 +7,8 @@ import {
   DepositsByLabelResponse,
   AllEventsResponse,
   GlobalEventsResponse,
+  BrevisAspLeavesResponse,
+  BrevisAspRootResponse,
 } from '~/types';
 
 // Define type for pool stats response
@@ -111,6 +114,9 @@ const fetchWithHeaders = async <T>(url: string, headers?: Record<string, string>
   return response.json();
 };
 
+// Brevis ASP endpoint for BSC chain (configurable via env)
+const { BREVIS_ASP_ENDPOINT } = getEnv();
+
 const aspClient = {
   fetchPoolInfo: (aspUrl: string, chainId: number, scope: string) =>
     fetchWithHeaders<PoolResponse>(`${aspUrl}/${chainId}/public/pool-info`, {
@@ -164,6 +170,11 @@ const aspClient = {
         'X-Pool-Scope': scope,
       },
     ),
+
+  // Brevis ASP endpoints for BSC chain
+  fetchBrevisAspLeaves: () => fetchWithHeaders<BrevisAspLeavesResponse>(`${BREVIS_ASP_ENDPOINT}/leaves`),
+
+  fetchBrevisAspRoot: () => fetchWithHeaders<BrevisAspRootResponse>(`${BREVIS_ASP_ENDPOINT}/root`),
 };
 
 export { aspClient };

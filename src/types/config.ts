@@ -7,6 +7,7 @@ export interface Env {
   FEE_COLLECTOR: string;
   ASP_ENDPOINT_TEST: string;
   ASP_ENDPOINT_NON_TEST: string;
+  BREVIS_ASP_ENDPOINT: string;
   TEST_MODE: boolean;
   SHOW_DISCLAIMER: boolean;
   IS_TESTNET: boolean;
