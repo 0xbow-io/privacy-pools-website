@@ -102,12 +102,12 @@ export type LeafIndexResponse = {
 // Brevis ASP API response types
 export type BrevisAspLeavesResponse = {
   err: unknown | null;
-  aspLeaves: string[]; // List of hex-encoded strings (called asp_leaves in proto)
+  aspLeaves: string[]; // List of decimal-encoded strings
 };
 
 export type BrevisAspRootResponse = {
   err: unknown | null;
-  aspMerkleTreeRoot: string; // Hex-encoded string (called asp_merkle_tree_root in proto)
+  aspMerkleTreeRoot: string; // Decimal-encoded string
 };
 
 // Extended response types that include Brevis data for BSC chain
