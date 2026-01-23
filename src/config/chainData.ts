@@ -6,8 +6,8 @@ import { woethAbi } from '~/config/woethAbi';
 import { yusndAbi } from '~/config/yusndAbi';
 import arbitrumIcon from '~/assets/icons/arbitrum.svg';
 // import baseIcon from '~/assets/icons/base.svg';
-// import bnbIcon from '~/assets/icons/bnb.svg';
-// import bscIcon from '~/assets/icons/bsc.svg';
+import bnbIcon from '~/assets/icons/bnb.svg';
+import bscIcon from '~/assets/icons/bsc.svg';
 import daiIcon from '~/assets/icons/dai.svg';
 import frxusdIcon from '~/assets/icons/frxusd.svg';
 import fxusdIcon from '~/assets/icons/fxusd.svg';
@@ -49,7 +49,8 @@ export type ChainAssets =
   | 'BNB'
   | 'yUSND'
   | 'USND'
-  | 'fxUSD';
+  | 'fxUSD'
+  | 'BSCUSD';
 
 export interface AlternativeTokenConfig {
   tokenAddress: Address;
@@ -421,36 +422,51 @@ const mainnetChainData: ChainData = {
   //     },
   //   ],
   // },
-  // // BSC
-  // [bsc.id]: {
-  //   name: bsc.name,
-  //   mobileName: 'BSC',
-  //   symbol: bsc.nativeCurrency.symbol,
-  //   decimals: bsc.nativeCurrency.decimals,
-  //   image: bscIcon.src,
-  //   explorerUrl: bsc.blockExplorers.default.url,
-  //   relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
-  //   sdkRpcUrl: `/api/hypersync-rpc?chainId=56`,
-  //   rpcUrl: `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
-  //   aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
-  //   poolInfo: [
-  //     {
-  //       chainId: bsc.id,
-  //       address: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
-  //       assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-  //       scope: 11123939809302748675379459504943549959694064271441044886820019404791514187711n,
-  //       deploymentBlock: 69568985n,
-  //       entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
-  //       maxDeposit: parseEther('10000'),
-  //       asset: 'BNB',
-  //       assetDecimals: 18,
-  //       icon: bnbIcon.src,
-  //       color: '#F0B90B',
-  //       isStableAsset: false,
-  //       isNativeToken: true,
-  //     },
-  //   ],
-  // },
+  // BSC
+  [bsc.id]: {
+    name: bsc.name,
+    mobileName: 'BSC',
+    symbol: bsc.nativeCurrency.symbol,
+    decimals: bsc.nativeCurrency.decimals,
+    image: bscIcon.src,
+    explorerUrl: bsc.blockExplorers.default.url,
+    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
+    sdkRpcUrl: `/api/hypersync-rpc?chainId=56`,
+    rpcUrl: `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
+    poolInfo: [
+      {
+        chainId: bsc.id,
+        address: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
+        assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+        scope: 11123939809302748675379459504943549959694064271441044886820019404791514187711n,
+        deploymentBlock: 69568985n,
+        entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
+        maxDeposit: parseEther('10000'),
+        asset: 'BNB',
+        assetDecimals: 18,
+        icon: bnbIcon.src,
+        color: '#F0B90B',
+        isStableAsset: false,
+        isNativeToken: true,
+      },
+      {
+        chainId: bsc.id,
+        address: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
+        assetAddress: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+        scope: 11123939809302748675379459504943549959694064271441044886820019404791514187711n,
+        deploymentBlock: 69568985n,
+        entryPointAddress: '0x44192215FEd782896BE2CE24E0Bfbf0BF825d15E',
+        maxDeposit: parseEther('10000'),
+        asset: 'BSCUSD',
+        assetDecimals: 18,
+        icon: usdtIcon.src,
+        color: '#F0B90B',
+        isStableAsset: false,
+        isNativeToken: true,
+      },
+    ],
+  },
   // Arbitrum
   [arbitrum.id]: {
     name: arbitrum.name,
