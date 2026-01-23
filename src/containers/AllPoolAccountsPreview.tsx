@@ -20,6 +20,7 @@ interface PoolPreviewSectionProps {
   poolInfo: PoolInfo;
   poolAccounts: PoolAccount[];
   aspUrl: string;
+  brevisAspUrl?: string;
   showMaxAccounts?: number;
   onNavigateToViewAll: (poolId: string) => void;
 }
@@ -29,11 +30,12 @@ const PoolPreviewSection = ({
   poolInfo,
   poolAccounts,
   aspUrl,
+  brevisAspUrl,
   showMaxAccounts = 5,
   onNavigateToViewAll,
 }: PoolPreviewSectionProps) => {
   const chain = chainData[chainId];
-  const { isLoading, isError } = useASP(chainId, poolInfo.scope.toString(), aspUrl);
+  const { isLoading, isError } = useASP(chainId, poolInfo.scope.toString(), aspUrl, brevisAspUrl);
 
   // Calculate totals for this pool (poolAccounts are already filtered)
   const amountPoolAsset = useMemo(() => {
@@ -243,6 +245,7 @@ export const AllPoolAccountsPreview = () => {
                   poolInfo={poolInfo}
                   poolAccounts={accounts}
                   aspUrl={chain.aspUrl}
+                  brevisAspUrl={chain.brevisAspUrl}
                   showMaxAccounts={5}
                   onNavigateToViewAll={handleNavigateToViewAll}
                 />

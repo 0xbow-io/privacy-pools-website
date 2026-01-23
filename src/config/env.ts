@@ -6,8 +6,6 @@ const env: Env = {
   FEE_COLLECTOR: process.env.NEXT_PUBLIC_FEE_COLLECTOR as string,
   ASP_ENDPOINT_TEST: process.env.NEXT_PUBLIC_ASP_ENDPOINT_TEST as string,
   ASP_ENDPOINT_NON_TEST: process.env.NEXT_PUBLIC_ASP_ENDPOINT_NON_TEST as string,
-  BREVIS_ASP_ENDPOINT:
-    process.env.NEXT_PUBLIC_BREVIS_ASP_ENDPOINT || 'https://brevis-asp-endpoint.brevis.network/v1/asp',
   TEST_MODE: process.env.NEXT_PUBLIC_TEST_MODE === 'true',
   SHOW_DISCLAIMER: process.env.NEXT_PUBLIC_SHOW_DISCLAIMER === 'true',
   IS_TESTNET: process.env.NEXT_PUBLIC_IS_TESTNET === 'true',

@@ -106,6 +106,7 @@ export interface ChainData {
     sdkRpcUrl: string;
     rpcUrl: string;
     aspUrl: string;
+    brevisAspUrl?: string; // Brevis ASP endpoint (currently only for BSC)
     relayers: {
       name: string;
       url: string;
@@ -434,6 +435,7 @@ const mainnetChainData: ChainData = {
     sdkRpcUrl: `/api/hypersync-rpc?chainId=56`,
     rpcUrl: `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
+    brevisAspUrl: 'https://brevis-asp-endpoint.brevis.network/v1/asp',
     poolInfo: [
       {
         chainId: bsc.id,

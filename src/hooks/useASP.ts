@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import { QueryObserverResult, useMutation, useQuery } from '@tanstack/react-query';
-import { bsc } from 'viem/chains';
 import {
   PoolResponse,
   DepositsByLabelResponse,
@@ -19,6 +18,7 @@ export const useASP = (
   chainId: number,
   scope: string,
   aspUrl: string,
+  brevisAspUrl?: string,
 ): {
   isError?: boolean;
   isLoading?: boolean;
@@ -32,8 +32,8 @@ export const useASP = (
   fetchDepositsByLabel: (labels: string[]) => Promise<DepositsByLabelResponse>;
   refetchMtLeaves: () => Promise<QueryObserverResult<MtLeavesResponse, Error>>;
 } => {
-  // Check if this is BSC chain to enable Brevis queries
-  const isBscChain = chainId === bsc.id;
+  // Enable Brevis queries only if brevisAspUrl is provided
+  const hasBrevisAsp = !!brevisAspUrl;
 
   const poolInfoQuery = useQuery({
     queryKey: ['asp_pool_info', chainId, scope, aspUrl],
@@ -59,24 +59,24 @@ export const useASP = (
     refetchOnWindowFocus: false,
   });
 
-  // Brevis ASP leaves query - only enabled for BSC chain
+  // Brevis ASP leaves query - only enabled if brevisAspUrl is provided
   const brevisAspLeavesQuery = useQuery({
-    queryKey: ['brevis_asp_leaves'],
-    queryFn: () => aspClient.fetchBrevisAspLeaves(),
+    queryKey: ['brevis_asp_leaves', brevisAspUrl],
+    queryFn: () => aspClient.fetchBrevisAspLeaves(brevisAspUrl!),
     staleTime: 60000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    enabled: isBscChain,
+    enabled: hasBrevisAsp,
   });
 
-  // Brevis ASP root query - only enabled for BSC chain
+  // Brevis ASP root query - only enabled if brevisAspUrl is provided
   const brevisAspRootQuery = useQuery({
-    queryKey: ['brevis_asp_root'],
-    queryFn: () => aspClient.fetchBrevisAspRoot(),
+    queryKey: ['brevis_asp_root', brevisAspUrl],
+    queryFn: () => aspClient.fetchBrevisAspRoot(brevisAspUrl!),
     staleTime: 60000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    enabled: isBscChain,
+    enabled: hasBrevisAsp,
   });
 
   const allEventsQuery = useQuery({
@@ -110,24 +110,24 @@ export const useASP = (
     poolInfoQuery.isLoading ||
     mtRootQuery.isLoading ||
     mtLeavesQuery.isLoading ||
-    (isBscChain && (brevisAspLeavesQuery.isLoading || brevisAspRootQuery.isLoading));
+    (hasBrevisAsp && (brevisAspLeavesQuery.isLoading || brevisAspRootQuery.isLoading));
 
-  // Merge Brevis data with standard data for BSC chain
+  // Merge Brevis data with standard data when brevisAspUrl is provided
   const mergedMtLeavesData: ExtendedMtLeavesResponse | undefined = useMemo(() => {
     if (!mtLeavesQuery.data) return undefined;
     return {
       ...mtLeavesQuery.data,
-      brevisAspLeaves: isBscChain ? brevisAspLeavesQuery.data?.aspLeaves : undefined,
+      brevisAspLeaves: hasBrevisAsp ? brevisAspLeavesQuery.data?.aspLeaves : undefined,
     };
-  }, [mtLeavesQuery.data, brevisAspLeavesQuery.data, isBscChain]);
+  }, [mtLeavesQuery.data, brevisAspLeavesQuery.data, hasBrevisAsp]);
 
   const mergedRootsData: ExtendedMtRootResponse | undefined = useMemo(() => {
     if (!mtRootQuery.data) return undefined;
     return {
       ...mtRootQuery.data,
-      brevisAspMerkleTreeRoot: isBscChain ? brevisAspRootQuery.data?.aspMerkleTreeRoot : undefined,
+      brevisAspMerkleTreeRoot: hasBrevisAsp ? brevisAspRootQuery.data?.aspMerkleTreeRoot : undefined,
     };
-  }, [mtRootQuery.data, brevisAspRootQuery.data, isBscChain]);
+  }, [mtRootQuery.data, brevisAspRootQuery.data, hasBrevisAsp]);
 
   return useMemo(
     () => ({
