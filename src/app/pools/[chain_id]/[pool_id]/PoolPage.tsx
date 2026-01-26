@@ -516,7 +516,15 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
                   <IncentivesValue>
                     {userEarnedFxn.amount > 0 ? userEarnedFxn.amount.toFixed(2) : '0'} FXN
                   </IncentivesValue>
-                  <ClaimButton disabled>Click to Claim</ClaimButton>
+                  {isLogged && userEarnedFxn.amount > 0 && (
+                    <ClaimButton
+                      href='https://fx.aladdin.club/v2/privacy-pool'
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      Click to Claim
+                    </ClaimButton>
+                  )}
                 </IncentivesValueRow>
                 <IncentivesSubtext>
                   ${userEarnedFxn.usdValue > 0 ? userEarnedFxn.usdValue.toFixed(2) : '0.00'}
@@ -1240,26 +1248,24 @@ const IncentivesValue = styled(Typography)(() => ({
   color: '#000000',
 }));
 
-const ClaimButton = styled(Button)(({ theme }) => ({
+const ClaimButton = styled('a')({
   backgroundColor: '#FFFFFF',
-  border: `1px solid ${theme.palette.grey[200]}`,
+  border: '1px solid #000000',
   borderRadius: '4px',
   padding: '4px 12px',
   fontWeight: 500,
   fontSize: '14px',
   lineHeight: 'normal',
-  color: theme.palette.grey[200],
+  color: '#000000',
   textTransform: 'none',
+  textDecoration: 'none',
+  cursor: 'pointer',
   '&:hover': {
-    backgroundColor: '#FFFFFF',
-    border: `1px solid ${theme.palette.grey[400]}`,
+    backgroundColor: '#f5f5f5',
+    border: '1px solid #000000',
+    color: '#000000',
   },
-  '&:disabled': {
-    backgroundColor: '#FFFFFF',
-    border: `1px solid ${theme.palette.grey[200]}`,
-    color: theme.palette.grey[200],
-  },
-}));
+});
 
 const IncentivesSubtext = styled(Typography)(() => ({
   fontWeight: 400,
