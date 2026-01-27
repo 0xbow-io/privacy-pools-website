@@ -431,7 +431,7 @@ const mainnetChainData: ChainData = {
     decimals: bsc.nativeCurrency.decimals,
     image: bscIcon.src,
     explorerUrl: bsc.blockExplorers.default.url,
-    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
+    relayers: [{ name: 'Fast Relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=56`,
     rpcUrl: `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
