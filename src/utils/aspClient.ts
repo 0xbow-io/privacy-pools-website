@@ -171,6 +171,14 @@ const aspClient = {
   fetchBrevisAspLeaves: (brevisAspUrl: string) => fetchWithHeaders<BrevisAspLeavesResponse>(`${brevisAspUrl}/leaves`),
 
   fetchBrevisAspRoot: (brevisAspUrl: string) => fetchWithHeaders<BrevisAspRootResponse>(`${brevisAspUrl}/root`),
+
+  fetchBrevisDepositReviewStatus: (labels: string[]) => {
+    const queryParams = labels.map((label) => `label=${encodeURIComponent(label)}`).join('&');
+    return fetchWithHeaders<{
+      err: string | null;
+      depositStatus: Array<{ label: string; reviewStatus: string }>;
+    }>(`https://brevis-asp-endpoint.brevis.network/v1/asp/deposits_by_label?${queryParams}`);
+  },
 };
 
 export { aspClient };
