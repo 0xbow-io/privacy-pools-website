@@ -142,11 +142,27 @@ export const AccountProvider = ({ children }: Props) => {
       if (!mtLeavesData?.aspLeaves) throw Error('ASP leaves not found');
 
       const scopeKey = `${chainId}-${selectedPoolInfo.scope}`;
+      const chainIdNum = parseInt(chainId, 10);
 
+      // Fetch Brevis review statuses and leaves for chain 56
       let chain56ReviewStatuses: Record<string, ReviewStatus> = {};
+      let brevisLeaves: string[] | undefined;
       if (chainId === '56') {
         const labels = _depositData.map((d) => d.label);
         chain56ReviewStatuses = await fetchChain56ReviewStatuses(labels);
+
+        // Fetch Brevis ASP leaves directly for chain 56
+        const poolInfo = chainData[chainIdNum]?.poolInfo.find(
+          (p) => p.scope.toString() === selectedPoolInfo.scope.toString(),
+        );
+        if (poolInfo?.externalAsp?.provider === 'brevis') {
+          try {
+            const brevisLeavesResponse = await aspClient.fetchBrevisAspLeaves(poolInfo.externalAsp.baseUrl);
+            brevisLeaves = brevisLeavesResponse.aspLeaves;
+          } catch (err) {
+            console.error('Error fetching Brevis ASP leaves:', err);
+          }
+        }
       }
 
       // Update poolAccountsByChainScope by processing the accounts for the current scope
@@ -171,8 +187,7 @@ export const AccountProvider = ({ children }: Props) => {
           }
 
           // For chain 56 (BSC), use Brevis ASP leaves; otherwise use standard ASP leaves
-          const leavesToCheck =
-            chainId === '56' && mtLeavesData.brevisAspLeaves ? mtLeavesData.brevisAspLeaves : mtLeavesData.aspLeaves;
+          const leavesToCheck = chainId === '56' && brevisLeaves ? brevisLeaves : mtLeavesData.aspLeaves;
           const aspLeaf = leavesToCheck.find((leaf) => leaf.toString() === entry.label.toString());
           let reviewStatus = deposit.reviewStatus;
 
@@ -203,8 +218,6 @@ export const AccountProvider = ({ children }: Props) => {
         }
 
         // Also update the poolAccounts state for the current view
-        // Convert chainId to number for comparison with PoolAccount.chainId (which is still number type)
-        const chainIdNum = parseInt(chainId, 10);
         setPoolAccounts(updatedAccountsForScope.filter((pa) => pa.chainId === chainIdNum));
 
         return newPoolAccountsByChainScope;
