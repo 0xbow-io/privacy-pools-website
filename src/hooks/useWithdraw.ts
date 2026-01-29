@@ -87,7 +87,11 @@ export const useWithdraw = () => {
   } = usePoolAccountsContext();
 
   const commitment = poolAccount?.lastCommitment;
-  const aspLeaves = aspData.mtLeavesData?.aspLeaves;
+  // For chain 56 (BSC), use Brevis ASP leaves if available; otherwise use standard ASP leaves
+  const aspLeaves =
+    chainId === 56 && aspData.mtLeavesData?.brevisAspLeaves
+      ? aspData.mtLeavesData.brevisAspLeaves
+      : aspData.mtLeavesData?.aspLeaves;
   const stateLeaves = aspData.mtLeavesData?.stateTreeLeaves;
   const { address } = useAccount();
 
