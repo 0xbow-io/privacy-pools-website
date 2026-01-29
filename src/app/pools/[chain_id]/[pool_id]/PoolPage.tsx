@@ -12,7 +12,7 @@ import { InfoTooltip } from '~/components/InfoTooltip';
 import { ChainAssets, chainData } from '~/config';
 import { Section, PAContainer, ActionMenu, ChainTokenSelectorDropdown } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useChainContext } from '~/hooks';
-import { EventType, ModalType, ReviewStatus } from '~/types';
+import { AllEventsResponse, EventType, ModalType, ReviewStatus } from '~/types';
 import { ROUTER, aspClient, fetchFxnPrice } from '~/utils';
 
 interface PoolPageProps {
@@ -66,6 +66,64 @@ const formatCompactNumber = (num: number, decimals = 2): string => {
     return (num / 1_000).toFixed(1).replace(/\.?0+$/, '') + 'K';
   }
   return Math.round(num).toLocaleString('en-US');
+};
+
+// Helper to enhance pool events with Brevis statuses if the pool uses Brevis ASP
+const enhancePoolEventsWithBrevisStatuses = async (
+  eventsResponse: AllEventsResponse | undefined,
+  poolInfo: (typeof chainData)[number]['poolInfo'][number] | undefined,
+): Promise<AllEventsResponse | undefined> => {
+  if (!eventsResponse?.events || !poolInfo?.externalAsp) return eventsResponse;
+
+  const { externalAsp } = poolInfo;
+  if (externalAsp.provider !== 'brevis') return eventsResponse;
+
+  // Get deposit events that need status lookup
+  const deposits = eventsResponse.events.filter((e) => e.type === 'deposit' && e.txHash);
+
+  if (deposits.length === 0) return eventsResponse;
+
+  try {
+    // Fetch all deposits from Brevis for this pool
+    const response = await aspClient.fetchBrevisAllDeposits(externalAsp.baseUrl, {
+      page_size: 250,
+      page: 1,
+      sort: 1,
+      pool_address: [externalAsp.poolAddress],
+    });
+
+    // Build txHash -> status map
+    const statusMap: Record<string, ReviewStatus> = {};
+
+    if (response.err === null && response.depositInfo) {
+      for (const deposit of response.depositInfo) {
+        if (deposit.reviewStatus != null && deposit.txHash != null) {
+          const status = deposit.reviewStatus.toUpperCase() as keyof typeof ReviewStatus;
+          if (status in ReviewStatus) {
+            statusMap[deposit.txHash.toLowerCase()] = ReviewStatus[status];
+          }
+        }
+      }
+    }
+
+    // Merge statuses into events
+    const enhancedEvents = eventsResponse.events.map((event) => {
+      if (event.type !== 'deposit' || !event.txHash) return event;
+
+      const status = statusMap[event.txHash.toLowerCase()];
+      if (status) {
+        return { ...event, reviewStatus: status };
+      }
+
+      return event;
+    });
+
+    return { ...eventsResponse, events: enhancedEvents };
+  } catch (error) {
+    console.error('Error fetching Brevis statuses for pool events:', error);
+  }
+
+  return eventsResponse;
 };
 
 export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
@@ -125,8 +183,12 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
 
   // Fetch pool-specific events for the activity feed
   const { data: poolEventsData, isLoading: poolEventsLoading } = useQuery({
-    queryKey: ['pool_events', parsedChainId, poolScope, aspUrl],
-    queryFn: () => aspClient.fetchAllEvents(aspUrl, parsedChainId, poolScope || '', 1, 6),
+    queryKey: ['pool_events', parsedChainId, poolScope, aspUrl, currentPoolInfo?.externalAsp?.provider],
+    queryFn: async () => {
+      const response = await aspClient.fetchAllEvents(aspUrl, parsedChainId, poolScope || '', 1, 6);
+      // Enhance with Brevis statuses if this pool uses Brevis ASP
+      return enhancePoolEventsWithBrevisStatuses(response, currentPoolInfo);
+    },
     enabled: !!poolScope && !!aspUrl,
     refetchInterval: 60000,
     staleTime: 30000,
