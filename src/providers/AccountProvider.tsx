@@ -170,7 +170,10 @@ export const AccountProvider = ({ children }: Props) => {
             };
           }
 
-          const aspLeaf = mtLeavesData.aspLeaves.find((leaf) => leaf.toString() === entry.label.toString());
+          // For chain 56 (BSC), use Brevis ASP leaves; otherwise use standard ASP leaves
+          const leavesToCheck =
+            chainId === '56' && mtLeavesData.brevisAspLeaves ? mtLeavesData.brevisAspLeaves : mtLeavesData.aspLeaves;
+          const aspLeaf = leavesToCheck.find((leaf) => leaf.toString() === entry.label.toString());
           let reviewStatus = deposit.reviewStatus;
 
           if (chainId === '56' && chain56ReviewStatuses[entry.label.toString()]) {
@@ -283,14 +286,28 @@ export const AccountProvider = ({ children }: Props) => {
           const labels = accountsForScope.map((a) => a.label.toString());
 
           try {
-            // Fetch both deposits and MT leaves for this scope
+            // Fetch deposits and MT leaves for this scope
             const [deposits, mtLeavesResponse] = await Promise.all([
               aspClient.fetchDepositsByLabel(chainInfo.aspUrl, chainIdNum, scope, labels),
               aspClient.fetchMtLeaves(chainInfo.aspUrl, chainIdNum, scope),
             ]);
             allDeposits.push(...deposits);
-            // Store the ASP leaves for this scope
-            mtLeavesByScope[scopeKey] = mtLeavesResponse.aspLeaves || [];
+
+            // For chain 56 (BSC), fetch Brevis ASP leaves instead
+            const poolInfo = chainInfo.poolInfo.find((p) => p.scope.toString() === scope);
+            if (chainIdNum === 56 && poolInfo?.externalAsp?.provider === 'brevis') {
+              try {
+                const brevisLeavesResponse = await aspClient.fetchBrevisAspLeaves(poolInfo.externalAsp.baseUrl);
+                mtLeavesByScope[scopeKey] = brevisLeavesResponse.aspLeaves || [];
+              } catch (brevisErr) {
+                console.error(`Error fetching Brevis ASP leaves for scope ${scopeKey}:`, brevisErr);
+                // Fallback to standard ASP leaves
+                mtLeavesByScope[scopeKey] = mtLeavesResponse.aspLeaves || [];
+              }
+            } else {
+              // Store the standard ASP leaves for this scope
+              mtLeavesByScope[scopeKey] = mtLeavesResponse.aspLeaves || [];
+            }
           } catch (err) {
             console.error(`Error fetching deposits for scope ${scopeKey}:`, err);
           }
