@@ -66,22 +66,23 @@ export const WithdrawForm = () => {
 
   const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals ?? 18;
 
-  // Filter pool accounts by current chain, pool scope, and balance > 0
+  // Filter pool accounts by current chain, pool scope, balance > 0, and APPROVED status
   const filteredPoolAccounts = useMemo(() => {
     return poolAccounts.filter(
-      (pa) => pa.balance > 0n && pa.chainId === chainId && pa.scope === selectedPoolInfo?.scope,
+      (pa) =>
+        pa.balance > 0n &&
+        pa.chainId === chainId &&
+        pa.scope === selectedPoolInfo?.scope &&
+        pa.reviewStatus === ReviewStatus.APPROVED,
     );
   }, [poolAccounts, chainId, selectedPoolInfo?.scope]);
 
   // Auto-select the first pool account when filtered list changes and no account is selected
+  // All filtered accounts are already approved, so just pick the first one
   useEffect(() => {
     const currentAccountStillValid = poolAccount && filteredPoolAccounts.some((pa) => pa.name === poolAccount.name);
     if (!currentAccountStillValid && filteredPoolAccounts.length > 0) {
-      // Find first approved account
-      const firstApproved = filteredPoolAccounts.find((pa) => pa.reviewStatus === ReviewStatus.APPROVED);
-      if (firstApproved) {
-        setPoolAccount(firstApproved);
-      }
+      setPoolAccount(filteredPoolAccounts[0]);
     }
   }, [filteredPoolAccounts, poolAccount, setPoolAccount]);
 
@@ -299,9 +300,17 @@ export const WithdrawForm = () => {
     return target !== '' && isAddress(target) && !targetAddressHasError;
   }, [target, targetAddressHasError]);
 
+  const hasApprovedAccounts = filteredPoolAccounts.length > 0;
+
   const isFormValid = useMemo(() => {
-    return isValidAmount && isRecipientAddressValid && !!selectedRelayer?.url && !!selectedPoolInfo?.assetAddress;
-  }, [isValidAmount, isRecipientAddressValid, selectedRelayer, selectedPoolInfo?.assetAddress]);
+    return (
+      hasApprovedAccounts &&
+      isValidAmount &&
+      isRecipientAddressValid &&
+      !!selectedRelayer?.url &&
+      !!selectedPoolInfo?.assetAddress
+    );
+  }, [hasApprovedAccounts, isValidAmount, isRecipientAddressValid, selectedRelayer, selectedPoolInfo?.assetAddress]);
 
   // Quote handling moved to Review screen
 
@@ -539,6 +548,12 @@ export const WithdrawForm = () => {
           decimals={decimals}
           symbol={symbol}
         />
+
+        {!hasApprovedAccounts && (
+          <Typography variant='body2' color='error' sx={{ textAlign: 'center', py: 1 }}>
+            No approved deposits available for withdrawal in this pool. Please wait for your deposits to be approved.
+          </Typography>
+        )}
 
         <FormControl fullWidth>
           <Box sx={{ position: 'relative' }}>

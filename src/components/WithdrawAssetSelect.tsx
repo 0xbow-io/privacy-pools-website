@@ -11,7 +11,7 @@ import { EventType, ModalType, ReviewStatus } from '~/types';
 
 export const WithdrawAssetSelect: React.FC = () => {
   const pathname = usePathname();
-  const { hasSomeRelayerAvailable, chainId, setSelectedAsset } = useChainContext();
+  const { hasSomeRelayerAvailable, chainId, setSelectedAsset, selectedPoolInfo } = useChainContext();
   const { setModalOpen } = useModal();
   const { setActionType } = usePoolAccountsContext();
   const { poolAccountsByChainScope, seed } = useAccountContext();
@@ -46,8 +46,21 @@ export const WithdrawAssetSelect: React.FC = () => {
     return null;
   }, [poolAccountsByChainScope]);
 
+  // Check if current pool has approved deposits (for pool pages)
+  const currentPoolHasApprovedDeposit = useMemo(() => {
+    if (!isOnPoolPage || !selectedPoolInfo?.scope) return true; // Not on pool page, don't restrict
+    const scopeKey = `${chainId}-${selectedPoolInfo.scope}`;
+    const accounts = poolAccountsByChainScope[scopeKey] || [];
+    return accounts.some((acc) => acc.reviewStatus === ReviewStatus.APPROVED && acc.balance > 0n);
+  }, [isOnPoolPage, chainId, selectedPoolInfo?.scope, poolAccountsByChainScope]);
+
   const hasAnyApprovedDeposit = !!firstPoolWithFunds;
-  const isWithdrawDisabled = !address || !hasAnyApprovedDeposit || !seed || !hasSomeRelayerAvailable;
+  const isWithdrawDisabled =
+    !address ||
+    !hasAnyApprovedDeposit ||
+    !seed ||
+    !hasSomeRelayerAvailable ||
+    (isOnPoolPage && !currentPoolHasApprovedDeposit);
 
   const handleClick = () => {
     // Only auto-switch to firstPoolWithFunds when NOT on a pool page.
