@@ -44,9 +44,9 @@ const enhanceWithBrevisStatuses = async (
 
   const brevisConfigs = getBrevisPoolConfigs();
 
-  // Get deposits from pools that use Brevis ASP
+  // Get deposits from pools that use Brevis ASP (match by txHash since 0xbow ASP may not have labels for BSC)
   const brevisDeposits = eventsResponse.events.filter(
-    (e) => isBrevisPool(e.pool?.poolAddress, brevisConfigs) && e.type === 'deposit' && e.label != null,
+    (e) => isBrevisPool(e.pool?.poolAddress, brevisConfigs) && e.type === 'deposit' && e.txHash,
   );
 
   if (brevisDeposits.length === 0) return eventsResponse;
@@ -81,14 +81,16 @@ const enhanceWithBrevisStatuses = async (
             pool_address: [config.poolAddress],
           });
 
+          // Build a map of txHash -> status (using txHash for matching since 0xbow ASP lacks labels for BSC)
           const statusMap: Record<string, ReviewStatus> = {};
 
-          if (response.err === null && response.deposits) {
-            for (const deposit of response.deposits) {
-              if (deposit.reviewStatus != null && deposit.label != null) {
+          if (response.err === null && response.depositInfo) {
+            for (const deposit of response.depositInfo) {
+              if (deposit.reviewStatus != null && deposit.txHash != null) {
                 const status = deposit.reviewStatus.toUpperCase() as keyof typeof ReviewStatus;
                 if (status in ReviewStatus) {
-                  statusMap[deposit.label] = ReviewStatus[status];
+                  // Use lowercase txHash as key for case-insensitive matching
+                  statusMap[deposit.txHash.toLowerCase()] = ReviewStatus[status];
                 }
               }
             }
@@ -108,7 +110,7 @@ const enhanceWithBrevisStatuses = async (
       statusMapByPool.set(poolAddress, statusMap);
     }
 
-    // Merge statuses into events
+    // Merge statuses into events (match by txHash)
     const enhancedEvents = eventsResponse.events.map((event) => {
       const poolAddress = event.pool?.poolAddress?.toLowerCase();
       if (!poolAddress || !isBrevisPool(poolAddress, brevisConfigs)) {
@@ -116,8 +118,11 @@ const enhanceWithBrevisStatuses = async (
       }
 
       const statusMap = statusMapByPool.get(poolAddress);
-      if (statusMap && event.label != null && statusMap[event.label]) {
-        return { ...event, reviewStatus: statusMap[event.label] };
+      if (statusMap && event.txHash) {
+        const status = statusMap[event.txHash.toLowerCase()];
+        if (status) {
+          return { ...event, reviewStatus: status };
+        }
       }
 
       return event;

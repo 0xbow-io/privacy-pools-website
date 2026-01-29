@@ -130,14 +130,16 @@ export type BrevisAllDepositsRequest = {
 export type BrevisDepositInfo = {
   label: string;
   reviewStatus: string;
-  blockNumber?: number;
+  blockNumber?: string;
+  blockTime?: string;
   poolAddress?: string;
-  // Add other fields as needed from the API response
+  amount?: string;
+  txHash?: string;
 };
 
 export type BrevisAllDepositsResponse = {
   err: string | null;
-  deposits: BrevisDepositInfo[];
+  depositInfo: BrevisDepositInfo[]; // Note: API returns 'depositInfo' not 'deposits'
   total?: number;
   page?: number;
   page_size?: number;
