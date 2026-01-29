@@ -119,9 +119,11 @@ export const AccountProvider = ({ children }: Props) => {
       if (response.err === null && response.depositStatus) {
         // Map each deposit status to our internal ReviewStatus enum
         for (const deposit of response.depositStatus) {
-          const status = deposit.reviewStatus.toUpperCase();
-          if (Object.values(ReviewStatus).includes(status as ReviewStatus)) {
-            reviewStatuses[deposit.label] = status as ReviewStatus;
+          if (deposit.reviewStatus != null && deposit.label != null) {
+            const status = deposit.reviewStatus.toUpperCase() as keyof typeof ReviewStatus;
+            if (status in ReviewStatus) {
+              reviewStatuses[deposit.label] = ReviewStatus[status];
+            }
           }
         }
       }
