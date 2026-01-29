@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { getConfig } from '~/config';
+import { chainData, ExternalAspConfig } from '~/config/chainData';
 import { useChainContext } from '~/hooks';
 import { GlobalEventsResponse, ReviewStatus } from '~/types';
 import { aspClient } from '~/utils';
@@ -12,49 +13,117 @@ const {
   constants: { ITEMS_PER_PAGE },
 } = getConfig();
 
-// Helper to check if an event is from BSC chain (handles both string and number chainId)
-const isBscChain = (chainId: number | string | undefined): boolean => {
-  return Number(chainId) === 56;
+// Build a map of pool addresses to their external ASP configs
+const getBrevisPoolConfigs = (): Map<string, ExternalAspConfig> => {
+  const poolConfigs = new Map<string, ExternalAspConfig>();
+
+  for (const chainId of Object.keys(chainData)) {
+    const chain = chainData[Number(chainId)];
+    for (const pool of chain.poolInfo) {
+      if (pool.externalAsp?.provider === 'brevis') {
+        // Use lowercase pool address as key for case-insensitive matching
+        poolConfigs.set(pool.address.toLowerCase(), pool.externalAsp);
+      }
+    }
+  }
+
+  return poolConfigs;
 };
 
-// Helper to fetch Brevis review statuses for chain 56 deposits and merge them into events
+// Check if an event's pool uses Brevis ASP
+const isBrevisPool = (poolAddress: string | undefined, brevisConfigs: Map<string, ExternalAspConfig>): boolean => {
+  if (!poolAddress) return false;
+  return brevisConfigs.has(poolAddress.toLowerCase());
+};
+
+// Helper to fetch Brevis review statuses for pools using Brevis ASP and merge them into events
 const enhanceWithBrevisStatuses = async (
   eventsResponse: GlobalEventsResponse | undefined,
 ): Promise<GlobalEventsResponse | undefined> => {
   if (!eventsResponse?.events) return eventsResponse;
 
-  // Get chain 56 deposit labels (handle both string and number chainId from API)
-  const chain56Labels = eventsResponse.events
-    .filter((e) => isBscChain(e.pool?.chainId) && e.type === 'deposit' && e.label != null)
-    .map((e) => e.label as string);
+  const brevisConfigs = getBrevisPoolConfigs();
 
-  if (chain56Labels.length === 0) return eventsResponse;
+  // Get deposits from pools that use Brevis ASP
+  const brevisDeposits = eventsResponse.events.filter(
+    (e) => isBrevisPool(e.pool?.poolAddress, brevisConfigs) && e.type === 'deposit' && e.label != null,
+  );
+
+  if (brevisDeposits.length === 0) return eventsResponse;
+
+  // Group deposits by their Brevis ASP base URL and pool address
+  const depositsByConfig = new Map<string, ExternalAspConfig>();
+
+  for (const deposit of brevisDeposits) {
+    const poolAddress = deposit.pool?.poolAddress?.toLowerCase();
+    if (!poolAddress) continue;
+
+    const config = brevisConfigs.get(poolAddress);
+    if (!config) continue;
+
+    // Use baseUrl + poolAddress as key to group requests (deduplicate)
+    const key = `${config.baseUrl}|${config.poolAddress}`;
+    if (!depositsByConfig.has(key)) {
+      depositsByConfig.set(key, config);
+    }
+  }
 
   try {
-    const brevisResponse = await aspClient.fetchBrevisDepositReviewStatus(chain56Labels);
+    // Fetch statuses from all Brevis endpoints in parallel
+    const statusMaps = await Promise.all(
+      Array.from(depositsByConfig.entries()).map(async ([, config]) => {
+        try {
+          // Use the new all_deposits endpoint with pool_address filter
+          const response = await aspClient.fetchBrevisAllDeposits(config.baseUrl, {
+            page_size: 250, // Fetch a large page to get all deposits
+            page: 1,
+            sort: 1, // Descending by block_number (most recent first)
+            pool_address: [config.poolAddress],
+          });
 
-    if (brevisResponse.err === null && brevisResponse.depositStatus) {
-      // Build a map of label -> status
-      const statusMap: Record<string, ReviewStatus> = {};
-      for (const deposit of brevisResponse.depositStatus) {
-        if (deposit.reviewStatus != null && deposit.label != null) {
-          const status = deposit.reviewStatus.toUpperCase() as keyof typeof ReviewStatus;
-          if (status in ReviewStatus) {
-            statusMap[deposit.label] = ReviewStatus[status];
+          const statusMap: Record<string, ReviewStatus> = {};
+
+          if (response.err === null && response.deposits) {
+            for (const deposit of response.deposits) {
+              if (deposit.reviewStatus != null && deposit.label != null) {
+                const status = deposit.reviewStatus.toUpperCase() as keyof typeof ReviewStatus;
+                if (status in ReviewStatus) {
+                  statusMap[deposit.label] = ReviewStatus[status];
+                }
+              }
+            }
           }
+
+          return { poolAddress: config.poolAddress.toLowerCase(), statusMap };
+        } catch (error) {
+          console.error(`Error fetching Brevis statuses for pool ${config.poolAddress}:`, error);
+          return { poolAddress: config.poolAddress.toLowerCase(), statusMap: {} };
         }
+      }),
+    );
+
+    // Merge all status maps by pool address
+    const statusMapByPool = new Map<string, Record<string, ReviewStatus>>();
+    for (const { poolAddress, statusMap } of statusMaps) {
+      statusMapByPool.set(poolAddress, statusMap);
+    }
+
+    // Merge statuses into events
+    const enhancedEvents = eventsResponse.events.map((event) => {
+      const poolAddress = event.pool?.poolAddress?.toLowerCase();
+      if (!poolAddress || !isBrevisPool(poolAddress, brevisConfigs)) {
+        return event;
       }
 
-      // Merge statuses into events
-      const enhancedEvents = eventsResponse.events.map((event) => {
-        if (isBscChain(event.pool?.chainId) && event.label != null && statusMap[event.label]) {
-          return { ...event, reviewStatus: statusMap[event.label] };
-        }
-        return event;
-      });
+      const statusMap = statusMapByPool.get(poolAddress);
+      if (statusMap && event.label != null && statusMap[event.label]) {
+        return { ...event, reviewStatus: statusMap[event.label] };
+      }
 
-      return { ...eventsResponse, events: enhancedEvents };
-    }
+      return event;
+    });
+
+    return { ...eventsResponse, events: enhancedEvents };
   } catch (error) {
     console.error('Error fetching Brevis review statuses for global events:', error);
   }

@@ -69,6 +69,13 @@ export interface PriceConversionConfig {
   conversionAbi: readonly unknown[]; // ABI for the conversion method
 }
 
+// External ASP configuration for pools that use third-party ASP providers
+export interface ExternalAspConfig {
+  provider: 'brevis'; // Add more providers as union types when needed (e.g., 'brevis' | 'acme' | 'foo')
+  baseUrl: string; // Base URL for the external ASP API
+  poolAddress: string; // Pool address used for filtering in the external ASP API
+}
+
 export interface PoolInfo {
   chainId: number;
   address: Address;
@@ -93,6 +100,7 @@ export interface PoolInfo {
     name: string;
     url: string;
   }[]; // Pool-specific relayers that override chain defaults
+  externalAsp?: ExternalAspConfig; // External ASP configuration for third-party ASP providers
 }
 
 export interface ChainData {
@@ -106,7 +114,6 @@ export interface ChainData {
     sdkRpcUrl: string;
     rpcUrl: string;
     aspUrl: string;
-    brevisAspUrl?: string; // Brevis ASP endpoint (currently only for BSC)
     relayers: {
       name: string;
       url: string;
@@ -435,7 +442,6 @@ const mainnetChainData: ChainData = {
     sdkRpcUrl: `/api/hypersync-rpc?chainId=56`,
     rpcUrl: `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
-    brevisAspUrl: 'https://brevis-asp-endpoint.brevis.network/v1/asp',
     poolInfo: [
       {
         chainId: bsc.id,
@@ -451,6 +457,11 @@ const mainnetChainData: ChainData = {
         color: '#F0B90B',
         isStableAsset: false,
         isNativeToken: true,
+        externalAsp: {
+          provider: 'brevis',
+          baseUrl: 'https://brevis-asp-endpoint.brevis.network/v1/asp',
+          poolAddress: '0x4626A182030D9e98b13f690FFF3C443191a918ff',
+        },
       },
       {
         chainId: bsc.id,
@@ -466,6 +477,11 @@ const mainnetChainData: ChainData = {
         color: '#F0B90B',
         isStableAsset: true,
         isNativeToken: false,
+        externalAsp: {
+          provider: 'brevis',
+          baseUrl: 'https://brevis-asp-endpoint.brevis.network/v1/asp',
+          poolAddress: '0x2ad9802Dc8b9b4022aDED1C6c8A7261970D84855',
+        },
       },
     ],
   },

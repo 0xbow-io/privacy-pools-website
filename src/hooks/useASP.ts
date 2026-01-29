@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { QueryObserverResult, useMutation, useQuery } from '@tanstack/react-query';
+import { ExternalAspConfig } from '~/config/chainData';
 import {
   PoolResponse,
   DepositsByLabelResponse,
@@ -18,7 +19,7 @@ export const useASP = (
   chainId: number,
   scope: string,
   aspUrl: string,
-  brevisAspUrl?: string,
+  externalAsp?: ExternalAspConfig,
 ): {
   isError?: boolean;
   isLoading?: boolean;
@@ -32,8 +33,9 @@ export const useASP = (
   fetchDepositsByLabel: (labels: string[]) => Promise<DepositsByLabelResponse>;
   refetchMtLeaves: () => Promise<QueryObserverResult<MtLeavesResponse, Error>>;
 } => {
-  // Enable Brevis queries only if brevisAspUrl is provided
-  const hasBrevisAsp = !!brevisAspUrl;
+  // Enable Brevis queries only if externalAsp is configured with brevis provider
+  const hasBrevisAsp = externalAsp?.provider === 'brevis';
+  const brevisAspUrl = hasBrevisAsp ? externalAsp.baseUrl : undefined;
 
   const poolInfoQuery = useQuery({
     queryKey: ['asp_pool_info', chainId, scope, aspUrl],
@@ -59,7 +61,7 @@ export const useASP = (
     refetchOnWindowFocus: false,
   });
 
-  // Brevis ASP leaves query - only enabled if brevisAspUrl is provided
+  // Brevis ASP leaves query - only enabled if externalAsp is configured with brevis provider
   const brevisAspLeavesQuery = useQuery({
     queryKey: ['brevis_asp_leaves', brevisAspUrl],
     queryFn: () => aspClient.fetchBrevisAspLeaves(brevisAspUrl!),
@@ -69,7 +71,7 @@ export const useASP = (
     enabled: hasBrevisAsp,
   });
 
-  // Brevis ASP root query - only enabled if brevisAspUrl is provided
+  // Brevis ASP root query - only enabled if externalAsp is configured with brevis provider
   const brevisAspRootQuery = useQuery({
     queryKey: ['brevis_asp_root', brevisAspUrl],
     queryFn: () => aspClient.fetchBrevisAspRoot(brevisAspUrl!),
@@ -112,7 +114,7 @@ export const useASP = (
     mtLeavesQuery.isLoading ||
     (hasBrevisAsp && (brevisAspLeavesQuery.isLoading || brevisAspRootQuery.isLoading));
 
-  // Merge Brevis data with standard data when brevisAspUrl is provided
+  // Merge Brevis data with standard data when externalAsp is configured with brevis provider
   const mergedMtLeavesData: ExtendedMtLeavesResponse | undefined = useMemo(() => {
     if (!mtLeavesQuery.data) return undefined;
     return {

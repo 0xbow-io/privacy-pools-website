@@ -118,3 +118,27 @@ export type ExtendedMtLeavesResponse = MtLeavesResponse & {
 export type ExtendedMtRootResponse = MtRootResponse & {
   brevisAspMerkleTreeRoot?: string; // ASP root from Brevis (for BSC chain)
 };
+
+// Brevis all_deposits endpoint types
+export type BrevisAllDepositsRequest = {
+  page_size?: number; // Default: 20
+  page?: number; // Page number (1-indexed)
+  sort?: 0 | 1; // 0: ascending by block_number, 1: descending (default)
+  pool_address?: string[]; // Optional filter for specific pools
+};
+
+export type BrevisDepositInfo = {
+  label: string;
+  reviewStatus: string;
+  blockNumber?: number;
+  poolAddress?: string;
+  // Add other fields as needed from the API response
+};
+
+export type BrevisAllDepositsResponse = {
+  err: string | null;
+  deposits: BrevisDepositInfo[];
+  total?: number;
+  page?: number;
+  page_size?: number;
+};

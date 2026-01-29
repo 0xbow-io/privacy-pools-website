@@ -7,7 +7,7 @@ export const useExternalServices = () => {
   const {
     chainId,
     selectedRelayer,
-    chain: { aspUrl, brevisAspUrl },
+    chain: { aspUrl },
     selectedPoolInfo,
     relayersData,
   } = useChainContext();
@@ -18,7 +18,7 @@ export const useExternalServices = () => {
 
   const relayerData = useRelayer();
 
-  const aspData = useASP(chainId, selectedPoolInfo.scope.toString(), aspUrl, brevisAspUrl);
+  const aspData = useASP(chainId, selectedPoolInfo.scope.toString(), aspUrl, selectedPoolInfo.externalAsp);
 
   const isLoading = aspData.isLoading || relayerData.isQuoteLoading;
 
