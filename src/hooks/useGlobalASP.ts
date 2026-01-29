@@ -12,15 +12,20 @@ const {
   constants: { ITEMS_PER_PAGE },
 } = getConfig();
 
+// Helper to check if an event is from BSC chain (handles both string and number chainId)
+const isBscChain = (chainId: number | string | undefined): boolean => {
+  return Number(chainId) === 56;
+};
+
 // Helper to fetch Brevis review statuses for chain 56 deposits and merge them into events
 const enhanceWithBrevisStatuses = async (
   eventsResponse: GlobalEventsResponse | undefined,
 ): Promise<GlobalEventsResponse | undefined> => {
   if (!eventsResponse?.events) return eventsResponse;
 
-  // Get chain 56 deposit labels
+  // Get chain 56 deposit labels (handle both string and number chainId from API)
   const chain56Labels = eventsResponse.events
-    .filter((e) => e.pool?.chainId === 56 && e.type === 'deposit' && e.label != null)
+    .filter((e) => isBscChain(e.pool?.chainId) && e.type === 'deposit' && e.label != null)
     .map((e) => e.label as string);
 
   if (chain56Labels.length === 0) return eventsResponse;
@@ -42,7 +47,7 @@ const enhanceWithBrevisStatuses = async (
 
       // Merge statuses into events
       const enhancedEvents = eventsResponse.events.map((event) => {
-        if (event.pool?.chainId === 56 && event.label != null && statusMap[event.label]) {
+        if (isBscChain(event.pool?.chainId) && event.label != null && statusMap[event.label]) {
           return { ...event, reviewStatus: statusMap[event.label] };
         }
         return event;
