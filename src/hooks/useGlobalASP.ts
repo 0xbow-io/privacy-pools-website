@@ -13,7 +13,8 @@ const {
   constants: { ITEMS_PER_PAGE },
 } = getConfig();
 
-// Build a map of pool addresses to their external ASP configs
+// Build a map of chainId+poolAddress to their external ASP configs
+// Key format: "chainId:poolAddress" (lowercase) to handle same address on different chains
 const getBrevisPoolConfigs = (): Map<string, ExternalAspConfig> => {
   const poolConfigs = new Map<string, ExternalAspConfig>();
 
@@ -21,8 +22,9 @@ const getBrevisPoolConfigs = (): Map<string, ExternalAspConfig> => {
     const chain = chainData[Number(chainId)];
     for (const pool of chain.poolInfo) {
       if (pool.externalAsp?.provider === 'brevis') {
-        // Use lowercase pool address as key for case-insensitive matching
-        poolConfigs.set(pool.address.toLowerCase(), pool.externalAsp);
+        // Include chainId in key since same pool address can exist on multiple chains
+        const key = `${chainId}:${pool.address.toLowerCase()}`;
+        poolConfigs.set(key, pool.externalAsp);
       }
     }
   }
@@ -30,10 +32,21 @@ const getBrevisPoolConfigs = (): Map<string, ExternalAspConfig> => {
   return poolConfigs;
 };
 
+// Build lookup key from chainId and poolAddress
+const makePoolKey = (chainId: number | string | undefined, poolAddress: string | undefined): string | null => {
+  if (!chainId || !poolAddress) return null;
+  return `${chainId}:${poolAddress.toLowerCase()}`;
+};
+
 // Check if an event's pool uses Brevis ASP
-const isBrevisPool = (poolAddress: string | undefined, brevisConfigs: Map<string, ExternalAspConfig>): boolean => {
-  if (!poolAddress) return false;
-  return brevisConfigs.has(poolAddress.toLowerCase());
+const isBrevisPool = (
+  chainId: number | string | undefined,
+  poolAddress: string | undefined,
+  brevisConfigs: Map<string, ExternalAspConfig>,
+): boolean => {
+  const key = makePoolKey(chainId, poolAddress);
+  if (!key) return false;
+  return brevisConfigs.has(key);
 };
 
 // Helper to fetch Brevis review statuses for pools using Brevis ASP and merge them into events
@@ -46,7 +59,7 @@ const enhanceWithBrevisStatuses = async (
 
   // Get deposits from pools that use Brevis ASP (match by txHash since 0xbow ASP may not have labels for BSC)
   const brevisDeposits = eventsResponse.events.filter(
-    (e) => isBrevisPool(e.pool?.poolAddress, brevisConfigs) && e.type === 'deposit' && e.txHash,
+    (e) => isBrevisPool(e.pool?.chainId, e.pool?.poolAddress, brevisConfigs) && e.type === 'deposit' && e.txHash,
   );
 
   if (brevisDeposits.length === 0) return eventsResponse;
@@ -55,16 +68,16 @@ const enhanceWithBrevisStatuses = async (
   const depositsByConfig = new Map<string, ExternalAspConfig>();
 
   for (const deposit of brevisDeposits) {
-    const poolAddress = deposit.pool?.poolAddress?.toLowerCase();
-    if (!poolAddress) continue;
+    const key = makePoolKey(deposit.pool?.chainId, deposit.pool?.poolAddress);
+    if (!key) continue;
 
-    const config = brevisConfigs.get(poolAddress);
+    const config = brevisConfigs.get(key);
     if (!config) continue;
 
     // Use baseUrl + poolAddress as key to group requests (deduplicate)
-    const key = `${config.baseUrl}|${config.poolAddress}`;
-    if (!depositsByConfig.has(key)) {
-      depositsByConfig.set(key, config);
+    const configKey = `${config.baseUrl}|${config.poolAddress}`;
+    if (!depositsByConfig.has(configKey)) {
+      depositsByConfig.set(configKey, config);
     }
   }
 
@@ -113,7 +126,7 @@ const enhanceWithBrevisStatuses = async (
     // Merge statuses into events (match by txHash)
     const enhancedEvents = eventsResponse.events.map((event) => {
       const poolAddress = event.pool?.poolAddress?.toLowerCase();
-      if (!poolAddress || !isBrevisPool(poolAddress, brevisConfigs)) {
+      if (!poolAddress || !isBrevisPool(event.pool?.chainId, event.pool?.poolAddress, brevisConfigs)) {
         return event;
       }
 
