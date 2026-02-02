@@ -26,6 +26,7 @@ import {
   prepareWithdrawalProofInput,
   getScope,
   createWithdrawalSecrets,
+  mergeAndSortAspLeaves,
 } from '~/utils';
 
 const {
@@ -87,10 +88,11 @@ export const useWithdraw = () => {
   } = usePoolAccountsContext();
 
   const commitment = poolAccount?.lastCommitment;
-  // For chain 56 (BSC), use Brevis ASP leaves if available; otherwise use standard ASP leaves
+  // For chain 56 (BSC), merge ASP leaves from both 0xBow and Brevis sources, sorted ASC
+  // For other chains, use standard ASP leaves
   const aspLeaves =
-    chainId === 56 && aspData.mtLeavesData?.brevisAspLeaves
-      ? aspData.mtLeavesData.brevisAspLeaves
+    chainId === 56
+      ? mergeAndSortAspLeaves(aspData.mtLeavesData?.aspLeaves, aspData.mtLeavesData?.brevisAspLeaves)
       : aspData.mtLeavesData?.aspLeaves;
   const stateLeaves = aspData.mtLeavesData?.stateTreeLeaves;
   const { address } = useAccount();

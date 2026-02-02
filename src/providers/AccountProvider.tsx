@@ -6,7 +6,14 @@ import { getEnv } from '~/config/env';
 import { useChainContext, useExternalServices, useNotifications, usePoolAccountsContext } from '~/hooks';
 import { useAccountManager } from '~/hooks/useAccountManager';
 import { AccountService, DepositsByLabelResponse, EventType, PoolAccount, ReviewStatus, HistoryData } from '~/types';
-import { addPoolAccount, addWithdrawal, getPoolAccountsFromAccount, addRagequit, aspClient } from '~/utils';
+import {
+  addPoolAccount,
+  addWithdrawal,
+  getPoolAccountsFromAccount,
+  addRagequit,
+  aspClient,
+  mergeAndSortAspLeaves,
+} from '~/utils';
 
 const { TEST_MODE } = getEnv();
 
@@ -186,9 +193,11 @@ export const AccountProvider = ({ children }: Props) => {
             };
           }
 
-          // For chain 56 (BSC), use Brevis ASP leaves; otherwise use standard ASP leaves
-          const leavesToCheck = chainId === '56' && brevisLeaves ? brevisLeaves : mtLeavesData.aspLeaves;
-          const aspLeaf = leavesToCheck.find((leaf) => leaf.toString() === entry.label.toString());
+          // For chain 56 (BSC), merge ASP leaves from both 0xBow and Brevis sources, sorted ASC
+          // For other chains, use standard ASP leaves
+          const leavesToCheck =
+            chainId === '56' ? mergeAndSortAspLeaves(mtLeavesData.aspLeaves, brevisLeaves) : mtLeavesData.aspLeaves;
+          const aspLeaf = leavesToCheck?.find((leaf) => leaf.toString() === entry.label.toString());
           let reviewStatus = deposit.reviewStatus;
 
           if (chainId === '56' && chain56ReviewStatuses[entry.label.toString()]) {
@@ -306,15 +315,17 @@ export const AccountProvider = ({ children }: Props) => {
             ]);
             allDeposits.push(...deposits);
 
-            // For chain 56 (BSC), fetch Brevis ASP leaves instead
+            // For chain 56 (BSC), merge ASP leaves from both 0xBow and Brevis sources, sorted ASC
             const poolInfo = chainInfo.poolInfo.find((p) => p.scope.toString() === scope);
             if (chainIdNum === 56 && poolInfo?.externalAsp?.provider === 'brevis') {
               try {
                 const brevisLeavesResponse = await aspClient.fetchBrevisAspLeaves(poolInfo.externalAsp.baseUrl);
-                mtLeavesByScope[scopeKey] = brevisLeavesResponse.aspLeaves || [];
+                // Merge leaves from both sources and sort ASC for consistent Merkle root
+                mtLeavesByScope[scopeKey] =
+                  mergeAndSortAspLeaves(mtLeavesResponse.aspLeaves, brevisLeavesResponse.aspLeaves) || [];
               } catch (brevisErr) {
                 console.error(`Error fetching Brevis ASP leaves for scope ${scopeKey}:`, brevisErr);
-                // Fallback to standard ASP leaves
+                // Fallback to standard ASP leaves only
                 mtLeavesByScope[scopeKey] = mtLeavesResponse.aspLeaves || [];
               }
             } else {

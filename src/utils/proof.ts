@@ -2,6 +2,40 @@ import { Address, encodeAbiParameters, Hex, isAddress, parseAbiParameters } from
 import { Secret, AccountCommitment, Withdrawal, WithdrawalProofInput, Hash } from '~/types';
 import { getMerkleProof } from '~/utils';
 
+/**
+ * Merges ASP leaves from multiple sources and sorts them in ascending order.
+ * This ensures the Merkle tree root matches the on-chain root.
+ *
+ * @param sources - Arrays of ASP leaves (as decimal-encoded strings) from different sources
+ * @returns Merged and sorted array of unique ASP leaves, or undefined if no leaves available
+ */
+export const mergeAndSortAspLeaves = (...sources: (string[] | undefined)[]): string[] | undefined => {
+  // Collect all leaves from all sources
+  const allLeaves: string[] = [];
+  for (const source of sources) {
+    if (source && source.length > 0) {
+      allLeaves.push(...source);
+    }
+  }
+
+  // Return undefined if no leaves available (maintains consistency with non-BSC behavior)
+  if (allLeaves.length === 0) {
+    return undefined;
+  }
+
+  // Remove duplicates using a Set (based on string representation)
+  const uniqueLeaves = [...new Set(allLeaves)];
+
+  // Sort in ascending order by BigInt value
+  return uniqueLeaves.sort((a, b) => {
+    const aBigInt = BigInt(a);
+    const bBigInt = BigInt(b);
+    if (aBigInt < bBigInt) return -1;
+    if (aBigInt > bBigInt) return 1;
+    return 0;
+  });
+};
+
 const encodeWithdrawData = (recipient: Address, feeRecipient: Address, relayFeeBPS: bigint): Hex => {
   const encodedData = encodeAbiParameters(
     parseAbiParameters('address recipient, address feeRecipient, uint256 relayFeeBPS'),
