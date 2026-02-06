@@ -461,10 +461,11 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
   };
 
   const handleNavigateToActivity = () => {
+    const params = new URLSearchParams({ chainId: chainId, pool: poolId });
     if (activityView === 'personal') {
-      push(ROUTER.activity.children.personal);
+      push(`${ROUTER.activity.children.personal}?${params.toString()}`);
     } else {
-      push(ROUTER.activity.children.global);
+      push(`${ROUTER.activity.children.global}?${params.toString()}`);
     }
   };
 

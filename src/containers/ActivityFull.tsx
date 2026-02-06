@@ -9,7 +9,8 @@ import { useAdvancedView } from '~/hooks';
 import { ActivityRecords } from '~/types';
 
 export const ActivityFull = () => {
-  const { ITEMS_PER_PAGE, allEventsByPage, fullPersonalActivity, globalEventsCount, isLoading } = useAdvancedView();
+  const { ITEMS_PER_PAGE, allEventsByPage, fullPersonalActivity, globalEventsCount, isLoading, poolFilter } =
+    useAdvancedView();
   const [view, setView] = useState<'global' | 'personal'>('global');
   const pathname = usePathname();
 
@@ -28,13 +29,17 @@ export const ActivityFull = () => {
 
   const totalCount = view === 'global' ? globalEventsCount : fullPersonalActivity.length;
 
+  const title = useMemo(() => {
+    const base = view === 'global' ? 'Global Activity' : 'Personal Activity';
+    if (poolFilter) {
+      return `${base} - ${poolFilter.pool.toUpperCase()}`;
+    }
+    return base;
+  }, [view, poolFilter]);
+
   return (
     <>
-      <AdvancedNavigation
-        title={view === 'global' ? 'Global Activity' : 'Personal Activity'}
-        isLogged={true}
-        count={totalCount}
-      />
+      <AdvancedNavigation title={title} isLogged={true} count={totalCount} />
 
       <ActivityContainer>
         <ActivityTable records={items as ActivityRecords} isLoading={isLoading} view={view} />
