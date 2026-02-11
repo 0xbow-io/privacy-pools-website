@@ -1,5 +1,5 @@
 import { captureException, withScope } from '@sentry/nextjs';
-import { decodeEventLog, parseAbiItem, TransactionReceipt } from 'viem';
+import { AbiEventSignatureNotFoundError, decodeEventLog, parseAbiItem, TransactionReceipt } from 'viem';
 
 export const truncateAddress = (address?: string) => {
   if (!address) return '';
@@ -83,7 +83,12 @@ export const decodeEventsFromReceipt = (receipt: TransactionReceipt, eventAbi: s
           args: decodedLog.args,
         };
       } catch (error) {
-        // Log decode errors to Sentry for debugging
+        // AbiEventSignatureNotFoundError is expected when receipt contains logs
+        // from multiple contracts/events — silently skip non-matching logs
+        if (error instanceof AbiEventSignatureNotFoundError) {
+          return null;
+        }
+        // Log unexpected decode errors to Sentry for debugging
         withScope((scope) => {
           scope.setTag('function', 'decodeEventsFromReceipt');
           scope.setTag('event_abi', parsedAbiItem.type === 'event' ? parsedAbiItem.name : 'unknown');

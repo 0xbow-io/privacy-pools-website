@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { QuoteProvider } from '~/contexts/QuoteContext';
 import { AccountProvider } from './AccountProvider';
 import { AuthProvider } from './AuthProvider';
@@ -9,7 +12,10 @@ import { NotificationProvider } from './NotificationProvider';
 import { PoolAccountsProvider } from './PoolAccountsProvider';
 import { SafeProviderWrapper } from './SafeProvider';
 import { ThemeProvider } from './ThemeProvider';
-import { WalletProvider } from './WalletProvider';
+
+const WalletProvider = dynamic(() => import('./WalletProvider').then((mod) => mod.WalletProvider), {
+  ssr: false,
+});
 
 type Props = {
   children: ReactNode;
