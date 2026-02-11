@@ -505,7 +505,7 @@ const mainnetChainData: ChainData = {
     decimals: arbitrum.nativeCurrency.decimals,
     image: arbitrumIcon.src,
     explorerUrl: arbitrum.blockExplorers.default.url,
-    relayers: [{ name: 'Fast Relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' }],
+    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=42161`,
     rpcUrl: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
