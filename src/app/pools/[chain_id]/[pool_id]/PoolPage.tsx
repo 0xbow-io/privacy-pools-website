@@ -10,6 +10,7 @@ import { useAccount, usePublicClient } from 'wagmi';
 import { PoolAccountTable, ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { ChainAssets, chainData } from '~/config';
+import { ibm_plex_mono } from '~/config/fonts';
 import { Section, PAContainer, ActionMenu, ChainTokenSelectorDropdown } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext, useChainContext } from '~/hooks';
 import { AllEventsResponse, EventType, ModalType, ReviewStatus } from '~/types';
@@ -61,9 +62,6 @@ const formatCompactNumber = (num: number, decimals = 2): string => {
   }
   if (num >= 1_000_000) {
     return (num / 1_000_000).toFixed(decimals).replace(/\.?0+$/, '') + 'M';
-  }
-  if (num >= 100_000) {
-    return (num / 1_000).toFixed(1).replace(/\.?0+$/, '') + 'K';
   }
   return Math.round(num).toLocaleString('en-US');
 };
@@ -532,37 +530,37 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
         <StatsContainer>
           <Grid container>
             <StatsColumn item xs={12} sm={2.4}>
-              <StatLabel>Accepted Funds</StatLabel>
-              <StatValue>
+              <AcceptedFundsLabel>Accepted Funds</AcceptedFundsLabel>
+              <AcceptedFundsValue>${formatCompactNumber(acceptedFundsUsd)}</AcceptedFundsValue>
+              <AcceptedFundsTokenAmount>
                 {formatCompactNumber(acceptedFundsToken)} {currentPoolInfo?.asset}
-              </StatValue>
-              <StatSubtext>${formatCompactNumber(acceptedFundsUsd)}</StatSubtext>
+              </AcceptedFundsTokenAmount>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4}>
-              <StatLabel>Pending Funds</StatLabel>
-              <StatValue>
+              <AcceptedFundsLabel>Pending Funds</AcceptedFundsLabel>
+              <AcceptedFundsValue>${formatCompactNumber(pendingFundsUsd)}</AcceptedFundsValue>
+              <AcceptedFundsTokenAmount>
                 {formatCompactNumber(pendingFundsToken)} {currentPoolInfo?.asset}
-              </StatValue>
-              <StatSubtext>${formatCompactNumber(pendingFundsUsd)}</StatSubtext>
+              </AcceptedFundsTokenAmount>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4}>
-              <StatLabel>Total Deposits</StatLabel>
-              <StatValue>{formatCompactNumber(totalDepositsCount)}</StatValue>
+              <AcceptedFundsLabel>Total Deposits</AcceptedFundsLabel>
+              <AcceptedFundsValue>{formatCompactNumber(totalDepositsCount)}</AcceptedFundsValue>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4}>
-              <StatLabel>My Funds</StatLabel>
-              <StatValue>
+              <AcceptedFundsLabel>My Funds</AcceptedFundsLabel>
+              <AcceptedFundsValue>${formatCompactNumber(myFundsUsd)}</AcceptedFundsValue>
+              <AcceptedFundsTokenAmount>
                 {formatCompactNumber(myFundsToken)} {currentPoolInfo?.asset}
-              </StatValue>
-              <StatSubtext>${formatCompactNumber(myFundsUsd)}</StatSubtext>
+              </AcceptedFundsTokenAmount>
             </StatsColumn>
 
             <StatsColumn item xs={12} sm={2.4} isLast>
-              <StatLabel>My Pool Accounts</StatLabel>
-              <StatValue>{myPoolAccountsCount}</StatValue>
+              <AcceptedFundsLabel>My Pool Accounts</AcceptedFundsLabel>
+              <AcceptedFundsValue>{myPoolAccountsCount}</AcceptedFundsValue>
             </StatsColumn>
           </Grid>
         </StatsContainer>
@@ -578,7 +576,15 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
                   <IncentivesValue>
                     {userEarnedFxn.amount > 0 ? userEarnedFxn.amount.toFixed(2) : '0'} FXN
                   </IncentivesValue>
-                  <ClaimButton disabled>Click to Claim</ClaimButton>
+                  {isLogged && userEarnedFxn.amount > 0 && (
+                    <ClaimButton
+                      href='https://fx.aladdin.club/v2/privacy-pool'
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      Click to Claim
+                    </ClaimButton>
+                  )}
                 </IncentivesValueRow>
                 <IncentivesSubtext>
                   ${userEarnedFxn.usdValue > 0 ? userEarnedFxn.usdValue.toFixed(2) : '0.00'}
@@ -1024,40 +1030,35 @@ const StatsContainer = styled(Box)(({ theme }) => ({
 const StatsColumn = styled(Grid, {
   shouldForwardProp: (prop) => prop !== 'isLast',
 })<{ isLast?: boolean }>(({ theme, isLast }) => ({
-  padding: '0 24px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+  padding: '20px',
   borderRight: !isLast ? '1px solid #999999' : 'none',
   [theme.breakpoints.down('sm')]: {
     borderRight: 'none',
     borderBottom: !isLast ? '1px solid #999999' : 'none',
-    padding: '16px 24px',
   },
 }));
 
-const StatLabel = styled(Typography)(() => ({
+const AcceptedFundsLabel = styled(Typography)(() => ({
+  fontFamily: ibm_plex_mono.style.fontFamily,
   fontWeight: 400,
   fontSize: '12px',
-  lineHeight: '12px',
+  lineHeight: '100%',
   color: '#4D4D4D',
-  marginBottom: '8px',
 }));
 
-const StatValue = styled(Typography)(({ theme }) => ({
+const AcceptedFundsValue = styled(Typography)(() => ({
+  fontFamily: ibm_plex_mono.style.fontFamily,
   fontWeight: 700,
   fontSize: '24px',
-  lineHeight: '31px',
-  color: '#000000',
-  marginBottom: '8px',
-  [theme.breakpoints.between(600, 850)]: {
-    fontSize: '18px',
-    lineHeight: '24px',
-  },
-  [theme.breakpoints.between(400, 656)]: {
-    fontSize: '16px',
-    lineHeight: '22px',
-  },
+  lineHeight: 'normal',
+  color: '#000',
 }));
 
-const StatSubtext = styled(Typography)(() => ({
+const AcceptedFundsTokenAmount = styled(Typography)(() => ({
+  fontFamily: ibm_plex_mono.style.fontFamily,
   fontWeight: 400,
   fontSize: '12px',
   lineHeight: '100%',
@@ -1302,26 +1303,24 @@ const IncentivesValue = styled(Typography)(() => ({
   color: '#000000',
 }));
 
-const ClaimButton = styled(Button)(({ theme }) => ({
+const ClaimButton = styled('a')({
   backgroundColor: '#FFFFFF',
-  border: `1px solid ${theme.palette.grey[200]}`,
+  border: '1px solid #000000',
   borderRadius: '4px',
   padding: '4px 12px',
   fontWeight: 500,
   fontSize: '14px',
   lineHeight: 'normal',
-  color: theme.palette.grey[200],
+  color: '#000000',
   textTransform: 'none',
+  textDecoration: 'none',
+  cursor: 'pointer',
   '&:hover': {
-    backgroundColor: '#FFFFFF',
-    border: `1px solid ${theme.palette.grey[400]}`,
+    backgroundColor: '#f5f5f5',
+    border: '1px solid #000000',
+    color: '#000000',
   },
-  '&:disabled': {
-    backgroundColor: '#FFFFFF',
-    border: `1px solid ${theme.palette.grey[200]}`,
-    color: theme.palette.grey[200],
-  },
-}));
+});
 
 const IncentivesSubtext = styled(Typography)(() => ({
   fontWeight: 400,

@@ -1,7 +1,7 @@
 {
   "name": "privacy-pools-website",
   "private": true,
-  "version": "2.7.0",
+  "version": "2.8.0",
   "type": "module",
   "license": "MIT",
   "author": "Wonderland",
@@ -49,7 +49,7 @@
     "@tanstack/react-query": "5.56.2",
     "@vercel/analytics": "1.5.0",
     "import-in-the-middle": "1.14.4",
-    "next": "15.5.9",
+    "next": "15.5.10",
     "porto": "0.0.91",
     "react": "19.2.3",
     "react-dom": "19.2.3",
