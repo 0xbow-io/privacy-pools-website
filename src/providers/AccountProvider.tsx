@@ -282,6 +282,9 @@ export const AccountProvider = ({ children }: Props) => {
         return;
       }
 
+      // Track the current scope key so we can update poolAccounts for the active view
+      const currentScopeKey = `${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`;
+
       try {
         // Fetch deposits and MT leaves for each scope from its respective ASP endpoint
         const allDeposits: DepositsByLabelResponse = [];
@@ -392,11 +395,11 @@ export const AccountProvider = ({ children }: Props) => {
                   }
 
                   // The deposit is approved but the leaves are not yet updated
-                  if (deposit.reviewStatus === ReviewStatus.APPROVED && !aspLeaf) {
+                  if (reviewStatus === ReviewStatus.APPROVED && !aspLeaf) {
                     reviewStatus = ReviewStatus.PENDING;
                   }
 
-                  const isWithdrawn = entry.balance === BigInt(0) && deposit.reviewStatus === ReviewStatus.APPROVED;
+                  const isWithdrawn = entry.balance === BigInt(0) && reviewStatus === ReviewStatus.APPROVED;
 
                   return {
                     ...entry,
@@ -405,6 +408,11 @@ export const AccountProvider = ({ children }: Props) => {
                     timestamp: deposit.timestamp,
                   };
                 });
+
+                // Also update poolAccounts if this is the currently viewed scope
+                if (scopeKey === currentScopeKey) {
+                  setPoolAccounts(updatedAccountsForScope.map((pa) => ({ ...pa })));
+                }
 
                 const newPoolAccountsByChainScope: Record<string, PoolAccount[]> = {};
                 for (const [key, accounts] of Object.entries(prev)) {
@@ -424,7 +432,7 @@ export const AccountProvider = ({ children }: Props) => {
         setHasProcessedInitialDeposits(true);
       }
     },
-    [fetchChain56ReviewStatuses],
+    [fetchChain56ReviewStatuses, selectedPoolInfo.chainId, selectedPoolInfo.scope],
   );
 
   const handleLoadAccount = useCallback(
