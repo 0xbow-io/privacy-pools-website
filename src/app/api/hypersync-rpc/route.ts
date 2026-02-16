@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerEnv } from '~/config/env';
 
+export const maxDuration = 60; // Vercel Pro max: 60 seconds
+
 const { HYPERSYNC_KEY } = getServerEnv();
 
-const HYPERSYNC_TIMEOUT_MS = 30_000; // 30 seconds per attempt
-const MAX_RETRIES = 2; // Retry up to 2 times on timeout errors
+const HYPERSYNC_TIMEOUT_MS = 20_000; // 20 seconds per attempt
+const MAX_RETRIES = 2; // Retry up to 2 times on timeout errors (3 attempts total, fits within Vercel Pro 60s limit)
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
