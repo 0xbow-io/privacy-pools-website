@@ -541,15 +541,15 @@ export const WithdrawForm = () => {
           anchorEl={tokenSelectorAnchor}
         />
 
-        <PoolAccountSelectorSection
-          poolAccountName={poolAccount?.name?.toString()}
-          handlePoolAccountChange={handlePoolAccountChange}
-          filteredPoolAccounts={filteredPoolAccounts}
-          decimals={decimals}
-          symbol={symbol}
-        />
-
-        {!hasApprovedAccounts && (
+        {hasApprovedAccounts ? (
+          <PoolAccountSelectorSection
+            poolAccountName={poolAccount?.name?.toString()}
+            handlePoolAccountChange={handlePoolAccountChange}
+            filteredPoolAccounts={filteredPoolAccounts}
+            decimals={decimals}
+            symbol={symbol}
+          />
+        ) : (
           <Typography variant='body2' color='error' sx={{ textAlign: 'center', py: 1 }}>
             No approved deposits available for withdrawal in this pool. Please wait for your deposits to be approved.
           </Typography>
