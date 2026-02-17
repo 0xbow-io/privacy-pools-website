@@ -352,9 +352,6 @@ const mainnetChainData: ChainData = {
         color: '#627EEA',
         isStableAsset: true,
         isNativeToken: false,
-        relayersOverride: [
-          { name: 'Fast Relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' },
-        ],
       },
       {
         chainId: mainnet.id,
@@ -381,7 +378,7 @@ const mainnetChainData: ChainData = {
     decimals: optimism.nativeCurrency.decimals,
     image: optimismIcon.src,
     explorerUrl: optimism.blockExplorers.default.url,
-    relayers: [{ name: 'Fast Relay', url: 'https://relayer-staging-github-deployed-149184580131.us-east1.run.app' }],
+    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=10`,
     rpcUrl: `https://opt-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id), // Use mainnet ASP
