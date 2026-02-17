@@ -77,15 +77,20 @@ export const AccountProvider = ({ children }: Props) => {
 
   const allPools = poolAccounts.length;
 
-  // Sum of all the pool assets with the same scope
+  // Sum of all the pool assets with the same scope and chain
   const amountPoolAsset = poolAccounts
-    .filter((pa) => pa.scope === selectedPoolInfo.scope)
+    .filter((pa) => pa.scope === selectedPoolInfo.scope && pa.chainId === selectedPoolInfo.chainId)
     .reduce((acc, curr) => acc + BigInt(curr.balance), BigInt(0));
 
-  // Sum of all the pending pool assets with the same scope
-  const pendingAmountPoolAsset = poolAccounts
-    .filter((pa) => pa.scope === selectedPoolInfo.scope)
-    .reduce((acc, curr) => (curr.reviewStatus === ReviewStatus.PENDING ? acc + BigInt(curr.balance) : acc), BigInt(0));
+  // Sum of all the pending pool assets with the same scope and chain
+  const pendingAmountPoolAsset = hasProcessedInitialDeposits
+    ? poolAccounts
+        .filter((pa) => pa.scope === selectedPoolInfo.scope && pa.chainId === selectedPoolInfo.chainId)
+        .reduce(
+          (acc, curr) => (curr.reviewStatus === ReviewStatus.PENDING ? acc + BigInt(curr.balance) : acc),
+          BigInt(0),
+        )
+    : BigInt(0);
 
   // Calculate the first approved account with a balance for the current scope
   const firstApprovedAccount = useMemo(() => {

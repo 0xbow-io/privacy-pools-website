@@ -40,11 +40,14 @@ const PoolPreviewSection = ({
     return poolAccounts.reduce((acc, curr) => acc + BigInt(curr.balance), BigInt(0));
   }, [poolAccounts]);
 
+  const { hasProcessedInitialDeposits } = useAccountContext();
+
   const pendingAmountPoolAsset = useMemo(() => {
+    if (!hasProcessedInitialDeposits) return BigInt(0);
     return poolAccounts.reduce((acc, curr) => {
       return curr.reviewStatus === ReviewStatus.PENDING ? acc + BigInt(curr.balance) : acc;
     }, BigInt(0));
-  }, [poolAccounts]);
+  }, [poolAccounts, hasProcessedInitialDeposits]);
 
   // Show only first few accounts for preview
   const previewAccounts = useMemo(() => {
