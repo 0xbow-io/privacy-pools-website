@@ -68,7 +68,76 @@ const dataServiceConfig: ChainConfig[] = poolsByChain.map((pool) => {
     apiKey: 'sdk', // It's not an api key https://viem.sh/docs/clients/public#key-optional
   };
 });
-const dataService = new DataService(dataServiceConfig);
+
+const logFetchConfig = new Map<
+  number,
+  {
+    blockChunkSize: number;
+    concurrency: number;
+    chunkDelayMs: number;
+    retryOnFailure: boolean;
+    maxRetries: number;
+    retryBaseDelayMs: number;
+  }
+>([
+  [
+    1,
+    {
+      blockChunkSize: 1250000,
+      concurrency: 1,
+      chunkDelayMs: 0,
+      retryOnFailure: true,
+      maxRetries: 3,
+      retryBaseDelayMs: 500,
+    },
+  ],
+  [
+    10,
+    {
+      blockChunkSize: 12000000,
+      concurrency: 1,
+      chunkDelayMs: 0,
+      retryOnFailure: true,
+      maxRetries: 3,
+      retryBaseDelayMs: 500,
+    },
+  ],
+  [
+    8453,
+    {
+      blockChunkSize: 6000000,
+      concurrency: 1,
+      chunkDelayMs: 0,
+      retryOnFailure: true,
+      maxRetries: 3,
+      retryBaseDelayMs: 500,
+    },
+  ],
+  [
+    42161,
+    {
+      blockChunkSize: 48000000,
+      concurrency: 1,
+      chunkDelayMs: 0,
+      retryOnFailure: true,
+      maxRetries: 3,
+      retryBaseDelayMs: 500,
+    },
+  ],
+  [
+    56,
+    {
+      blockChunkSize: 10000000,
+      concurrency: 1,
+      chunkDelayMs: 0,
+      retryOnFailure: true,
+      maxRetries: 3,
+      retryBaseDelayMs: 500,
+    },
+  ],
+]);
+
+const dataService = new DataService(dataServiceConfig, logFetchConfig);
 
 /**
  * Generates a zero-knowledge proof for a commitment using Poseidon hash.
@@ -141,7 +210,7 @@ export const verifyWithdrawalProof = async (proof: WithdrawalProof) => {
 };
 
 export const createAccount = (seed: string) => {
-  const accountService = new AccountService(dataService, { mnemonic: seed });
+  const accountService = new AccountService(dataService, { mnemonic: seed, poolConcurrency: 1 });
 
   return accountService;
 };
