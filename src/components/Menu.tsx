@@ -62,7 +62,7 @@ export const Menu = () => {
 
   const ethBalanceBN = value.toString() ?? '0';
   const balance = formatDataNumber(ethBalanceBN, decimals, 2, false, false, false);
-  const usdBalance = getUsdBalance(price, formatUnits(value, decimals), decimals);
+  const usdBalance = price ? getUsdBalance(price, formatUnits(value, decimals), decimals) : null;
 
   const goTo = useGoTo();
 
@@ -160,7 +160,7 @@ export const Menu = () => {
             {balance}
             <span>{symbol}</span>
           </EthText>
-          <BalanceUsd variant='body2'>{`~ ${usdBalance}`}</BalanceUsd>
+          {usdBalance && <BalanceUsd variant='body2'>{`~ ${usdBalance}`}</BalanceUsd>}
         </Stack>
 
         <SMenuItem onClick={handleCopyAddress}>

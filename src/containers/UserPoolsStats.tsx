@@ -263,7 +263,7 @@ const PoolCard = ({
   const myBalance = poolAccounts.reduce((sum, pa) => sum + BigInt(pa.balance || 0), BigInt(0));
   const myBalanceFormatted = formatUnits(myBalance, pool.decimals);
   const myBalanceTokenAmount = Number(myBalanceFormatted);
-  const myBalanceUsd = myBalanceTokenAmount * price;
+  const myBalanceUsd = price ? myBalanceTokenAmount * price : null;
 
   // Calculate pending (sum of balances where reviewStatus is PENDING)
   // Show $0 until the initial deposit status fetch completes to avoid showing incorrect pending values
@@ -306,7 +306,9 @@ const PoolCard = ({
         <StatColumn>
           <StatLabel>My balance</StatLabel>
           <BalanceValue>{myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</BalanceValue>
-          <StatSubtext>${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</StatSubtext>
+          <StatSubtext>
+            {myBalanceUsd != null ? `$${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
+          </StatSubtext>
         </StatColumn>
         <StatColumn align='right'>
           <StatLabel>Pending</StatLabel>
@@ -335,7 +337,7 @@ const BalanceOnlyCard = ({
   const myBalance = poolAccounts.reduce((sum, pa) => sum + BigInt(pa.balance || 0), BigInt(0));
   const myBalanceFormatted = formatUnits(myBalance, pool.decimals);
   const myBalanceTokenAmount = Number(myBalanceFormatted);
-  const myBalanceUsd = myBalanceTokenAmount * price;
+  const myBalanceUsd = price ? myBalanceTokenAmount * price : null;
 
   const handleClick = () => {
     router.push(`/pools/${pool.chainId}/${pool.asset.toLowerCase()}`);
@@ -366,7 +368,9 @@ const BalanceOnlyCard = ({
         <StatColumn>
           <StatLabel>My balance</StatLabel>
           <BalanceValue>{myBalanceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</BalanceValue>
-          <StatSubtext>${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</StatSubtext>
+          <StatSubtext>
+            {myBalanceUsd != null ? `$${myBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
+          </StatSubtext>
         </StatColumn>
       </StatsRow>
     </SinglePoolCardContainer>

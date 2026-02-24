@@ -28,8 +28,9 @@ type ContextType = {
   balanceInPoolBN: string;
   setChainId: (value: number) => void;
   setBalanceInPool: (val: string) => void;
-  price: number;
-  nativeAssetPrice: number;
+  price: number | null;
+  nativeAssetPrice: number | null;
+  refetchPrice: () => void;
   maxDeposit: string;
   selectedRelayer: SelectedRelayerType | undefined;
   setSelectedRelayer: (value: SelectedRelayerType | undefined) => void;
@@ -61,8 +62,8 @@ export const ChainProvider = ({ children }: Props) => {
   const [chainId, setChainId] = useState(whitelistedChains[0].id);
   const { addNotification } = useNotifications();
   const [balanceInPoolBN, setBalanceInPool] = useState<string>(parseEther('100').toString());
-  const [price, setPrice] = useState<number>(0);
-  const [nativeAssetPrice, setNativeAssetPrice] = useState<number>(0);
+  const [price, setPrice] = useState<number | null>(null);
+  const [nativeAssetPrice, setNativeAssetPrice] = useState<number | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<ChainAssets>(DEFAULT_ASSET);
   const [selectedRelayer, setSelectedRelayer] = useState<SelectedRelayerType | undefined>(
     () => chainData[chainId].relayers[0],
@@ -144,32 +145,74 @@ export const ChainProvider = ({ children }: Props) => {
     };
   }, [userBalance, selectedAsset]);
 
-  useEffect(() => {
+  const priceRetryRef = useRef(false);
+  const priceFetchIdRef = useRef(0);
+
+  const doFetchPrice = useCallback(() => {
     if (chain && selectedPoolInfo) {
+      const fetchId = ++priceFetchIdRef.current;
+      priceRetryRef.current = false;
+      setPrice(null);
       fetchTokenPrice(selectedAsset, selectedPoolInfo, publicClient)
         .then((data) => {
-          setPrice(data);
+          if (fetchId !== priceFetchIdRef.current) return; // stale — asset changed
+          const fetchedPrice = data || null;
+          // If a non-stablecoin gets a suspicious ~$1 price (likely stale from a previous
+          // stablecoin selection), auto-retry once before accepting it
+          if (fetchedPrice && fetchedPrice <= 1.1 && !selectedPoolInfo.isStableAsset && !priceRetryRef.current) {
+            priceRetryRef.current = true;
+            setPrice(null);
+            fetchTokenPrice(selectedAsset, selectedPoolInfo, publicClient)
+              .then((retryData) => {
+                if (fetchId !== priceFetchIdRef.current) return;
+                setPrice(retryData || null);
+              })
+              .catch(() => {
+                if (fetchId !== priceFetchIdRef.current) return;
+                setPrice(null);
+              });
+            return;
+          }
+          setPrice(fetchedPrice);
         })
         .catch(() => {
-          setPrice(0);
-          addNotification('error', `Error fetching ${selectedAsset} price`);
+          if (fetchId !== priceFetchIdRef.current) return;
+          setPrice(null);
         });
     }
-  }, [addNotification, chain, selectedAsset, selectedPoolInfo, publicClient]);
+  }, [chain, selectedAsset, selectedPoolInfo, publicClient]);
 
-  // Fetch native asset price (e.g., ETH) for gas fee calculations
   useEffect(() => {
+    doFetchPrice();
+  }, [doFetchPrice]);
+
+  const nativePriceFetchIdRef = useRef(0);
+
+  const doFetchNativeAssetPrice = useCallback(() => {
     if (chain) {
+      const fetchId = ++nativePriceFetchIdRef.current;
+      setNativeAssetPrice(null);
       fetchTokenPrice(chain.symbol as ChainAssets)
         .then((data) => {
-          setNativeAssetPrice(data);
+          if (fetchId !== nativePriceFetchIdRef.current) return;
+          setNativeAssetPrice(data || null);
         })
         .catch(() => {
-          setNativeAssetPrice(0);
-          console.error(`Error fetching ${chain.symbol} price for gas calculations`);
+          if (fetchId !== nativePriceFetchIdRef.current) return;
+          setNativeAssetPrice(null);
         });
     }
   }, [chain]);
+
+  // Fetch native asset price (e.g., ETH) for gas fee calculations
+  useEffect(() => {
+    doFetchNativeAssetPrice();
+  }, [doFetchNativeAssetPrice]);
+
+  const refetchPrice = useCallback(() => {
+    doFetchPrice();
+    doFetchNativeAssetPrice();
+  }, [doFetchPrice, doFetchNativeAssetPrice]);
 
   const feesQueries = useQueries({
     queries: activeRelayers.map((relayer) => ({
@@ -248,6 +291,7 @@ export const ChainProvider = ({ children }: Props) => {
       setBalanceInPool: handleSetBalanceInPool,
       price,
       nativeAssetPrice,
+      refetchPrice,
       maxDeposit: selectedPoolInfo?.maxDeposit.toString() ?? '0',
       chainId,
       selectedRelayer,
@@ -271,6 +315,7 @@ export const ChainProvider = ({ children }: Props) => {
       handleSetBalanceInPool,
       price,
       nativeAssetPrice,
+      refetchPrice,
       selectedPoolInfo,
       chainId,
       selectedRelayer,

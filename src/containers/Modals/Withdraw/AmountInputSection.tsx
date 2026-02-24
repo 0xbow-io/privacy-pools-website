@@ -12,7 +12,7 @@ interface AmountInputSectionProps {
   symbol: string;
   poolAccountName: string | undefined;
   balanceUSD: string;
-  currentPrice: number;
+  currentPrice: number | null;
   anonymitySet?: number | null;
   isLoadingAnonymitySet?: boolean;
 }
@@ -40,7 +40,7 @@ export const AmountInputSection = ({
     }
   };
 
-  const usdAmount = amount ? (Number(amount) * currentPrice).toFixed(2) : '0.00';
+  const usdAmount = amount && currentPrice ? (Number(amount) * currentPrice).toFixed(2) : null;
 
   return (
     <Stack width='100%'>
@@ -55,7 +55,7 @@ export const AmountInputSection = ({
             }}
             inputProps={{ maxLength: 20 }}
           />
-          <UsdAmountText>${usdAmount}</UsdAmountText>
+          <UsdAmountText>{usdAmount ? `$${usdAmount}` : ''}</UsdAmountText>
         </Stack>
 
         <Stack direction='column' alignItems='flex-end' gap='8px'>

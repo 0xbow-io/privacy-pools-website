@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import { Stack, styled, Typography, IconButton, Collapse, Avatar, Alert } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { Stack, styled, Typography, IconButton, Collapse, Avatar, Alert, Button } from '@mui/material';
 import { formatUnits, parseUnits, isAddress } from 'viem';
 import { useAccount, useEnsName, useEnsAvatar, usePublicClient } from 'wagmi';
 import { ExtendedTooltip as Tooltip } from '~/components';
@@ -35,6 +36,7 @@ export const DataSection = () => {
   const {
     balanceBN: { symbol, decimals },
     price,
+    refetchPrice,
     selectedPoolInfo,
     chainId,
   } = useChainContext();
@@ -171,12 +173,14 @@ export const DataSection = () => {
   const amountWithFeeBN = parseUnits(amount, decimals) - fees;
   const amountWithFee = formatUnits(amountWithFeeBN, decimals);
   const amountWithFeeUSD = getUsdBalance(price, amountWithFee, decimals);
-  const valueText = `${parseFloat(amountWithFee).toString()} ${displaySymbol} (~$${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)} USD)`;
+  const valueText = price
+    ? `${parseFloat(amountWithFee).toString()} ${displaySymbol} (~$${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)} USD)`
+    : `${parseFloat(amountWithFee).toString()} ${displaySymbol}`;
   const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${displaySymbol}`;
 
   // Net Fee calculation (includes extra gas amount if enabled)
   let netFeeAmount = fees;
-  if (quoteState.extraGas && quoteExtraGasAmountETH) {
+  if (quoteState.extraGas && quoteExtraGasAmountETH && price) {
     // Convert extraGasAmountETH from wei to token amount
     const extraGasETH = parseFloat(formatUnits(BigInt(quoteExtraGasAmountETH), 18));
     const extraGasInToken = (extraGasETH * price) / parseFloat(formatUnits(parseUnits('1', decimals), decimals));
@@ -193,7 +197,9 @@ export const DataSection = () => {
   const netFeeNumeric = parseFloat(netFeeFormatted);
   const netFeeDisplayValue = parseFloat(netFeeNumeric.toFixed(netFeePrecision)).toString();
 
-  const netFeeText = `${netFeeDisplayValue} ${displaySymbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`;
+  const netFeeText = price
+    ? `${netFeeDisplayValue} ${displaySymbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`
+    : `${netFeeDisplayValue} ${displaySymbol}`;
   const netFeeTooltip = `${formatFullPrecision(netFeeAmount, decimals)} ${displaySymbol}`;
 
   const totalAmountBN = parseUnits(amount, decimals);
@@ -326,7 +332,7 @@ export const DataSection = () => {
                 {formatFeeDisplay(totalAmountBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
               </TotalAmount>
             </Tooltip>
-            <TotalUSD>${parseFloat(amountUSD.replace('$', '')).toFixed(2)}</TotalUSD>
+            {price && <TotalUSD>${parseFloat(amountUSD.replace('$', '')).toFixed(2)}</TotalUSD>}
           </TotalBox>
 
           <TotalBox>
@@ -336,8 +342,14 @@ export const DataSection = () => {
                 {formatFeeDisplay(amountWithFeeBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
               </TotalAmount>
             </Tooltip>
-            <TotalUSD>${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)}</TotalUSD>
+            {price && <TotalUSD>${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)}</TotalUSD>}
           </TotalBox>
+
+          {!price && (
+            <RefetchPriceButton size='small' onClick={refetchPrice} startIcon={<RefreshIcon sx={{ fontSize: 14 }} />}>
+              Load price
+            </RefetchPriceButton>
+          )}
         </TotalsContainer>
       )}
     </Container>
@@ -438,24 +450,19 @@ const FeeBreakdownContainer = styled('div')({
   marginLeft: '16px',
 });
 
-const TotalsContainer = styled('div')(({ theme }) => ({
+const TotalsContainer = styled('div')(() => ({
   display: 'flex',
+  flexWrap: 'wrap',
   marginTop: '24px',
   justifyContent: 'space-between',
   position: 'relative',
-  '&::after': {
-    content: '""',
-    position: 'absolute',
-    left: '50%',
-    top: '0',
-    bottom: '0',
-    width: '1px',
-    backgroundColor: theme.palette.divider,
-    transform: 'translateX(-50%)',
+  '& > button': {
+    width: '100%',
+    justifyContent: 'center',
   },
 }));
 
-const TotalBox = styled('div')(() => ({
+const TotalBox = styled('div')(({ theme }) => ({
   flex: 1,
   display: 'flex',
   flexDirection: 'column',
@@ -465,6 +472,9 @@ const TotalBox = styled('div')(() => ({
   backgroundColor: 'transparent',
   minWidth: '208px',
   height: '86px',
+  '& + &': {
+    borderLeft: `1px solid ${theme.palette.divider}`,
+  },
 }));
 
 const TotalLabel = styled(Typography)(({ theme }) => ({
@@ -490,4 +500,20 @@ const TotalUSD = styled(Typography)(({ theme }) => ({
   lineHeight: '18px',
   color: theme.palette.text.secondary,
   textAlign: 'center',
+}));
+
+const RefetchPriceButton = styled(Button)(({ theme }) => ({
+  fontSize: '12px',
+  fontWeight: 500,
+  lineHeight: '16px',
+  color: theme.palette.text.secondary,
+  textTransform: 'none',
+  padding: '2px 8px',
+  minHeight: 0,
+  '&:hover': {
+    color: theme.palette.text.primary,
+  },
+  '& .MuiSvgIcon-root': {
+    fontSize: '14px !important',
+  },
 }));

@@ -27,18 +27,13 @@ export const formatFeeDisplay = (
   feeAmount: bigint,
   symbol: string,
   decimals: number,
-  price: number,
+  price: number | null,
   isStableAsset: boolean,
 ): { displayText: string; fullPrecision: string; usdValue: string } => {
   const feeInToken = formatUnits(feeAmount, decimals);
-  const usdValue = getUsdBalance(price, feeInToken, decimals);
 
   // Full precision for tooltip
   const fullPrecision = `${formatUnits(feeAmount, decimals)} ${symbol}`;
-
-  // Parse USD value and ensure 2 decimal places
-  const usdNumeric = parseFloat(usdValue.replace('$', ''));
-  const usdFormatted = `$${usdNumeric.toFixed(2)}`;
 
   // Use the max precision based on asset type - no special cases needed
   const displayPrecision = getMaxDisplayPrecision(isStableAsset);
@@ -49,6 +44,14 @@ export const formatFeeDisplay = (
     feeNumeric < Math.pow(10, -displayPrecision)
       ? feeNumeric.toExponential(2)
       : parseFloat(feeNumeric.toFixed(displayPrecision)).toString();
+
+  if (!price) {
+    return { displayText: `${displayValue} ${symbol}`, fullPrecision, usdValue: '' };
+  }
+
+  const usdValue = getUsdBalance(price, feeInToken, decimals);
+  const usdNumeric = parseFloat(usdValue.replace('$', ''));
+  const usdFormatted = `$${usdNumeric.toFixed(2)}`;
 
   const displayText = `${displayValue} ${symbol} (~${usdFormatted} USD)`;
 
@@ -66,16 +69,8 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCos
 
   const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
 
-  // Guard against invalid inputs
-  if (
-    !amount ||
-    amount === '0' ||
-    decimals == null ||
-    !symbol ||
-    price == null ||
-    feeBPS == null ||
-    baseFeeBPS == null
-  ) {
+  // Guard against invalid inputs (price is NOT required — fees display in token units regardless)
+  if (!amount || amount === '0' || decimals == null || !symbol || feeBPS == null || baseFeeBPS == null) {
     return null;
   }
 
@@ -108,7 +103,8 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCos
       })()
     : null;
   // Use native asset price (e.g., ETH price) for gas fee USD calculation
-  const blockchainFeeUSD = blockchainFeeNative ? (blockchainFeeNative * nativeAssetPrice).toFixed(2) : null;
+  const blockchainFeeUSD =
+    blockchainFeeNative && nativeAssetPrice ? (blockchainFeeNative * nativeAssetPrice).toFixed(2) : null;
 
   // Extra gas amount (convert from wei to native asset)
   const extraGasNative = extraGasAmountETH ? parseFloat(formatUnits(BigInt(extraGasAmountETH), 18)) : null;
@@ -120,7 +116,7 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCos
       })()
     : null;
   // Use native asset price for extra gas USD calculation
-  const extraGasUSD = extraGasNative ? (extraGasNative * nativeAssetPrice).toFixed(2) : null;
+  const extraGasUSD = extraGasNative && nativeAssetPrice ? (extraGasNative * nativeAssetPrice).toFixed(2) : null;
 
   return (
     <Container>
@@ -178,14 +174,14 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCos
         {/* Blockchain Fee - shows actual gas cost from relayer */}
         <FeeRow>
           <FeeLabel>Blockchain Fee:</FeeLabel>
-          {blockchainFeeNative && blockchainFeeUSD ? (
+          {blockchainFeeNative ? (
             <Tooltip
               title={
                 <TooltipContent>
                   <div>
                     Amount: {blockchainFeeNativeFormatted} {nativeSymbol}
                   </div>
-                  <div>USD Value: ~${blockchainFeeUSD}</div>
+                  {blockchainFeeUSD && <div>USD Value: ~${blockchainFeeUSD}</div>}
                   <div>Estimated gas cost based on recent similar transactions.</div>
                   <div>Actual cost may vary slightly depending on network conditions.</div>
                 </TooltipContent>
@@ -193,7 +189,8 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCos
               placement='top'
             >
               <FeeValue>
-                {blockchainFeeNativeFormatted} {nativeSymbol} (~${blockchainFeeUSD})
+                {blockchainFeeNativeFormatted} {nativeSymbol}
+                {blockchainFeeUSD ? ` (~$${blockchainFeeUSD})` : ''}
               </FeeValue>
             </Tooltip>
           ) : (
@@ -202,7 +199,7 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCos
         </FeeRow>
 
         {/* Gas token received (only show if extraGasAmountETH exists) */}
-        {extraGasNative && extraGasUSD && (
+        {extraGasNative && (
           <>
             <FeeRow>
               <FeeLabel>Gas token received:</FeeLabel>
@@ -212,14 +209,15 @@ export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCos
                     <div>
                       Amount: {extraGasNativeFormatted} {nativeSymbol}
                     </div>
-                    <div>USD Value: ~${extraGasUSD}</div>
+                    {extraGasUSD && <div>USD Value: ~${extraGasUSD}</div>}
                     <div>This amount is deducted from your withdrawal to provide {nativeSymbol} for gas fees</div>
                   </TooltipContent>
                 }
                 placement='top'
               >
                 <FeeValue negative>
-                  {extraGasNativeFormatted} {nativeSymbol} (~${extraGasUSD})
+                  {extraGasNativeFormatted} {nativeSymbol}
+                  {extraGasUSD ? ` (~$${extraGasUSD})` : ''}
                 </FeeValue>
               </Tooltip>
             </FeeRow>

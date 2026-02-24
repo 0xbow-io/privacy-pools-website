@@ -4,10 +4,16 @@ import { EventType, ReviewStatus, StatusObject } from '~/types';
 
 export const getUsdBalance = (price: number | null, balance: string, decimals: number): string => {
   if (!price || !balance || !decimals) return '0';
-  const priceBN = parseUnits(price.toString(), decimals);
-  const balanceBN = parseUnits(balance, decimals);
-  const result = (priceBN * balanceBN) / BigInt(10 ** decimals);
-  return formatDataNumber(result.toString(), decimals, 2, true, false);
+  try {
+    // Truncate price string to avoid exceeding decimal precision for parseUnits
+    const priceStr = price.toFixed(decimals);
+    const priceBN = parseUnits(priceStr, decimals);
+    const balanceBN = parseUnits(balance, decimals);
+    const result = (priceBN * balanceBN) / BigInt(10 ** decimals);
+    return formatDataNumber(result.toString(), decimals, 2, true, false);
+  } catch {
+    return '0';
+  }
 };
 
 /**

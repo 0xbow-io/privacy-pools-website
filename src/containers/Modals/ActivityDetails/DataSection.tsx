@@ -49,22 +49,22 @@ export const DataSection = () => {
   const fees = isWithdrawal && onChainFee !== null ? onChainFee : calculatedFees;
 
   const feeFormatted = formatDataNumber(fees, decimals);
-  const feeUSD = getUsdBalance(price, formatUnits(fees, decimals), decimals);
-  const feeText = isFeeLoading ? 'Loading...' : `${feeFormatted} ${asset} (~ ${feeUSD} USD)`;
+  const feeUSD = price ? getUsdBalance(price, formatUnits(fees, decimals), decimals) : null;
+  const feeText = isFeeLoading ? 'Loading...' : `${feeFormatted} ${asset}${feeUSD ? ` (~ ${feeUSD} USD)` : ''}`;
 
   const feesCollectorAddress = isDeposit ? entryPointAddress : currentSelectedRelayerData?.relayerAddress;
   const feesCollector = `OxBow (${truncateAddress(feesCollectorAddress ?? '0x')})`;
 
   const totalText = isDeposit ? formatUnits(originalAmount, decimals) : formatUnits(amountInWei, decimals);
-  const totalUSD = getUsdBalance(price, totalText, decimals);
-  const valueText = `~${totalText.slice(0, 6)} ${asset} (~ ${totalUSD} USD)`;
+  const totalUSD = price ? getUsdBalance(price, totalText, decimals) : null;
+  const valueText = `~${totalText.slice(0, 6)} ${asset}${totalUSD ? ` (~ ${totalUSD} USD)` : ''}`;
 
   // Use on-chain received amount for withdrawals if available
   const amountWithFee = isWithdrawal && actualReceivedAmount !== null ? actualReceivedAmount : originalAmount - fees;
-  const amountWithFeeUSD = getUsdBalance(price, formatUnits(amountWithFee, decimals), decimals);
+  const amountWithFeeUSD = price ? getUsdBalance(price, formatUnits(amountWithFee, decimals), decimals) : null;
   const receivedText = isFeeLoading
     ? 'Loading...'
-    : `${formatUnits(amountWithFee, decimals)} ${asset} (~ ${amountWithFeeUSD} USD)`;
+    : `${formatUnits(amountWithFee, decimals)} ${asset}${amountWithFeeUSD ? ` (~ ${amountWithFeeUSD} USD)` : ''}`;
 
   // const poolAccountName = useMemo(() => {
   //   const name = poolAccounts.find((pool) => pool.label === selectedHistoryData?.commitment?.preimage?.label)?.name;

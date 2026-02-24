@@ -736,9 +736,9 @@ export const DepositForm = () => {
               data-testid='deposit-input'
             />
             <UsdAmountText>
-              {inputAmount && !isNaN(Number(inputAmount))
+              {inputAmount && !isNaN(Number(inputAmount)) && currentPrice
                 ? `$${(Number(inputAmount) * currentPrice).toFixed(2)}`
-                : '$0.00'}
+                : ''}
             </UsdAmountText>
           </Stack>
 

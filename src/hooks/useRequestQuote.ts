@@ -103,6 +103,10 @@ export const useRequestQuote = ({
 
       const remainingTime = calculateRemainingTime(newQuoteData.feeCommitment.expiration);
 
+      if (remainingTime <= 0) {
+        addNotification('warning', 'Quote expired immediately. Your system clock may be inaccurate.');
+      }
+
       expiredNotificationSentRef.current = null;
 
       setQuoteData(

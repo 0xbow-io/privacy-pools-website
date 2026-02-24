@@ -68,7 +68,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
         extraGasAmountETH,
         relayTxCostETH,
         countdown,
-        isExpired: false,
+        isExpired: countdown <= 0, // Mark as expired immediately if countdown is already 0 (e.g., clock skew)
         extraGas: prev.extraGas, // Preserve current extraGas setting
         quotedAmount,
         pendingQuoteRequest: false, // Clear pending request when quote is set
