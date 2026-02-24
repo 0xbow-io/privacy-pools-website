@@ -21,7 +21,7 @@ import { formatUnits } from 'viem';
 import { usePublicClient } from 'wagmi';
 import { ChainFilterSelect } from '~/components/ChainFilterSelect';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { allPoolsChainData, getConfig, PoolInfo } from '~/config';
+import { allPoolsChainData, chainData, getConfig, PoolInfo } from '~/config';
 import { PAContainer, Section } from '~/containers';
 import { useChainContext } from '~/hooks';
 import type { PoolResponse } from '~/types';
@@ -483,9 +483,11 @@ export const AllPoolsStats = () => {
   const { ASP_ENDPOINT_TEST, ASP_ENDPOINT_NON_TEST } = getConfig().env;
 
   // Fetch incentives stats for fxUSD pool (uses avg TVL for APR calculation)
+  const fxusdPoolScope = chainData[1]?.poolInfo.find((p) => p.asset === 'fxUSD')?.scope?.toString();
   const { data: fxusdIncentivesStats } = useQuery({
-    queryKey: ['pool_incentives_stats', 'fxusd', ASP_ENDPOINT_NON_TEST],
-    queryFn: () => aspClient.fetchPoolIncentivesStats(ASP_ENDPOINT_NON_TEST, 1, 'fxusd', 7),
+    queryKey: ['pool_incentives_stats', fxusdPoolScope, ASP_ENDPOINT_NON_TEST],
+    queryFn: () => aspClient.fetchPoolIncentivesStats(ASP_ENDPOINT_NON_TEST, 1, fxusdPoolScope!, 7),
+    enabled: !!fxusdPoolScope,
     staleTime: 300000, // 5 minutes
     refetchInterval: 300000,
     retry: 2,
