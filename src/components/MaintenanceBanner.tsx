@@ -5,7 +5,7 @@ import { Box, Typography, styled } from '@mui/material';
 const MAINTENANCE_MODE = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true';
 const MAINTENANCE_MESSAGE =
   process.env.NEXT_PUBLIC_MAINTENANCE_MESSAGE ||
-  'We are currently in maintenance mode. Withdrawals may be limited. Exit remains available at all times.';
+  "We are currently investigating an SDK bug that we're in the process of fixing, but we suspect there might have been an attempt to exploit it. To be safe, please ragequit your funds. We froze all deposits & withdrawals so only ragequits are available at this time - the funds can only be withdrawn back to your address, so there isn't any additional urgent risk - but we do want to confirm that your funds are safe.";
 
 export const MaintenanceBanner = () => {
   if (!MAINTENANCE_MODE) return null;
