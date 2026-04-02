@@ -132,7 +132,7 @@ const mainnetChainData: ChainData = {
     decimals: mainnet.nativeCurrency.decimals,
     image: mainnetIcon.src,
     explorerUrl: mainnet.blockExplorers.default.url,
-    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }],
+    relayers: [{ name: 'Fast Relay', url: 'https://fastrelay.xyz' }, { name: 'Privacy Relayer', url: 'https://relayerprivacypools4.mooo.com' },],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
     aspUrl: getAspEndpointForChain(mainnet.id),
