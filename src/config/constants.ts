@@ -13,6 +13,8 @@ const constants: Constants = {
       label: 'Github',
       href: `https://github.com/0xbow-io/privacy-pools-website`,
     },
+    { label: 'Terms', href: 'https://docs.privacypools.com/toc' },
+    { label: 'Privacy', href: 'https://docs.privacypools.com/privacy-policy' },
   ],
   ASP_OPTIONS: ['0xBow ASP'],
   COOKIES: {
