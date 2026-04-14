@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { styled } from '@mui/material/styles';
 import { Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
+import { MaintenanceBanner } from '~/components/MaintenanceBanner';
 import { useAuthContext } from '~/hooks';
 import { MigrationBanner } from '~/migration';
 import { zIndex } from '~/utils';
@@ -15,6 +16,7 @@ export const Header = () => {
     <HeaderWrapper>
       <Disclaimer />
       <MigrationBanner />
+      <MaintenanceBanner />
 
       <StyledHeader>
         <LeftSection>
