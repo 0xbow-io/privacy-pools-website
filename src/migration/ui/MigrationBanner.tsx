@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import { alpha, styled, Typography } from '@mui/material';
@@ -9,11 +10,30 @@ const announcementUrl = process.env.NEXT_PUBLIC_MIGRATION_ANNOUNCEMENT_URL;
 
 export const MigrationBanner = () => {
   const { showBanner } = useMigration();
+  const bannerRef = useRef<HTMLDivElement>(null);
+
+  // Add banner height to --header-height so mobile content padding-top accounts for it
+  useEffect(() => {
+    if (!showBanner) {
+      document.body.style.removeProperty('--banner-height');
+      return;
+    }
+    const update = () => {
+      const h = bannerRef.current?.offsetHeight ?? 0;
+      document.body.style.setProperty('--banner-height', `${h}px`);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      document.body.style.removeProperty('--banner-height');
+    };
+  }, [showBanner]);
 
   if (!showBanner) return null;
 
   return (
-    <BannerRoot>
+    <BannerRoot ref={bannerRef}>
       <WarningAmberRoundedIcon fontSize='small' />
       <BannerText variant='body2'>
         We strengthened our key generation entropy.
