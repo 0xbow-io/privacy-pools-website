@@ -47,6 +47,9 @@ const HeaderWrapper = styled('div')(({ theme }) => {
       position: 'fixed',
       top: 0,
       left: 0,
+      // solid background so scrolled content doesn't bleed through the
+      // semi-transparent migration banner on iOS Safari
+      backgroundColor: theme.palette.background.default,
     },
   };
 });
