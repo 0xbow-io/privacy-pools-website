@@ -134,7 +134,7 @@ const mainnetChainData: ChainData = {
     explorerUrl: mainnet.blockExplorers.default.url,
     relayers: [
       { name: 'Fast Relay', url: 'https://fastrelay.xyz' },
-      { name: 'Cloaked Relay', url: 'https://api.clkd.xyz/relayer' },
+      { name: 'Cloaked Relay', url: 'https://api.clkd.xyz' },
     ],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
