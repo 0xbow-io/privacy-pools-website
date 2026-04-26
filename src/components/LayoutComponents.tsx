@@ -23,7 +23,7 @@ export const PageWrapper = styled('main')(({ theme }) => {
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     [theme.breakpoints.down('sm')]: {
-      paddingTop: `var(--header-height)`,
+      paddingTop: `calc(var(--header-height) + var(--banner-height, 0px) + var(--maintenance-banner-height, 0px))`,
     },
   };
 });

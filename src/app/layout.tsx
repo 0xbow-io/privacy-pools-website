@@ -5,7 +5,6 @@ import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { MainContent, NoScriptMessage, PageWrapper } from '~/components';
 import { FeatureFlagInitializer } from '~/components/FeatureFlagInitializer';
-import { MaintenanceBanner } from '~/components/MaintenanceBanner';
 import { ibm_plex_mono } from '~/config/fonts';
 import { Footer, Header, Modals } from '~/containers';
 import { NotificationContainer } from '~/containers/NotificationContainer';
@@ -40,7 +39,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <p>This website requires JavaScript to function properly.</p>
                 </NoScriptMessage>
 
-                <MaintenanceBanner />
                 <Header />
                 <MainContent data-testid='main-content'>{children}</MainContent>
                 <Footer />

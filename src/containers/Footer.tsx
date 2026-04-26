@@ -1,11 +1,13 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import Link from 'next/link';
-import { styled, useMediaQuery } from '@mui/material';
+import { Menu, MenuItem, styled, useMediaQuery } from '@mui/material';
 import { getConfig } from '~/config';
 import { useModal } from '~/hooks';
 import { ModalType } from '~/types';
+
+const MOBILE_MORE_LABELS = ['Github', 'Terms', 'Privacy'];
 
 export const Footer = () => {
   const {
@@ -13,10 +15,16 @@ export const Footer = () => {
     env: { GITHUB_HASH },
   } = getConfig();
   const { setModalOpen } = useModal();
-  const isMobile = useMediaQuery('(max-width:768px)'); // Explicit pixel-based mobile detection
+  const isMobile = useMediaQuery('(max-width:768px)');
+  const [moreAnchor, setMoreAnchor] = useState<null | HTMLElement>(null);
+
   const handleNewsletterClick = () => {
     setModalOpen(ModalType.NEWSLETTER_SUBSCRIPTION);
   };
+
+  const mainLinks = isMobile ? FOOTER_LINKS.filter((item) => !MOBILE_MORE_LABELS.includes(item.label)) : FOOTER_LINKS;
+
+  const moreLinks = isMobile ? FOOTER_LINKS.filter((item) => MOBILE_MORE_LABELS.includes(item.label)) : [];
 
   // GitHub icon SVG
   const GitHubIcon = () => (
@@ -34,26 +42,56 @@ export const Footer = () => {
   return (
     <FooterContainer>
       <Links>
-        {FOOTER_LINKS.map((item) => (
+        {mainLinks.map((item) => (
           <Fragment key={item.label}>
-            <LinkItem style={item.label === 'Github' && isMobile ? { paddingTop: '10px' } : {}}>
+            <LinkItem>
               <Link href={item.href} target='_blank'>
-                {item.label === 'X' && '𝕏'}
-
-                {item.label === 'Github' && isMobile ? (
-                  <LinkHash>
-                    <GitHubIcon /> {GITHUB_HASH && <span>{GITHUB_HASH}</span>}
-                  </LinkHash>
-                ) : (
-                  item.label === 'Github' && 'Github'
-                )}
-
-                {item.label !== 'Github' && item.label !== 'X' && item.label}
+                {item.label === 'X' ? '𝕏' : item.label}
               </Link>
             </LinkItem>
             <VBar>|</VBar>
           </Fragment>
         ))}
+        {isMobile && moreLinks.length > 0 && (
+          <>
+            <LinkItem>
+              <MoreButton
+                type='button'
+                onClick={(e) => setMoreAnchor(e.currentTarget)}
+                aria-haspopup='true'
+                aria-expanded={Boolean(moreAnchor)}
+              >
+                More ▾
+              </MoreButton>
+            </LinkItem>
+            <VBar>|</VBar>
+            <Menu
+              anchorEl={moreAnchor}
+              open={Boolean(moreAnchor)}
+              onClose={() => setMoreAnchor(null)}
+              anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+              transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+              {moreLinks.map((item) => (
+                <MenuItem
+                  key={item.label}
+                  component={Link}
+                  href={item.href}
+                  target='_blank'
+                  onClick={() => setMoreAnchor(null)}
+                >
+                  {item.label === 'Github' ? (
+                    <LinkHash>
+                      <GitHubIcon /> {GITHUB_HASH ? <span>{GITHUB_HASH}</span> : 'Github'}
+                    </LinkHash>
+                  ) : (
+                    item.label
+                  )}
+                </MenuItem>
+              ))}
+            </Menu>
+          </>
+        )}
         <LinkItem>
           <NewsletterLink onClick={handleNewsletterClick}>Newsletter</NewsletterLink>
         </LinkItem>
@@ -135,3 +173,17 @@ const NewsletterLink = styled('span')(({ theme }) => {
     },
   };
 });
+
+const MoreButton = styled('button')(({ theme }) => ({
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  margin: 0,
+  cursor: 'pointer',
+  color: theme.palette.text.primary,
+  fontSize: theme.typography.caption.fontSize,
+  fontFamily: 'inherit',
+  '&:hover': {
+    fontWeight: 700,
+  },
+}));
