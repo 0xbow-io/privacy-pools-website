@@ -10,6 +10,11 @@ const STABLECOIN_FALLBACK_PRICES: Record<string, number> = {
   USND: 1.0, // Nerite USD - redeemable for $1 worth of collateral
   BSCUSD: 1.0, // BSC USD - USD-pegged stablecoin on BSC
   BOLD: 1.0, // Liquity v2 BOLD - soft-pegged USD stablecoin, not listed on Alchemy
+  USDe: 1.0, // Ethena USDe - USD-pegged stablecoin
+  frxUSD: 1.0, // Frax USD - USD-pegged stablecoin
+  fxUSD: 1.0, // f(x) Protocol fxUSD - approximately USD-pegged
+  sUSDS: 1.0, // Sky savings USDS - approximately USD (yield-bearing)
+  yUSND: 1.0, // Nerite yUSND - approximately USD (yield-bearing); kept as fallback in case the on-chain price conversion path can't run
 };
 
 // Uniswap V3 FXN/WETH pool on Ethereum mainnet
