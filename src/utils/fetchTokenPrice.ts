@@ -9,6 +9,7 @@ const options = { method: 'GET', headers: { accept: 'application/json' } };
 const STABLECOIN_FALLBACK_PRICES: Record<string, number> = {
   USND: 1.0, // Nerite USD - redeemable for $1 worth of collateral
   BSCUSD: 1.0, // BSC USD - USD-pegged stablecoin on BSC
+  BOLD: 1.0, // Liquity v2 BOLD - soft-pegged USD stablecoin, not listed on Alchemy
 };
 
 // Uniswap V3 FXN/WETH pool on Ethereum mainnet
