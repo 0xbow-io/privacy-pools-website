@@ -110,6 +110,12 @@ export const fetchTokenPrice = async (
   poolInfo?: PoolInfo,
   publicClient?: PublicClient,
 ): Promise<number> => {
+  // Prefer the canonical asset name from chain config when available — the
+  // caller may pass an upper-cased version coming from the URL slug (e.g.
+  // "SUSDS"), which would miss case-sensitive fallback map lookups for
+  // symbols like "sUSDS", "frxUSD", etc.
+  const symbol = poolInfo?.asset ?? tokenSymbol;
+
   // Check if this token has a custom price conversion
   if (poolInfo?.priceConversion && publicClient) {
     try {
@@ -145,17 +151,17 @@ export const fetchTokenPrice = async (
       const conversionRate = Number(formatUnits(underlyingAmount, poolInfo.assetDecimals || 18));
       return underlyingPrice * conversionRate;
     } catch (error) {
-      console.error(`Error fetching price via conversion for ${tokenSymbol}:`, error);
+      console.error(`Error fetching price via conversion for ${symbol}:`, error);
       // Fall back to direct price fetch
     }
   }
 
   // Standard price fetch from Alchemy
-  const response = await fetch(`${url}symbols=${tokenSymbol}`, options);
+  const response = await fetch(`${url}symbols=${symbol}`, options);
   const json = await response.json();
   const value = json.data?.[0]?.prices?.[0]?.value;
-  if (!value && STABLECOIN_FALLBACK_PRICES[tokenSymbol] !== undefined) {
-    return STABLECOIN_FALLBACK_PRICES[tokenSymbol];
+  if (!value && STABLECOIN_FALLBACK_PRICES[symbol] !== undefined) {
+    return STABLECOIN_FALLBACK_PRICES[symbol];
   }
   return value || 0;
 };

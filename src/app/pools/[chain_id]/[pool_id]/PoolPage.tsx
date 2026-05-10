@@ -238,17 +238,40 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     return Number(formatUnits(amountPoolAsset, poolDecimals));
   }, [isLogged, amountPoolAsset, poolDecimals]);
 
+  // If the chain context can't supply a live price (Alchemy doesn't list the
+  // token, on-chain conversion failed, etc.), derive one from the pool stats
+  // returned by the ASP. This is more accurate than a fixed $1 fallback for
+  // yield-bearing assets like sUSDS/yUSND, which trade above $1 because of
+  // accrued yield.
+  const derivedPriceFromStats = useMemo(() => {
+    const usdStr = currentPoolStats?.acceptedDepositsValueUsd ?? currentPoolStats?.totalInPoolValueUsd;
+    const tokensStr = currentPoolStats?.acceptedDepositsValue ?? currentPoolStats?.totalInPoolValue;
+    if (!usdStr || !tokensStr) return null;
+    const usd = parseFloat(String(usdStr).replace(/,/g, ''));
+    if (!Number.isFinite(usd) || usd <= 0) return null;
+    let tokens: number;
+    try {
+      tokens = Number(formatUnits(BigInt(tokensStr), poolDecimals));
+    } catch {
+      return null;
+    }
+    if (tokens <= 0) return null;
+    return usd / tokens;
+  }, [currentPoolStats, poolDecimals]);
+
+  const effectivePrice = price ?? derivedPriceFromStats;
+
   const myFundsUsd = useMemo(() => {
-    return price ? myFundsToken * price : null;
-  }, [myFundsToken, price]);
+    return effectivePrice ? myFundsToken * effectivePrice : null;
+  }, [myFundsToken, effectivePrice]);
 
   const acceptedFundsUsd = useMemo(() => {
-    return price ? acceptedFundsToken * price : null;
-  }, [acceptedFundsToken, price]);
+    return effectivePrice ? acceptedFundsToken * effectivePrice : null;
+  }, [acceptedFundsToken, effectivePrice]);
 
   const pendingFundsUsd = useMemo(() => {
-    return price ? pendingFundsToken * price : null;
-  }, [pendingFundsToken, price]);
+    return effectivePrice ? pendingFundsToken * effectivePrice : null;
+  }, [pendingFundsToken, effectivePrice]);
 
   const totalDepositsCount = useMemo(() => {
     return currentPoolStats?.totalDepositsCount || 0;
@@ -356,7 +379,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
       const participationTimeMs = Math.max(0, participationEnd - participationStart);
 
       // Contribution = balance * time participated (in USD terms for weighting)
-      const balanceUsd = balanceToken * (price ?? 0);
+      const balanceUsd = balanceToken * (effectivePrice ?? 0);
       userTimeWeightedContribution += balanceUsd * participationTimeMs;
     }
 
@@ -388,7 +411,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
       amount: earnedFxn,
       usdValue,
     };
-  }, [incentivesTimeline, isLogged, acceptedFundsUsd, currentPoolAccounts, poolDecimals, price, fxnPrice]);
+  }, [incentivesTimeline, isLogged, acceptedFundsUsd, currentPoolAccounts, poolDecimals, effectivePrice, fxnPrice]);
 
   useEffect(() => {
     // Parse and set the chain ID
