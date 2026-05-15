@@ -96,6 +96,7 @@ export const DataSection = () => {
     amountBN,
     assetAddress: selectedPoolInfo?.assetAddress,
     recipient: target,
+    relayerUrl: currentSelectedRelayerData?.url,
     isValidAmount: amountBN > 0n,
     isRecipientAddressValid: !!target,
     isRelayerSelected: !!currentSelectedRelayerData?.relayerAddress,
@@ -249,7 +250,7 @@ export const DataSection = () => {
 
         <Row>
           <Label variant='body2'>To:</Label>
-          <Value variant='body2' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Value component='div' variant='body2' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {ensAvatar && <Avatar src={ensAvatar} sx={{ width: 20, height: 20 }} />}
             <Tooltip title={toAddress} placement='top'>
               <span>
