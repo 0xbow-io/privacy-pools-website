@@ -57,9 +57,10 @@ export const WithdrawForm = () => {
     setChainId,
   } = useChainContext();
 
-  const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount } = usePoolAccountsContext();
+  const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount, setFeeCommitment, setFeeBPSForWithdraw } =
+    usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
-  const { setExtraGas, requestQuote } = useQuoteContext();
+  const { setExtraGas, requestQuote, resetQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
 
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
@@ -125,7 +126,7 @@ export const WithdrawForm = () => {
 
   // Resolved address display component
   const ResolvedAddressDisplay = () => (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+    <Box component='span' sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
       <span>Resolved to: {truncateAddress(target)}</span>
       <Tooltip title={`${target} (Click to copy)`}>
         <Box
@@ -448,6 +449,11 @@ export const WithdrawForm = () => {
   const handleRelayerChange = (e: SelectChangeEvent<unknown>) => {
     const newRelayerUrl = e.target.value as string;
     const newRelayer = relayersData.find((r) => r.url === newRelayerUrl);
+    if (newRelayerUrl !== selectedRelayer?.url) {
+      resetQuote();
+      setFeeCommitment(null);
+      setFeeBPSForWithdraw(0n);
+    }
     setSelectedRelayer(newRelayer ? { name: newRelayer.name, url: newRelayer.url } : undefined);
   };
 
