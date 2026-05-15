@@ -1,12 +1,13 @@
 'use client';
 
 import { createContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import { useQueries } from '@tanstack/react-query';
-import { parseEther } from 'viem';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { formatUnits, parseEther } from 'viem';
 import { useAccount, useBalance, usePublicClient } from 'wagmi';
 import { ChainData, chainData, allPoolsChainData, ChainAssets, whitelistedChains, PoolInfo, getConfig } from '~/config';
+import { getAspEndpointForChain } from '~/config/env';
 import { useNotifications } from '~/hooks';
-import { fetchTokenPrice, relayerClient } from '~/utils';
+import { aspClient, fetchTokenPrice, relayerClient } from '~/utils';
 
 type RelayerDataType = {
   name: string;
@@ -214,6 +215,45 @@ export const ChainProvider = ({ children }: Props) => {
     doFetchNativeAssetPrice();
   }, [doFetchPrice, doFetchNativeAssetPrice]);
 
+  // Pool stats include both the token amount and the USD value of accepted
+  // deposits, which lets us derive a per-token price as a fallback when
+  // Alchemy's price API doesn't list the token or returns 0. This also gives
+  // accurate prices for yield-bearing tokens (e.g. sUSDS trades above $1).
+  const { data: poolStatsData } = useQuery({
+    queryKey: ['pool_stats', chainId],
+    queryFn: () => aspClient.fetchPoolStats(getAspEndpointForChain(chainId), chainId),
+    enabled: !!chainId,
+    refetchInterval: 120000,
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const derivedPriceFromStats = useMemo(() => {
+    if (!poolStatsData?.pools || !selectedPoolInfo?.scope) return null;
+    const scopeStr = selectedPoolInfo.scope.toString();
+    const ps = poolStatsData.pools.find((p) => p.scope === scopeStr);
+    const usdStr = ps?.acceptedDepositsValueUsd ?? ps?.totalInPoolValueUsd;
+    const tokensStr = ps?.acceptedDepositsValue ?? ps?.totalInPoolValue;
+    if (!usdStr || !tokensStr) return null;
+    const usd = parseFloat(String(usdStr).replace(/,/g, ''));
+    if (!Number.isFinite(usd) || usd <= 0) return null;
+    let tokens: number;
+    try {
+      tokens = Number(formatUnits(BigInt(tokensStr), selectedPoolInfo.assetDecimals || 18));
+    } catch {
+      return null;
+    }
+    if (tokens <= 0) return null;
+    return usd / tokens;
+  }, [poolStatsData, selectedPoolInfo]);
+
+  // Live token price from Alchemy/conversion if available, otherwise fall
+  // back to the price derived from the ASP pool stats. Exposed to all
+  // consumers via context.price so the withdraw review modal, fee breakdown,
+  // pool page and anywhere else stay consistent.
+  const effectivePrice = price ?? derivedPriceFromStats;
+
   const feesQueries = useQueries({
     queries: activeRelayers.map((relayer) => ({
       queryKey: ['relayerFees', relayer.url, chainId, selectedPoolInfo?.assetAddress],
@@ -260,8 +300,16 @@ export const ChainProvider = ({ children }: Props) => {
     }
   }, [hasSomeRelayerAvailable, allQueriesAreLoading, addNotification]);
 
-  // Effect to ensure the relayer selection is always valid
+  // Effect to ensure the relayer selection is always valid.
+  //
+  // Wait for every relayer's /details query to finish before doing the
+  // auto-select. Otherwise the first relayer to respond (e.g. a faster
+  // secondary relayer) wins the default slot and the configured primary
+  // (Fast Relay) never gets re-selected once it loads, because the effect
+  // sees a valid current selection and bails out.
   useEffect(() => {
+    if (allQueriesAreLoading) return;
+
     const firstAvailable = relayersData.find((r) => r.isSelectable);
     const isCurrentSelectedStillValid = selectedRelayer
       ? relayersData.some((r) => r.url === selectedRelayer.url && r.isSelectable)
@@ -280,7 +328,7 @@ export const ChainProvider = ({ children }: Props) => {
         handleSetSelectedRelayer(undefined);
       }
     }
-  }, [relayersData, selectedRelayer, handleSetSelectedRelayer]);
+  }, [allQueriesAreLoading, relayersData, selectedRelayer, handleSetSelectedRelayer]);
 
   const contextValue = useMemo(
     () => ({
@@ -289,7 +337,7 @@ export const ChainProvider = ({ children }: Props) => {
       balanceBN,
       balanceInPoolBN,
       setBalanceInPool: handleSetBalanceInPool,
-      price,
+      price: effectivePrice,
       nativeAssetPrice,
       refetchPrice,
       maxDeposit: selectedPoolInfo?.maxDeposit.toString() ?? '0',
@@ -313,7 +361,7 @@ export const ChainProvider = ({ children }: Props) => {
       balanceBN,
       balanceInPoolBN,
       handleSetBalanceInPool,
-      price,
+      effectivePrice,
       nativeAssetPrice,
       refetchPrice,
       selectedPoolInfo,
