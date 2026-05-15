@@ -162,7 +162,8 @@ export const DataSection = () => {
   const feesCollectorAddress = isDeposit
     ? selectedPoolInfo.entryPointAddress
     : currentSelectedRelayerData?.relayerAddress;
-  const feesCollector = `OxBow (${truncateAddress(feesCollectorAddress)})`;
+  const feesCollectorName = isDeposit ? '0xBow' : currentSelectedRelayerData?.name || 'Relayer';
+  const feesCollector = `${feesCollectorName} (${truncateAddress(feesCollectorAddress)})`;
 
   // Use alternative token symbol if selected
   const displaySymbol = selectedAlternativeToken && isDeposit ? selectedAlternativeToken.tokenSymbol : symbol;
