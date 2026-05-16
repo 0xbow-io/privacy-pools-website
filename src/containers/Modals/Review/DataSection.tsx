@@ -250,7 +250,7 @@ export const DataSection = () => {
 
         <Row>
           <Label variant='body2'>To:</Label>
-          <Value component='div' variant='body2' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AddressValue>
             {ensAvatar && <Avatar src={ensAvatar} sx={{ width: 20, height: 20 }} />}
             <Tooltip title={toAddress} placement='top'>
               <span>
@@ -258,7 +258,7 @@ export const DataSection = () => {
                 {!toAddress && 'New Pool Account'}
               </span>
             </Tooltip>
-          </Value>
+          </AddressValue>
         </Row>
       </Stack>
       {actionType !== EventType.EXIT && (
@@ -394,6 +394,21 @@ const Label = styled(Typography)(({ theme }) => ({
 
 const Value = styled(Label)(() => ({
   fontWeight: 400,
+}));
+
+const AddressValue = styled('div')(({ theme }) => ({
+  color: theme.palette.grey[500],
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+  fontSize: '1.6rem',
+  fontStyle: 'normal',
+  fontWeight: 400,
+  lineHeight: '150%',
+
+  [theme.breakpoints.down('sm')]: {
+    fontSize: theme.typography.body2.fontSize,
+  },
 }));
 
 const QuoteTimer = styled(Value)(({ theme }) => ({
