@@ -52,6 +52,7 @@ export const ReviewModal = () => {
     amountBN,
     assetAddress: selectedPoolInfo?.assetAddress,
     recipient: target,
+    relayerUrl: currentSelectedRelayerData?.url,
     isValidAmount: amountBN > 0n,
     isRecipientAddressValid: !!target,
     isRelayerSelected: !!currentSelectedRelayerData?.relayerAddress,

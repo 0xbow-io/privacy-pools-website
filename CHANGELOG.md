@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.1] - 2026-05-15
+
+### Fixed
+
+- Restored the relayer dropdown so users can pick between Fast Relay and Cloaked Relay (Fast Relay stays first)
+- Display the selected relayer name as the fee collector in the withdrawal review modal instead of always showing `0xBow`
+- Fixed a race in the relayer auto-select effect that caused Cloaked Relay to win the default slot when its `/details` endpoint responded faster than Fast Relay's
+- Fall back to an ASP-derived per-token price when Alchemy doesn't return one, so withdrawal review modal and other surfaces stop showing `$0.00 USD` (and yield-bearing tokens like sUSDS show their actual price instead of a flat $1)
+- Coerce Alchemy price values to a number (the API returns quoted strings) so the review modal no longer silently throws and shows `$0.00`
+- Reset the quote, fee commitment and countdown when the user switches relayer in the withdraw form, so reopening the Review modal doesn't show stale data from the previous relayer
+
 ## [2.14.0] - 2026-05-11
 
 ### Added

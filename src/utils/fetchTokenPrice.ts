@@ -135,7 +135,9 @@ export const fetchTokenPrice = async (
       // Get the price of the underlying asset
       const underlyingResponse = await fetch(`${url}symbols=${underlyingAsset}`, options);
       const underlyingJson = await underlyingResponse.json();
-      let underlyingPrice = underlyingJson.data?.[0]?.prices?.[0]?.value;
+      const rawUnderlyingPrice = underlyingJson.data?.[0]?.prices?.[0]?.value;
+      let underlyingPrice =
+        rawUnderlyingPrice != null && Number.isFinite(Number(rawUnderlyingPrice)) ? Number(rawUnderlyingPrice) : 0;
 
       // Use fallback price for stablecoins not supported by Alchemy
       if (!underlyingPrice && STABLECOIN_FALLBACK_PRICES[underlyingAsset]) {
@@ -159,9 +161,16 @@ export const fetchTokenPrice = async (
   // Standard price fetch from Alchemy
   const response = await fetch(`${url}symbols=${symbol}`, options);
   const json = await response.json();
-  const value = json.data?.[0]?.prices?.[0]?.value;
-  if (!value && STABLECOIN_FALLBACK_PRICES[symbol] !== undefined) {
-    return STABLECOIN_FALLBACK_PRICES[symbol];
+  // Alchemy returns price values as JSON strings (e.g. "0.9998"). Coerce to a
+  // number so callers that expect a number (e.g. `getUsdBalance` calls
+  // `price.toFixed`) don't silently throw and return $0.
+  const rawValue = json.data?.[0]?.prices?.[0]?.value;
+  const numericValue = rawValue != null ? Number(rawValue) : NaN;
+  if (!Number.isFinite(numericValue) || numericValue === 0) {
+    if (STABLECOIN_FALLBACK_PRICES[symbol] !== undefined) {
+      return STABLECOIN_FALLBACK_PRICES[symbol];
+    }
+    return 0;
   }
-  return value || 0;
+  return numericValue;
 };

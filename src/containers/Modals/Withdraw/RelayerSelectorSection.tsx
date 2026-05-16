@@ -1,6 +1,16 @@
 'use client';
 
-import { CircularProgress, Stack, styled, Typography, SelectChangeEvent } from '@mui/material';
+import {
+  Box,
+  CircularProgress,
+  FormControl,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Stack,
+  styled,
+  Typography,
+} from '@mui/material';
 
 type RelayerData = {
   name: string;
@@ -22,6 +32,8 @@ interface RelayerSelectorSectionProps {
 
 export const RelayerSelectorSection = ({
   selectedRelayer,
+  relayersData,
+  handleRelayerChange,
   isQuoteLoading,
   quoteError,
   feeText,
@@ -30,7 +42,36 @@ export const RelayerSelectorSection = ({
 }: RelayerSelectorSectionProps) => {
   return (
     <Stack gap='1.2rem' width='100%' alignItems='center'>
-      <RelayerLabel>{selectedRelayer?.name || 'Fast Relay'}</RelayerLabel>
+      <FormControl fullWidth>
+        <RelayerSelect
+          id='relayer-select'
+          labelId='relayer-select-label'
+          value={selectedRelayer?.url ?? ''}
+          onChange={handleRelayerChange}
+          renderValue={() => selectedRelayer?.name ?? 'Select Relayer'}
+          displayEmpty
+        >
+          {relayersData.map(({ name, url, fees, isSelectable }) => (
+            <RelayMenuItem key={url} value={url} disabled={!isSelectable}>
+              <Stack direction='row' justifyContent='space-between' alignItems='center' width='100%'>
+                <Box>
+                  <Typography variant='body2'>{name}</Typography>
+                  {fees !== undefined && (
+                    <Typography variant='caption' color='textSecondary'>
+                      Base Fee: {Number(fees) / 100}%
+                    </Typography>
+                  )}
+                </Box>
+                {!isSelectable && (
+                  <Typography variant='caption' color='error'>
+                    Unavailable
+                  </Typography>
+                )}
+              </Stack>
+            </RelayMenuItem>
+          ))}
+        </RelayerSelect>
+      </FormControl>
 
       {/* Fee Details */}
       <Stack direction='column' alignItems='flex-start' gap={0.5} width='100%'>
@@ -53,12 +94,23 @@ export const RelayerSelectorSection = ({
   );
 };
 
-const RelayerLabel = styled(Typography)(({ theme }) => ({
-  width: '100%',
-  padding: '16px 14px',
-  border: `1px solid ${theme.palette.grey[400]}`,
-  borderRadius: '4px',
-  fontSize: '16px',
-  fontWeight: 500,
-  color: theme.palette.text.primary,
+const RelayerSelect = styled(Select)(({ theme }) => ({
+  '& .MuiSelect-select': {
+    padding: '16px 14px',
+    fontSize: '16px',
+    fontWeight: 500,
+    color: theme.palette.text.primary,
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: theme.palette.grey[400],
+  },
 }));
+
+const RelayMenuItem = styled(MenuItem)({
+  '&.Mui-disabled': {
+    opacity: 0.5,
+    span: {
+      fontWeight: 700,
+    },
+  },
+});
