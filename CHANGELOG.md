@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Display the selected relayer name as the fee collector in the withdrawal review modal instead of always showing `0xBow`
 - Fixed a race in the relayer auto-select effect that caused Cloaked Relay to win the default slot when its `/details` endpoint responded faster than Fast Relay's
 - Fall back to an ASP-derived per-token price when Alchemy doesn't return one, so withdrawal review modal and other surfaces stop showing `$0.00 USD` (and yield-bearing tokens like sUSDS show their actual price instead of a flat $1)
+- Coerce Alchemy price values to a number (the API returns quoted strings) so the review modal no longer silently throws and shows `$0.00`
+- Reset the quote, fee commitment and countdown when the user switches relayer in the withdraw form, so reopening the Review modal doesn't show stale data from the previous relayer
 
 ## [2.14.0] - 2026-05-11
 
