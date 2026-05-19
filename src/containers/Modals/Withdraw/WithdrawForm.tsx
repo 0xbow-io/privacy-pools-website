@@ -507,7 +507,7 @@ export const WithdrawForm = () => {
 
   return (
     <ModalContainer>
-      <ModalTitle variant='h2'>Make a withdraw</ModalTitle>
+      <ModalTitle variant='h2'>Withdraw</ModalTitle>
 
       <DecorativeCircle />
 
