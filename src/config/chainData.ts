@@ -135,6 +135,7 @@ const mainnetChainData: ChainData = {
     relayers: [
       { name: 'Fast Relay', url: 'https://fastrelay.xyz' },
       { name: 'Cloaked Relay', url: 'https://api.clkd.xyz' },
+      { name: 'Privacy Relay', url: 'https://relayerprivacypools4.mooo.com' }
     ],
     sdkRpcUrl: `/api/hypersync-rpc?chainId=1`, // Secure Hypersync proxy (relative URL)
     rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
