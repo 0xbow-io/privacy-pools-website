@@ -53,6 +53,7 @@ const extractLegacyCommitments = (
 
     for (const rawAccount of rawAccounts) {
       if ((rawAccount as { ragequit?: unknown }).ragequit) continue;
+      if ((rawAccount as { isMigrated?: boolean }).isMigrated) continue;
 
       const account = rawAccount as {
         deposit?: AccountCommitment;

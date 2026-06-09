@@ -11,17 +11,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the FXN incentives badge (340% APR / Rollover / Incentives) from the fxUSD pool card; incentives are no longer running
 
-## [2.2.0] - 2026-03-19
+## [2.14.1] - 2026-05-15
 
 ### Fixed
 
-- Replaced `bytesToNumber` with `bytesToBigInt` in the Privacy Pools SDK, restoring full 256-bit entropy for all newly generated keys and ensuring new accounts carry the full cryptographic security guarantees intended by the original specification
+- Restored the relayer dropdown so users can pick between Fast Relay and Cloaked Relay (Fast Relay stays first)
+- Display the selected relayer name as the fee collector in the withdrawal review modal instead of always showing `0xBow`
+- Fixed a race in the relayer auto-select effect that caused Cloaked Relay to win the default slot when its `/details` endpoint responded faster than Fast Relay's
+- Fall back to an ASP-derived per-token price when Alchemy doesn't return one, so withdrawal review modal and other surfaces stop showing `$0.00 USD` (and yield-bearing tokens like sUSDS show their actual price instead of a flat $1)
+- Coerce Alchemy price values to a number (the API returns quoted strings) so the review modal no longer silently throws and shows `$0.00`
+- Reset the quote, fee commitment and countdown when the user switches relayer in the withdraw form, so reopening the Review modal doesn't show stale data from the previous relayer
+
+## [2.14.0] - 2026-05-11
 
 ### Added
 
-- Introduced an entropy upgrade flow that allows existing users to easily upgrade their account security
+- Added Cloaked Relay as a secondary mainnet relayer
 
-## [2.11.1] - 2026-03-19
+### Changed
+
+- Mainnet relayer list now preserves the order configured in `chainData` so Fast Relay stays first regardless of momentary price differences
+
+### Fixed
+
+- Fixed missing USD price for BOLD, sUSDS, USDe, frxUSD, fxUSD and yUSND pool stats. Live prices fall back to the ASP's reported pool USD value when Alchemy doesn't list the token, which also shows accurate prices for yield-bearing assets like sUSDS instead of pinning them at $1.
+
+### Security
+
+- Bumped Next.js to 15.5.18, picking up the 12 security advisories from the v16.2.6 release (Server Components DoS, middleware/proxy bypasses, WebSocket SSRF, CSP nonce XSS, Image Optimization DoS and RSC cache poisoning).
+
+## [2.13.0] - 2026-04-14
+
+### Added
+
+- Added Terms of Use and Privacy Policy links to footer
+- Migration banner and maintenance banner are now dismissible (with localStorage persistence)
+
+### Fixed
+
+- Fixed migration banner covering content on mobile (content now offsets for banner height)
+- Collapsed Github/Terms/Privacy into a More dropdown on mobile footer to keep it on a single row
+- Fixed content bleeding through the fixed header on iOS Safari by adding an opaque background
+
+## [2.12.0] - 2026-03-19
+
+### Added
+- Introduced an entropy upgrade flow that allows existing users to easily upgrade their account security
 
 ### Fixed
 
@@ -37,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed target address not preserved when switching tokens in withdrawal form
 - Show 'price unavailable' instead of blank when price fetch fails
 - Added graceful fallback for unsupported extra gas on non-mainnet chains
+- Replaced `bytesToNumber` with `bytesToBigInt` in the Privacy Pools SDK, restoring full 256-bit entropy for all newly generated keys and ensuring new accounts carry the full cryptographic security guarantees intended by the original specification
 
 ## [2.11.0] - 2026-03-11
 
