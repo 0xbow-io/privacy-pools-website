@@ -183,8 +183,10 @@ export const calculatePrivacyScore = (
   }
 };
 
-// Assets that have incentives and APR display
-const INCENTIVIZED_ASSETS = ['fxUSD'];
+// Assets that have incentives and APR display.
+// Empty list — FXN incentives ended. Keep the list-based gate so new
+// incentive programs can be added by appending an asset name.
+const INCENTIVIZED_ASSETS: string[] = [];
 
 // FXN incentives configuration
 const FXUSD_INCENTIVES_CONFIG = {
