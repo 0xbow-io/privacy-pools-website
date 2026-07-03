@@ -9,8 +9,17 @@ import { useAdvancedView } from '~/hooks';
 import { ActivityRecords } from '~/types';
 
 export const ActivityFull = () => {
-  const { ITEMS_PER_PAGE, allEventsByPage, fullPersonalActivity, globalEventsCount, isLoading, poolFilter } =
-    useAdvancedView();
+  const {
+    ITEMS_PER_PAGE,
+    allEventsByPage,
+    fullPersonalActivity,
+    globalEventsCount,
+    isLoading,
+    isPageLoading,
+    isPageError,
+    refetchByPage,
+    poolFilter,
+  } = useAdvancedView();
   const [view, setView] = useState<'global' | 'personal'>('global');
   const pathname = usePathname();
 
@@ -42,11 +51,19 @@ export const ActivityFull = () => {
       <AdvancedNavigation title={title} isLogged={true} count={totalCount} />
 
       <ActivityContainer>
-        <ActivityTable records={items as ActivityRecords} isLoading={isLoading} view={view} />
+        <ActivityTable
+          records={items as ActivityRecords}
+          isLoading={view === 'global' ? isPageLoading : isLoading}
+          isError={view === 'global' ? isPageError : false}
+          onRetry={view === 'global' ? () => refetchByPage() : undefined}
+          view={view}
+        />
 
-        <ActionMenuContainer>
-          <SPagination numberOfItems={totalCount} perPage={ITEMS_PER_PAGE} />
-        </ActionMenuContainer>
+        {totalCount > 0 && (
+          <ActionMenuContainer>
+            <SPagination numberOfItems={totalCount} perPage={ITEMS_PER_PAGE} />
+          </ActionMenuContainer>
+        )}
       </ActivityContainer>
     </>
   );

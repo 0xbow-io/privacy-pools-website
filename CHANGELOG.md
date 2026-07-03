@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.3] - 2026-07-03
+
+### Fixed
+
+- Global activity pages no longer get stuck on "No activity found" with the pager reading "4 OF 0" after a transient API failure — the table's loading/error state now tracks the paginated query itself (it previously tracked only the first-page preview), failures show a "Couldn't load activity." message with a Retry button, and navigating back to a failed page refetches instead of staying broken until a hard refresh
+- Pagination is hidden when there are no items, so the "N OF 0" state can no longer appear while loading or after an error
+
 ## [2.14.2] - 2026-05-20
 
 ### Fixed
