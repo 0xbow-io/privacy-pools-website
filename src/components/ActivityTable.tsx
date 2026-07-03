@@ -1,6 +1,6 @@
 'use client';
 
-import { Table, TableBody, TableHead, TableRow, TableCell, styled, Typography, Stack } from '@mui/material';
+import { Button, Table, TableBody, TableHead, TableRow, TableCell, styled, Typography, Stack } from '@mui/material';
 import { formatUnits } from 'viem';
 import {
   ExtendedTooltip as Tooltip,
@@ -22,11 +22,15 @@ const {
 export const ActivityTable = ({
   records,
   isLoading,
+  isError,
+  onRetry,
   view,
   size = 'large',
 }: {
   records: ActivityRecords;
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   view?: 'personal' | 'global';
   size?: 'small' | 'large';
 }) => {
@@ -205,10 +209,15 @@ export const ActivityTable = ({
               <STableRow></STableRow>
             </TableBody>
           </Table>
-          <Stack alignItems='center' justifyContent='center' width='100%' height={tableBodyHeight}>
+          <Stack alignItems='center' justifyContent='center' width='100%' height={tableBodyHeight} gap='1.2rem'>
             <Typography variant='body2' color='textDisabled'>
-              {isLoading ? 'Loading...' : noRecordsMessage}
+              {isLoading ? 'Loading...' : isError ? "Couldn't load activity." : noRecordsMessage}
             </Typography>
+            {!isLoading && isError && onRetry && (
+              <Button variant='outlined' size='small' onClick={onRetry}>
+                Retry
+              </Button>
+            )}
           </Stack>
         </STableContainer>
       )}
