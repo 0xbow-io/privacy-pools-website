@@ -17,7 +17,15 @@ export const useAdvancedView = () => {
   } = useChainContext();
   const { isLoading: isLoadingExternalServices } = useExternalServices();
   const { poolAccounts, historyData, hideEmptyPools } = useAccountContext();
-  const { globalEventsData, globalEventsByPage, isLoading: isLoadingGlobalEvents, poolFilter } = useGlobalASP();
+  const {
+    globalEventsData,
+    globalEventsByPage,
+    isLoading: isLoadingGlobalEvents,
+    isPageLoading,
+    isPageError,
+    refetchByPage,
+    poolFilter,
+  } = useGlobalASP();
 
   const allEventsByPage = globalEventsByPage?.events ?? [];
 
@@ -68,6 +76,9 @@ export const useAdvancedView = () => {
     previewPersonalActivity,
     fullPersonalActivity,
     isLoading,
+    isPageLoading: isLoadingExternalServices || isPageLoading,
+    isPageError,
+    refetchByPage,
     globalEventsCount: globalEventsByPage?.total ?? 0,
     poolFilter,
   };

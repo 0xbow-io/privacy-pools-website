@@ -161,8 +161,11 @@ type EventsResponse = GlobalEventsResponse | AllEventsResponse;
 export const useGlobalASP = (): {
   isError?: boolean;
   isLoading?: boolean;
+  isPageError?: boolean;
+  isPageLoading?: boolean;
   globalEventsData: EventsResponse | undefined;
   globalEventsByPage: EventsResponse | undefined;
+  refetchByPage: () => void;
   poolFilter: PoolFilter;
 } => {
   const {
@@ -232,20 +235,42 @@ export const useGlobalASP = (): {
       return enhanceWithBrevisStatuses(response);
     },
     refetchInterval: 60000,
-    retryOnMount: false,
+    // No retryOnMount:false here — a page that failed (network blip) must
+    // refetch when the user navigates back to it, not stay broken until a
+    // hard refresh.
   });
 
+  // Two consumers, two states: the home preview renders the page-1 preview
+  // query (isLoading/isError), while the full activity table renders the
+  // page-N query — its state must come from THAT query, otherwise a failed
+  // or slow page renders as an empty "No activity found" with the pager at
+  // "N OF 0" (and a Retry wired to the wrong query couldn't clear it).
   const isError = globalEventsQuery.isError;
   const isLoading = globalEventsQuery.isLoading;
+  const isPageError = globalEventsByPageQuery.isError;
+  const isPageLoading = globalEventsByPageQuery.isLoading;
+  const refetchByPage = globalEventsByPageQuery.refetch;
 
   return useMemo(
     () => ({
       isError,
       isLoading,
+      isPageError,
+      isPageLoading,
       globalEventsData: globalEventsQuery.data,
       globalEventsByPage: globalEventsByPageQuery.data,
+      refetchByPage,
       poolFilter,
     }),
-    [isError, isLoading, globalEventsQuery.data, globalEventsByPageQuery.data, poolFilter],
+    [
+      isError,
+      isLoading,
+      isPageError,
+      isPageLoading,
+      globalEventsQuery.data,
+      globalEventsByPageQuery.data,
+      refetchByPage,
+      poolFilter,
+    ],
   );
 };
