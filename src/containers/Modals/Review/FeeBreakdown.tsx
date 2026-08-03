@@ -49,9 +49,7 @@ export const formatFeeDisplay = (
     return { displayText: `${displayValue} ${symbol}`, fullPrecision, usdValue: '' };
   }
 
-  const usdValue = getUsdBalance(price, feeInToken, decimals);
-  const usdNumeric = parseFloat(usdValue.replace('$', ''));
-  const usdFormatted = `$${usdNumeric.toFixed(2)}`;
+  const usdFormatted = getUsdBalance(price, feeInToken, decimals);
 
   const displayText = `${displayValue} ${symbol} (~${usdFormatted} USD)`;
 

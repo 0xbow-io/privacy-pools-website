@@ -174,7 +174,7 @@ export const DataSection = () => {
   const amountWithFee = formatUnits(amountWithFeeBN, decimals);
   const amountWithFeeUSD = getUsdBalance(price, amountWithFee, decimals);
   const valueText = price
-    ? `${parseFloat(amountWithFee).toString()} ${displaySymbol} (~$${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)} USD)`
+    ? `${parseFloat(amountWithFee).toString()} ${displaySymbol} (~${amountWithFeeUSD} USD)`
     : `${parseFloat(amountWithFee).toString()} ${displaySymbol}`;
   const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${displaySymbol}`;
 
@@ -198,7 +198,7 @@ export const DataSection = () => {
   const netFeeDisplayValue = parseFloat(netFeeNumeric.toFixed(netFeePrecision)).toString();
 
   const netFeeText = price
-    ? `${netFeeDisplayValue} ${displaySymbol} (~$${parseFloat(netFeeUSD.replace('$', '')).toFixed(2)} USD)`
+    ? `${netFeeDisplayValue} ${displaySymbol} (~${netFeeUSD} USD)`
     : `${netFeeDisplayValue} ${displaySymbol}`;
   const netFeeTooltip = `${formatFullPrecision(netFeeAmount, decimals)} ${displaySymbol}`;
 
@@ -332,7 +332,7 @@ export const DataSection = () => {
                 {formatFeeDisplay(totalAmountBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
               </TotalAmount>
             </Tooltip>
-            {price && <TotalUSD>${parseFloat(amountUSD.replace('$', '')).toFixed(2)}</TotalUSD>}
+            {price && <TotalUSD>{amountUSD}</TotalUSD>}
           </TotalBox>
 
           <TotalBox>
@@ -342,7 +342,7 @@ export const DataSection = () => {
                 {formatFeeDisplay(amountWithFeeBN, symbol, decimals, price, isStableAsset).displayText.split(' (~')[0]}
               </TotalAmount>
             </Tooltip>
-            {price && <TotalUSD>${parseFloat(amountWithFeeUSD.replace('$', '')).toFixed(2)}</TotalUSD>}
+            {price && <TotalUSD>{amountWithFeeUSD}</TotalUSD>}
           </TotalBox>
 
           {!price && (
