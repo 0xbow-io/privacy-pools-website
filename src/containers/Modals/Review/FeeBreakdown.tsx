@@ -41,9 +41,11 @@ export const formatFeeDisplay = (
 
   // For display, use precision based on asset type
   const displayValue =
-    feeNumeric < Math.pow(10, -displayPrecision)
-      ? feeNumeric.toExponential(2)
-      : parseFloat(feeNumeric.toFixed(displayPrecision)).toString();
+    feeNumeric === 0
+      ? '0'
+      : feeNumeric < Math.pow(10, -displayPrecision)
+        ? feeNumeric.toExponential(2)
+        : parseFloat(feeNumeric.toFixed(displayPrecision)).toString();
 
   if (!price) {
     return { displayText: `${displayValue} ${symbol}`, fullPrecision, usdValue: '' };
