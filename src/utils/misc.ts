@@ -9,7 +9,7 @@ export const getUsdBalance = (price: number | null, balance: string, decimals: n
     const priceStr = price.toFixed(decimals);
     const priceBN = parseUnits(priceStr, decimals);
     const balanceBN = parseUnits(balance, decimals);
-    const result = (priceBN * balanceBN) / BigInt(10 ** decimals);
+    const result = (priceBN * balanceBN) / BigInt(10) ** BigInt(decimals);
     return formatDataNumber(result.toString(), decimals, 2, true, false);
   } catch {
     return '0';
