@@ -36,7 +36,6 @@ export const DataSection = () => {
   const {
     balanceBN: { symbol, decimals },
     price,
-    nativeAssetPrice,
     refetchPrice,
     selectedPoolInfo,
     chainId,
@@ -179,24 +178,23 @@ export const DataSection = () => {
     : `${parseFloat(amountWithFee).toString()} ${displaySymbol}`;
   const valueTooltip = `${formatFullPrecision(amountWithFeeBN, decimals)} ${displaySymbol}`;
 
-  // Net Fee calculation (includes extra gas amount if enabled)
-  let netFeeAmount = fees;
-  if (quoteState.extraGas && quoteExtraGasAmountETH && price && nativeAssetPrice) {
-    // Extra gas is denominated in the native asset; convert to pool-token units via USD prices
-    const extraGasETH = parseFloat(formatUnits(BigInt(quoteExtraGasAmountETH), 18));
-    const extraGasInToken = (extraGasETH * nativeAssetPrice) / price;
-
-    // Convert to fixed decimal string to avoid scientific notation
-    const extraGasAmountBN = parseUnits(extraGasInToken.toFixed(decimals), decimals);
-    netFeeAmount = fees + extraGasAmountBN;
-  }
+  // Net Fee comes straight from the quoted feeBPS: the relayer's quote is
+  // gas-adjusted and refetched when extra gas toggles, so the extra-gas
+  // funding is already included — adding it again would double-count it and
+  // desync Net Fee from Total Withdrawn - Total Received.
+  const netFeeAmount = fees;
   const netFeeFormatted = formatUnits(netFeeAmount, decimals);
   const netFeeUSD = getUsdBalance(price, netFeeFormatted, decimals);
 
   // Net fee uses the same precision logic as fee breakdown
   const netFeePrecision = getMaxDisplayPrecision(isStableAsset);
   const netFeeNumeric = parseFloat(netFeeFormatted);
-  const netFeeDisplayValue = parseFloat(netFeeNumeric.toFixed(netFeePrecision)).toString();
+  const netFeeDisplayValue =
+    netFeeNumeric === 0
+      ? '0'
+      : netFeeNumeric < Math.pow(10, -netFeePrecision)
+        ? netFeeNumeric.toExponential(2)
+        : parseFloat(netFeeNumeric.toFixed(netFeePrecision)).toString();
 
   const netFeeText = price
     ? `${netFeeDisplayValue} ${displaySymbol} (~${netFeeUSD} USD)`
@@ -278,7 +276,7 @@ export const DataSection = () => {
               )}
             </Row>
           )}
-          {actionType !== EventType.WITHDRAWAL && (isQuoteValid || isExpired) && (
+          {actionType !== EventType.WITHDRAWAL && (
             <Row>
               <Label variant='body2'>Value:</Label>
               <Tooltip title={valueTooltip} placement='top'>
