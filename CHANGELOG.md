@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.4] - 2026-08-03
+
+### Fixed
+
+- Withdrawal review totals no longer collapse at the thousands separator — "Total Withdrawn"/"Total Received" for any amount worth ≥ $1,000 displayed only its leading digits (e.g. 3 ETH → "$5.00") because the Intl-formatted USD string was re-parsed with parseFloat, which stops at the comma; formatted USD strings are now rendered directly, which also fixes dust amounts rendering as "$NaN"
+- Activity details now price each row by its own asset instead of the currently selected pool's price, so a global USDT deposit no longer shows an ETH-priced USD value (~$75M for ~$40k)
+- Net Fee no longer double-counts the Extra Gas amount: the relayer's quoted fee is already gas-adjusted, so Net Fee now reconciles with Total Withdrawn − Total Received (the removed local conversion also used a broken formula that inflated Net Fee ~1,800× on ETH pools when Extra Gas was enabled)
+- The deposit review "Value" row renders again — it was gated on withdrawal-quote state a deposit never reaches
+- Sub-precision stablecoin net fees (e.g. 0.0004 USDC) are no longer displayed as 0, and a zero fee no longer renders as "0.00e+0"
+- USD conversion divisor is computed with bigint exponentiation to stay exact at high token decimals
+
 ## [2.14.3] - 2026-07-03
 
 ### Fixed
