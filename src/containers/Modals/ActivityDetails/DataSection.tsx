@@ -3,7 +3,13 @@
 import { Stack, styled, Typography } from '@mui/material';
 import { formatUnits } from 'viem';
 import { ExtendedTooltip as Tooltip } from '~/components';
-import { useExternalServices, usePoolAccountsContext, useChainContext, useTransactionFee } from '~/hooks';
+import {
+  useExternalServices,
+  usePoolAccountsContext,
+  useChainContext,
+  useTransactionFee,
+  useActivityAssetPrice,
+} from '~/hooks';
 import { EventType, GlobalEvent } from '~/types';
 import { formatDataNumber, formatTimestamp, getUsdBalance, truncateAddress } from '~/utils';
 
@@ -11,8 +17,8 @@ export const DataSection = () => {
   const {
     selectedPoolInfo: { assetDecimals, asset, entryPointAddress },
     balanceBN: { decimals: balanceDecimals },
-    price,
   } = useChainContext();
+  const price = useActivityAssetPrice();
   const { vettingFeeBPS, selectedHistoryData } = usePoolAccountsContext();
   const { currentSelectedRelayerData } = useExternalServices();
   const isDeposit = selectedHistoryData?.type === EventType.DEPOSIT;

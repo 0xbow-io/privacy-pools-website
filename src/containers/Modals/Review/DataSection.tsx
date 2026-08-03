@@ -36,6 +36,7 @@ export const DataSection = () => {
   const {
     balanceBN: { symbol, decimals },
     price,
+    nativeAssetPrice,
     refetchPrice,
     selectedPoolInfo,
     chainId,
@@ -180,10 +181,10 @@ export const DataSection = () => {
 
   // Net Fee calculation (includes extra gas amount if enabled)
   let netFeeAmount = fees;
-  if (quoteState.extraGas && quoteExtraGasAmountETH && price) {
-    // Convert extraGasAmountETH from wei to token amount
+  if (quoteState.extraGas && quoteExtraGasAmountETH && price && nativeAssetPrice) {
+    // Extra gas is denominated in the native asset; convert to pool-token units via USD prices
     const extraGasETH = parseFloat(formatUnits(BigInt(quoteExtraGasAmountETH), 18));
-    const extraGasInToken = (extraGasETH * price) / parseFloat(formatUnits(parseUnits('1', decimals), decimals));
+    const extraGasInToken = (extraGasETH * nativeAssetPrice) / price;
 
     // Convert to fixed decimal string to avoid scientific notation
     const extraGasAmountBN = parseUnits(extraGasInToken.toFixed(decimals), decimals);
