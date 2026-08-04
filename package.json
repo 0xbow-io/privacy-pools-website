@@ -5,6 +5,7 @@
   "type": "module",
   "license": "MIT",
   "author": "Wonderland",
+  "packageManager": "pnpm@10.34.5",
   "engines": {
     "node": ">=18.17.0"
   },
