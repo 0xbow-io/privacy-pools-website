@@ -69,7 +69,7 @@ const dataServiceConfig: ChainConfig[] = poolsByChain.map((pool) => {
     // Without this the SDK falls back to viem's 10s default, which aborts a
     // chunk well before the proxy route is done with it. Mirrors
     // HYPERSYNC_TIMEOUT_MS in /api/hypersync-rpc.
-    timeout: 30_000,
+    timeout: 60_000,
   };
 });
 
