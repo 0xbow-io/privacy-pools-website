@@ -69,7 +69,7 @@ const dataServiceConfig: ChainConfig[] = poolsByChain.map((pool) => {
     // Without this the SDK falls back to viem's 10s default, which aborts a
     // chunk well before the proxy route is done with it. Mirrors
     // HYPERSYNC_TIMEOUT_MS in /api/hypersync-rpc.
-    timeout: 30_000,
+    timeout: 60_000,
   };
 });
 
@@ -99,7 +99,7 @@ const logFetchConfig = new Map<
     10,
     {
       blockChunkSize: 12000000,
-      concurrency: 1,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
@@ -110,7 +110,7 @@ const logFetchConfig = new Map<
     8453,
     {
       blockChunkSize: 6000000,
-      concurrency: 1,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
@@ -121,7 +121,7 @@ const logFetchConfig = new Map<
     42161,
     {
       blockChunkSize: 48000000,
-      concurrency: 1,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
@@ -132,7 +132,7 @@ const logFetchConfig = new Map<
     56,
     {
       blockChunkSize: 15000000,
-      concurrency: 1,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
