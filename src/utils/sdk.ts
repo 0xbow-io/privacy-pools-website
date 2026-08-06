@@ -83,7 +83,7 @@ const logFetchConfig = new Map<
   [
     1,
     {
-      blockChunkSize: 60000,
+      blockChunkSize: 30000,
       concurrency: 1,
       chunkDelayMs: 0,
       retryOnFailure: true,
