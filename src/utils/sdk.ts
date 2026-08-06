@@ -66,6 +66,10 @@ const dataServiceConfig: ChainConfig[] = poolsByChain.map((pool) => {
     startBlock: pool.deploymentBlock,
     rpcUrl: chainData[pool.chainId].sdkRpcUrl,
     apiKey: 'sdk', // It's not an api key https://viem.sh/docs/clients/public#key-optional
+    // Without this the SDK falls back to viem's 10s default, which aborts a
+    // chunk well before the proxy route is done with it. Mirrors
+    // HYPERSYNC_TIMEOUT_MS in /api/hypersync-rpc.
+    timeout: 30_000,
   };
 });
 
@@ -83,7 +87,7 @@ const logFetchConfig = new Map<
   [
     1,
     {
-      blockChunkSize: 30000,
+      blockChunkSize: 1500000,
       concurrency: 1,
       chunkDelayMs: 0,
       retryOnFailure: true,
@@ -127,7 +131,7 @@ const logFetchConfig = new Map<
   [
     56,
     {
-      blockChunkSize: 10000000,
+      blockChunkSize: 15000000,
       concurrency: 1,
       chunkDelayMs: 0,
       retryOnFailure: true,
