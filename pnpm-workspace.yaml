@@ -1,0 +1,16 @@
+# Supply-chain hardening: refuse to resolve package versions published less
+# than 7 days ago (minutes). Compromised releases are typically caught and
+# unpublished within hours, so a week-old floor avoids them entirely.
+# Requires pnpm >= 10.16 (pinned via the packageManager field).
+minimumReleaseAge: 10080
+
+# Our own packages are bumped and consumed same-day; exempt them from the floor.
+minimumReleaseAgeExclude:
+  - '@0xbow/*'
+
+# pnpm 10 blocks dependency install scripts by default. Cypress ships its
+# platform binary via a postinstall download, so without this the binary is
+# never fetched and `cypress verify` fails in CI. Each entry here is arbitrary
+# code running at install time — keep the list as small as possible.
+onlyBuiltDependencies:
+  - cypress

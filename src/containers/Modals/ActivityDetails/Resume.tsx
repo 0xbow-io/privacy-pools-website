@@ -3,7 +3,7 @@ import { Stack, Typography, styled } from '@mui/material';
 import { formatUnits } from 'viem';
 import { ExtendedTooltip as Tooltip, StatusChip } from '~/components';
 import { getConstants } from '~/config/constants';
-import { useAccountContext, usePoolAccountsContext, useChainContext } from '~/hooks';
+import { useAccountContext, usePoolAccountsContext, useChainContext, useActivityAssetPrice } from '~/hooks';
 import { GlobalEvent, ReviewStatus } from '~/types';
 import { getUsdBalance, getStatus } from '~/utils';
 
@@ -12,10 +12,10 @@ export const Resume = () => {
   const { poolAccounts } = useAccountContext();
   const { selectedHistoryData } = usePoolAccountsContext();
   const {
-    price,
     balanceBN: { decimals: balanceDecimals },
     selectedPoolInfo: { assetDecimals, asset },
   } = useChainContext();
+  const price = useActivityAssetPrice();
 
   const isGlobal = selectedHistoryData && 'pool' in selectedHistoryData;
   const globalEvent = isGlobal ? (selectedHistoryData as unknown as GlobalEvent) : null;

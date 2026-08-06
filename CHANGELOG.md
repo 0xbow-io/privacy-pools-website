@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.8] - 2026-08-06
+
+### Fixed
+
+- Adjusted SDK concurrency
+
+## [2.14.7] - 2026-08-06
+
+### Fixed
+
+- Fixed envio sync issues
+- Bumped SDK version to increase requests timeouts
+
+## [2.14.6] - 2026-08-06
+
+### Fixed
+
+- Fixed envio sync issues
+
+## [2.14.5] - 2026-08-04
+
+### Security
+
+- Pinned all dependencies to exact versions (removed the four remaining caret ranges) so package.json can never float onto a freshly published release
+- Enforced a 7-day minimum release age for dependency resolution (`minimumReleaseAge: 10080`, own `@0xbow/*` packages exempt) in response to the Aug 4 Shai-Hulud npm supply-chain attack — audited the tree and confirmed the app was not affected
+- Pinned pnpm to 10.34.5 via the packageManager field and moved CI off pnpm 9, which still ran dependency lifecycle scripts on install; pnpm 10 blocks them, closing the preinstall-script attack vector
+
+## [2.14.4] - 2026-08-03
+
+### Fixed
+
+- Replaced `bytesToNumber` with `bytesToBigInt` in the Privacy Pools SDK, restoring full 256-bit entropy for all newly generated keys and ensuring new accounts carry the full cryptographic security guarantees intended by the original specification
+
 ## [2.14.3] - 2026-07-03
 
 ### Fixed
@@ -64,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.12.0] - 2026-03-19
 
 ### Added
+
 - Introduced an entropy upgrade flow that allows existing users to easily upgrade their account security
 
 ### Fixed
@@ -135,7 +169,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.8.0] - 2026-01-27
 
-### Added 
+### Added
 
 - f(x)usd rewards claim button
 
