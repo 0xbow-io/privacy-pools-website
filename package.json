@@ -1,7 +1,7 @@
 {
   "name": "privacy-pools-website",
   "private": true,
-  "version": "2.14.6",
+  "version": "2.14.7",
   "type": "module",
   "license": "MIT",
   "author": "Wonderland",
@@ -30,7 +30,7 @@
     "src/**/*.{js,jsx,ts,tsx,css,scss,md,html}": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "@0xbow/privacy-pools-core-sdk": "1.2.0",
+    "@0xbow/privacy-pools-core-sdk": "1.4.0",
     "@carbon/icons-react": "11.52.0",
     "@emotion/cache": "11.13.1",
     "@emotion/react": "11.14.0",
