@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.9] - 2026-08-12
+
+### Security
+
+- Bumped Next.js 15.5.18 → 15.5.23, patching the seven advisories fixed in 15.5.21: two high-severity SSRF issues (Server Actions on custom servers, rewrites via attacker-controlled destination hostname), two DoS issues (Server Actions in App Router, Image Optimization API via SVGs), two response-body cache-confusion issues, an unbounded Server Action payload on the Edge runtime, and unauthenticated disclosure of internal Server Function endpoints
+
 ## [2.14.8] - 2026-08-06
 
 ### Fixed
