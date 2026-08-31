@@ -47,7 +47,7 @@ export const useDeposit = () => {
   const { setModalOpen, setIsClosable } = useModal();
   const { amount, setTransactionHash, vettingFeeBPS, selectedAlternativeToken } = usePoolAccountsContext();
   const [isLoading, setIsLoading] = useState(false);
-  const { accountService, poolAccounts, addPoolAccount } = useAccountContext();
+  const { accountService, poolAccounts, addPoolAccount, isScopeComplete } = useAccountContext();
   const { data: walletClient, refetch: refetchWalletClient } = useWalletClient({ chainId });
   const publicClient = usePublicClient({ chainId });
   const { isSafeApp, createSafeBatchTransaction, sendSafeBatchTransaction, waitForSafeTransaction } =
@@ -141,6 +141,17 @@ export const useDeposit = () => {
 
       if (!selectedPoolInfo.isNativeToken && selectedPoolInfo.asset !== DEFAULT_ASSET) {
         assetAllowance = await allowance(selectedPoolInfo.assetAddress, address, selectedPoolInfo.entryPointAddress);
+      }
+
+      // Refuse to deposit into a scope whose history we could not load. Its
+      // reconstructed state is absent, not empty, so the index derived below
+      // would be understated and could collide with a deposit index already
+      // used on-chain — producing a deposit that later reconstructions skip.
+      if (!isScopeComplete(selectedPoolInfo.scope)) {
+        throw new Error(
+          "This pool's history could not be loaded, so your balance may be incomplete. " +
+            'Reload your account before depositing to avoid creating a deposit that cannot be found later.',
+        );
       }
 
       // Count only pool accounts for the current scope
