@@ -69,7 +69,7 @@ export const useWithdraw = () => {
     selectedRelayer,
   } = useChainContext();
 
-  const { accountService, addWithdrawal } = useAccountContext();
+  const { accountService, addWithdrawal, isScopeComplete } = useAccountContext();
   const publicClient = usePublicClient({ chainId });
 
   const {
@@ -385,6 +385,19 @@ export const useWithdraw = () => {
       const currentProof = proofData || proof;
       const currentWithdrawal = withdrawalData || withdrawal;
       const currentNewSecretKeys = secretKeysData || newSecretKeys;
+
+      // Defense in depth: a scope whose history failed to load has no
+      // reconstructed accounts today, so there is normally nothing to select
+      // and withdraw. Guard anyway — withdrawal secrets are derived from the
+      // account's child count, so acting on partially reconstructed state
+      // would risk reusing a withdrawal index.
+      if (selectedPoolInfo?.scope && !isScopeComplete(selectedPoolInfo.scope)) {
+        throw new Error(
+          "This pool's history could not be loaded, so your balance may be incomplete. " +
+            'Reload your account before withdrawing.',
+        );
+      }
+
       if (!TEST_MODE) {
         const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
 
@@ -550,6 +563,7 @@ export const useWithdraw = () => {
       feeCommitment,
       newSecretKeys,
       accountService,
+      isScopeComplete,
       switchChainAsync,
       chainId,
       publicClient,

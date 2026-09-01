@@ -13,6 +13,7 @@ interface QuoteState {
   isExpired: boolean;
   extraGas: boolean;
   quotedAmount: string | null; // The amount used when the quote was requested
+  quotedRelayerUrl: string | null; // The relayer that produced the quote
   pendingQuoteRequest: boolean; // Flag to trigger quote request when Review screen opens
 }
 
@@ -26,6 +27,7 @@ interface QuoteContextType {
     relayTxCostETH: string | null,
     countdown: number,
     quotedAmount: string,
+    quotedRelayerUrl: string,
   ) => void;
   updateCountdown: (countdown: number) => void;
   resetQuote: () => void;
@@ -48,6 +50,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     isExpired: false,
     extraGas: false,
     quotedAmount: null,
+    quotedRelayerUrl: null,
     pendingQuoteRequest: false,
   });
 
@@ -60,6 +63,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       relayTxCostETH: string | null,
       countdown: number,
       quotedAmount: string,
+      quotedRelayerUrl: string,
     ) => {
       setQuoteState((prev) => ({
         quoteCommitment: commitment,
@@ -71,6 +75,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
         isExpired: countdown <= 0, // Mark as expired immediately if countdown is already 0 (e.g., clock skew)
         extraGas: prev.extraGas, // Preserve current extraGas setting
         quotedAmount,
+        quotedRelayerUrl,
         pendingQuoteRequest: false, // Clear pending request when quote is set
       }));
     },
@@ -96,6 +101,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       isExpired: false,
       extraGas: prev.extraGas, // Preserve extraGas setting when resetting quote
       quotedAmount: null,
+      quotedRelayerUrl: null,
       pendingQuoteRequest: prev.pendingQuoteRequest, // Preserve pending request state
     }));
   }, []);

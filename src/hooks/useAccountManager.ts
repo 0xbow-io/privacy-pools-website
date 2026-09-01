@@ -12,6 +12,7 @@ export function useAccountManager(
   accountServiceRef: RefObject<AccountService | null>,
   legacyAccountServiceRef: RefObject<AccountService | null>,
   chainId: number,
+  setIncompleteScopes: (scopes: string[]) => void,
 ) {
   const createAccount = useCallback(
     (_seed: string) => {
@@ -21,8 +22,10 @@ export function useAccountManager(
       setSeed(_seed);
       accountServiceRef.current = _accountService;
       legacyAccountServiceRef.current = null;
+      // A freshly created account has no history to be incomplete.
+      setIncompleteScopes([]);
     },
-    [setSeed, accountServiceRef, legacyAccountServiceRef],
+    [setSeed, accountServiceRef, legacyAccountServiceRef, setIncompleteScopes],
   );
 
   const loadAccount = async (seed: string) => {
@@ -30,12 +33,17 @@ export function useAccountManager(
       accountService: _accountService,
       legacyAccountService: _legacyAccountService,
       errors,
+      incompleteScopes,
     } = await sdkLoadAccount(seed);
 
-    // Log any errors that occurred during loading
     if (errors.length > 0) {
       console.warn('Some pools failed to load during account initialization:', errors);
     }
+
+    // Record which scopes we could not reconstruct so the UI can block actions
+    // on them. Must be set on every load, including the success case, so a
+    // recovered scope stops being blocked.
+    setIncompleteScopes(incompleteScopes);
 
     accountServiceRef.current = _accountService;
     legacyAccountServiceRef.current = _legacyAccountService;

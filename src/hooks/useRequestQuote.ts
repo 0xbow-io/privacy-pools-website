@@ -17,6 +17,7 @@ interface UseRequestQuoteParams {
   amountBN: bigint;
   assetAddress: Address | undefined;
   recipient: Address | '';
+  relayerUrl: string | undefined;
 
   isValidAmount: boolean;
   isRecipientAddressValid: boolean;
@@ -49,6 +50,7 @@ export const useRequestQuote = ({
   amountBN,
   assetAddress,
   recipient,
+  relayerUrl,
   isValidAmount,
   isRecipientAddressValid,
   isRelayerSelected,
@@ -78,14 +80,24 @@ export const useRequestQuote = ({
       !!recipient &&
       isRecipientAddressValid &&
       isRelayerSelected &&
+      !!relayerUrl &&
       !!assetAddress &&
       chainId !== undefined &&
       amountBN > 0n
     );
-  }, [isValidAmount, recipient, isRecipientAddressValid, isRelayerSelected, assetAddress, chainId, amountBN]);
+  }, [
+    isValidAmount,
+    recipient,
+    isRecipientAddressValid,
+    isRelayerSelected,
+    relayerUrl,
+    assetAddress,
+    chainId,
+    amountBN,
+  ]);
 
   const executeFetchAndSetQuote = useCallback(async () => {
-    if (!canRequestQuote || !chainId || !assetAddress || !recipient || isFetchingRef.current) {
+    if (!canRequestQuote || !chainId || !assetAddress || !recipient || !relayerUrl || isFetchingRef.current) {
       return;
     }
 
@@ -117,6 +129,7 @@ export const useRequestQuote = ({
         newQuoteData.detail?.relayTxCost?.eth || null,
         remainingTime,
         requestedAmount,
+        relayerUrl,
       );
     } catch (err) {
       // If extraGas was requested but the relayer doesn't support it for this chain,
@@ -144,6 +157,7 @@ export const useRequestQuote = ({
             retryData.detail?.relayTxCost?.eth || null,
             remainingTime,
             requestedAmount,
+            relayerUrl,
           );
           return;
         } catch (retryErr) {
@@ -168,6 +182,7 @@ export const useRequestQuote = ({
     amountBN,
     assetAddress,
     recipient,
+    relayerUrl,
     quoteState.extraGas,
     getQuote,
     addNotification,
@@ -251,6 +266,7 @@ export const useRequestQuote = ({
       quoteState.quoteCommitment &&
       quoteState.countdown > 0 &&
       !quoteState.isExpired &&
+      quoteState.quotedRelayerUrl === relayerUrl &&
       currentQuoteId &&
       currentQuoteId !== currentQuoteIdRef.current &&
       !globalTimerInstanceActive
@@ -258,16 +274,25 @@ export const useRequestQuote = ({
       startTimer(currentQuoteId, quoteState.countdown);
     }
 
-    if (!quoteState.quoteCommitment) {
+    if (!quoteState.quoteCommitment || quoteState.quotedRelayerUrl !== relayerUrl) {
       stopTimer();
     }
 
     return stopTimer;
-  }, [quoteState.quoteCommitment?.signedRelayerCommitment, quoteState.isExpired]);
+  }, [
+    quoteState.quoteCommitment?.signedRelayerCommitment,
+    quoteState.isExpired,
+    quoteState.quotedRelayerUrl,
+    relayerUrl,
+  ]);
 
   const isQuoteValid = useMemo(
-    () => quoteState.quoteCommitment !== null && quoteState.countdown > 0 && !quoteState.isExpired,
-    [quoteState.quoteCommitment, quoteState.countdown, quoteState.isExpired],
+    () =>
+      quoteState.quoteCommitment !== null &&
+      quoteState.countdown > 0 &&
+      !quoteState.isExpired &&
+      quoteState.quotedRelayerUrl === relayerUrl,
+    [quoteState.quoteCommitment, quoteState.countdown, quoteState.isExpired, quoteState.quotedRelayerUrl, relayerUrl],
   );
 
   const requestNewQuote = useCallback(async () => {

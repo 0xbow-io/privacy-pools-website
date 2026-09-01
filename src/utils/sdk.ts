@@ -19,6 +19,7 @@ import {
   PoolInfo,
   PoolEventsError,
 } from '@0xbow/privacy-pools-core-sdk';
+import { captureException, withScope } from '@sentry/nextjs';
 import { createPublicClient, Hex } from 'viem';
 import { ChainData, chainData, whitelistedChains } from '~/config';
 import { transports } from '~/config/wagmiConfig';
@@ -66,6 +67,10 @@ const dataServiceConfig: ChainConfig[] = poolsByChain.map((pool) => {
     startBlock: pool.deploymentBlock,
     rpcUrl: chainData[pool.chainId].sdkRpcUrl,
     apiKey: 'sdk', // It's not an api key https://viem.sh/docs/clients/public#key-optional
+    // Without this the SDK falls back to viem's 10s default, which aborts a
+    // chunk well before the proxy route is done with it. Mirrors
+    // HYPERSYNC_TIMEOUT_MS in /api/hypersync-rpc.
+    timeout: 60_000,
   };
 });
 
@@ -83,7 +88,7 @@ const logFetchConfig = new Map<
   [
     1,
     {
-      blockChunkSize: 1250000,
+      blockChunkSize: 1500000,
       concurrency: 1,
       chunkDelayMs: 0,
       retryOnFailure: true,
@@ -95,7 +100,7 @@ const logFetchConfig = new Map<
     10,
     {
       blockChunkSize: 12000000,
-      concurrency: 1,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
@@ -106,7 +111,7 @@ const logFetchConfig = new Map<
     8453,
     {
       blockChunkSize: 6000000,
-      concurrency: 1,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
@@ -117,7 +122,7 @@ const logFetchConfig = new Map<
     42161,
     {
       blockChunkSize: 48000000,
-      concurrency: 1,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
@@ -127,8 +132,8 @@ const logFetchConfig = new Map<
   [
     56,
     {
-      blockChunkSize: 10000000,
-      concurrency: 1,
+      blockChunkSize: 15000000,
+      concurrency: 2,
       chunkDelayMs: 0,
       retryOnFailure: true,
       maxRetries: 3,
@@ -221,21 +226,45 @@ export const loadAccount = async (
   accountService: AccountService;
   legacyAccountService: AccountService | null;
   errors: PoolEventsError[];
+  incompleteScopes: string[];
 }> => {
   const result = await AccountService.initializeWithEvents(dataService, { mnemonic: seed }, pools);
 
-  // Log any errors that occurred during event fetching
+  // Scopes whose event history failed to load. Reconstructed state for these is
+  // ABSENT, not empty: the account may hold notes we cannot see, and any deposit
+  // index inferred from the visible count would collide with one already in use
+  // on-chain. Callers must block account actions for these scopes rather than
+  // treating them as scopes with no accounts.
+  const incompleteScopes = [...new Set(result.errors.map((error) => error.scope.toString()))];
+
   if (result.errors.length > 0) {
     console.warn('Some pools failed to load:', result.errors);
+
+    // Previously console-only, so we had no telemetry on how often this fires.
+    withScope((scope) => {
+      scope.setLevel('error');
+      scope.setContext('poolLoad', {
+        incompleteScopes,
+        reasons: result.errors.map((error) => error.reason),
+      });
+      captureException(new Error(`Pool event history failed to load for ${result.errors.length} scope(s)`));
+    });
   }
 
   return {
     accountService: result.account,
     legacyAccountService: result.legacyAccount ?? null,
     errors: result.errors,
+    incompleteScopes,
   };
 };
 
+// TODO(sdk@1.5.0): drop the `index` argument and let the SDK derive it. On 1.4.0
+// the SDK infers the next index from `poolAccounts.length`, which is the same
+// unsafe derivation as computing it here; the incomplete-scope guard in
+// useDeposit is what actually prevents the collision today. Once 1.5.0 lands the
+// SDK records `depositIndex` per account, derives the next index from it, and
+// throws for an incomplete scope on its own.
 export const createDepositSecrets = (accountService: AccountService, scope: Hash, index: bigint) => {
   return accountService.createDepositSecrets(scope, index);
 };
