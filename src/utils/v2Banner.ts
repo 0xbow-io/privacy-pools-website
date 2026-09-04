@@ -9,6 +9,11 @@ export const V2_APP_URL = (process.env.NEXT_PUBLIC_V2_URL || 'https://v2.privacy
 
 export const V2_BANNER_DISMISSED_KEY = 'v2-invite-banner-dismissed-at';
 
+/** The per-deposit cap V2 runs with while in preview, as shown in the banner.
+ *  NEXT_PUBLIC_V2_DEPOSIT_CAP="" hides the sentence once the cap is lifted. */
+export const V2_DEPOSIT_CAP_LABEL =
+  process.env.NEXT_PUBLIC_V2_DEPOSIT_CAP === undefined ? '$100' : process.env.NEXT_PUBLIC_V2_DEPOSIT_CAP;
+
 /** A dismissal is an invitation declined, not a permanent opt-out: it comes
  *  back after this many days so a returning user hears about V2 again. */
 export const V2_BANNER_DISMISS_DAYS = 14;

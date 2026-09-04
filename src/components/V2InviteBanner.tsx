@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { alpha, Box, IconButton, keyframes, styled, Typography } from '@mui/material';
-import { shouldShowV2Banner, V2_BANNER_DISMISSED_KEY, V2_BANNER_ENABLED, v2BannerHref } from '~/utils/v2Banner';
+import {
+  shouldShowV2Banner,
+  V2_BANNER_DISMISSED_KEY,
+  V2_BANNER_ENABLED,
+  V2_DEPOSIT_CAP_LABEL,
+  v2BannerHref,
+} from '~/utils/v2Banner';
 
 /**
  * Invitation to try Privacy Pools V2, at the very top of the page.
@@ -61,12 +67,13 @@ export const V2InviteBanner = () => {
   if (!visible) return null;
 
   return (
-    <Root ref={bannerRef} role='region' aria-label='Privacy Pools V2 is live' data-testid='v2-invite-banner'>
+    <Root ref={bannerRef} role='region' aria-label='Privacy Pools V2 is live in preview' data-testid='v2-invite-banner'>
       <Content>
-        <Tag>New</Tag>
+        <Tag>Preview</Tag>
         <Copy variant='body2'>
-          <strong>Privacy Pools V2 is live.</strong>
-          <span> Shield, send, swap, withdraw and earn. Provably clean, privately yours.</span>
+          <strong>Privacy Pools V2 is live in preview.</strong>
+          <span> Shield, send, swap, withdraw and earn.</span>
+          {V2_DEPOSIT_CAP_LABEL && <span> Deposits capped at {V2_DEPOSIT_CAP_LABEL} for now.</span>}
         </Copy>
         <Cta href={v2BannerHref()} target='_blank' rel='noopener noreferrer'>
           Try V2
