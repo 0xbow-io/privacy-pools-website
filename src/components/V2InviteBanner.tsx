@@ -13,14 +13,17 @@ import {
 } from '~/utils/v2Banner';
 
 /**
- * Invitation to try Privacy Pools V2, at the very top of the page.
+ * Invitation to try the Privacy Pools V2 preview, at the very top of the page.
  *
- * Monochrome on purpose: the site is black-and-white IBM Plex Mono, so the
- * banner borrows the theme's grey scale (a soft gradient one step off the page
- * background) rather than a coloured stripe, and gets its "look at me" from a
- * single high-contrast button and a slow shimmer along its bottom rule. The
- * shimmer is off under prefers-reduced-motion. Dismissal is remembered for a
- * fortnight (utils/v2Banner.ts), and the banner publishes its height as
+ * ONE line at every width (Pat, 2026-09-04): the copy never wraps. Desktop
+ * reads the full sentence with the deposit cap; below the md breakpoint the
+ * detail drops; on phones only "V2 is live on mainnet (preview)" and the
+ * button remain. Monochrome on purpose: the site is black-and-white IBM Plex
+ * Mono, so the banner borrows the theme's grey scale (a soft gradient one step
+ * off the page background) and gets its emphasis from a single high-contrast
+ * button and a slow shimmer along its bottom rule (off under
+ * prefers-reduced-motion). Dismissal is remembered for a fortnight
+ * (utils/v2Banner.ts), and the banner publishes its height as
  * --v2-banner-height so the fixed mobile header keeps content below it, the
  * same contract the maintenance and migration banners use.
  */
@@ -67,21 +70,32 @@ export const V2InviteBanner = () => {
   if (!visible) return null;
 
   return (
-    <Root ref={bannerRef} role='region' aria-label='Privacy Pools V2 is live in preview' data-testid='v2-invite-banner'>
-      <Content>
-        <Tag>Preview</Tag>
-        <Copy variant='body2'>
-          <strong>Privacy Pools V2 is live in preview.</strong>
-          <span> Shield, send, swap, withdraw and earn.</span>
-          {V2_DEPOSIT_CAP_LABEL && <span> Deposits capped at {V2_DEPOSIT_CAP_LABEL} for now.</span>}
-        </Copy>
-        <Cta href={v2BannerHref()} target='_blank' rel='noopener noreferrer'>
-          Try V2
-          <ArrowForwardRoundedIcon sx={{ fontSize: '1.5rem' }} />
-        </Cta>
-      </Content>
+    <Root
+      ref={bannerRef}
+      role='region'
+      aria-label='Privacy Pools V2 is live on mainnet in preview'
+      data-testid='v2-invite-banner'
+    >
+      <Tag>Preview</Tag>
+      <Copy variant='body2'>
+        <Wide>
+          <strong>Privacy Pools V2 is live on mainnet.</strong>
+          <Detail>
+            {' '}
+            Shield, send, swap, withdraw and earn.
+            {V2_DEPOSIT_CAP_LABEL ? ` Deposits capped at ${V2_DEPOSIT_CAP_LABEL} for now.` : ''}
+          </Detail>
+        </Wide>
+        <Narrow>
+          <strong>V2 is live on mainnet</strong> (preview)
+        </Narrow>
+      </Copy>
+      <Cta href={v2BannerHref()} target='_blank' rel='noopener noreferrer'>
+        Try V2
+        <ArrowForwardRoundedIcon sx={{ fontSize: '1.4rem' }} />
+      </Cta>
       <Dismiss size='small' onClick={handleDismiss} aria-label='Dismiss the Privacy Pools V2 invitation'>
-        <CloseRoundedIcon fontSize='small' />
+        <CloseRoundedIcon sx={{ fontSize: '1.6rem' }} />
       </Dismiss>
       <Shimmer aria-hidden='true' />
     </Root>
@@ -103,56 +117,75 @@ const Root = styled(Box)(({ theme }) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexWrap: 'nowrap',
     gap: '1.2rem',
-    padding: '1rem 5.6rem 1rem 2rem',
+    minHeight: '3.6rem',
+    padding: '0.5rem 4.4rem 0.5rem 1.6rem',
     overflow: 'hidden',
     background: `linear-gradient(90deg, ${from} 0%, ${to} 50%, ${from} 100%)`,
     borderBottom: `1px solid ${theme.palette.divider}`,
     color: theme.palette.text.primary,
     [theme.breakpoints.down('sm')]: {
-      padding: '1rem 4.8rem 1rem 1.6rem',
+      gap: '0.8rem',
+      padding: '0.4rem 3.8rem 0.4rem 1.2rem',
+      justifyContent: 'flex-start',
     },
   };
 });
 
-const Content = styled('div')(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexWrap: 'wrap',
-  gap: '1.2rem 1.6rem',
-  maxWidth: '112rem',
-  [theme.breakpoints.down('sm')]: {
-    gap: '0.8rem 1.2rem',
-  },
-}));
-
 const Tag = styled('span')(({ theme }) => ({
   flex: 'none',
-  fontSize: '1rem',
+  fontSize: '0.95rem',
   fontWeight: 600,
   letterSpacing: '0.18em',
   textTransform: 'uppercase',
   lineHeight: 1,
-  padding: '0.5rem 0.7rem 0.4rem',
+  padding: '0.45rem 0.6rem 0.35rem',
   border: `1px solid ${theme.palette.text.primary}`,
   color: theme.palette.text.primary,
   borderRadius: theme.borderRadius?.sm ?? '4px',
+  [theme.breakpoints.down('sm')]: {
+    display: 'none',
+  },
 }));
 
+// The copy is a single line everywhere: it may shed detail, never wrap.
 const Copy = styled(Typography)(({ theme }) => ({
   margin: 0,
-  fontSize: '1.4rem',
-  lineHeight: 1.45,
+  minWidth: 0,
+  fontSize: '1.3rem',
+  lineHeight: 1.3,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
   color: theme.palette.text.secondary,
   '& strong': {
     color: theme.palette.text.primary,
     fontWeight: 600,
   },
   [theme.breakpoints.down('sm')]: {
-    fontSize: '1.3rem',
-    flexBasis: '100%',
-    textAlign: 'center',
+    fontSize: '1.2rem',
+    flex: 1,
+  },
+}));
+
+const Wide = styled('span')(({ theme }) => ({
+  [theme.breakpoints.down('sm')]: {
+    display: 'none',
+  },
+}));
+
+const Narrow = styled('span')(({ theme }) => ({
+  display: 'none',
+  [theme.breakpoints.down('sm')]: {
+    display: 'inline',
+  },
+}));
+
+// The second sentence goes first when width gets tight (tablets).
+const Detail = styled('span')(({ theme }) => ({
+  [theme.breakpoints.down('md')]: {
+    display: 'none',
   },
 }));
 
@@ -160,11 +193,12 @@ const Cta = styled('a')(({ theme }) => ({
   flex: 'none',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: '0.6rem',
-  padding: '0.7rem 1.2rem 0.7rem 1.4rem',
-  fontSize: '1.3rem',
+  gap: '0.5rem',
+  padding: '0.5rem 0.9rem 0.5rem 1.1rem',
+  fontSize: '1.2rem',
   fontWeight: 600,
   lineHeight: 1,
+  whiteSpace: 'nowrap',
   textDecoration: 'none',
   color: theme.palette.background.default,
   backgroundColor: theme.palette.text.primary,
@@ -187,13 +221,16 @@ const Cta = styled('a')(({ theme }) => ({
 
 const Dismiss = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
-  right: '1.2rem',
+  right: '1rem',
   top: '50%',
   transform: 'translateY(-50%)',
   color: theme.palette.text.secondary,
-  padding: '0.4rem',
+  padding: '0.3rem',
   '&:hover': {
     color: theme.palette.text.primary,
+  },
+  [theme.breakpoints.down('sm')]: {
+    right: '0.6rem',
   },
 }));
 
