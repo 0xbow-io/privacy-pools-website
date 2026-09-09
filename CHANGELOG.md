@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.10] - 2026-09-09
+
+### Security
+
+- Bumped Next.js 15.5.23 -> 15.5.25, patching two critical unauthenticated remote-code-execution advisories fixed in 15.5.24: GHSA-2xp9-vwfh-vxw4 (Image Optimization API, via AVIF files) and GHSA-p293-qw3h-jr36 / CVE-2026-75604 (windows-hosted servers). Dependency change only, no source changes
+
 ## [2.14.9] - 2026-08-12
 
 ### Security
