@@ -93,7 +93,7 @@ export const AmountInputSection = ({
             ? 'Loading anonymity set...'
             : anonymitySet !== null && anonymitySet !== undefined
               ? `Your anonymity set is ${anonymitySet}`
-              : null}
+              : 'Anonymity set unavailable'}
         </AnonymitySetText>
       )}
 

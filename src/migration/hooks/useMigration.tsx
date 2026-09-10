@@ -23,7 +23,8 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
   const { isConnected, isLogged, logout } = useAuthContext();
   const { addNotification } = useNotifications();
   const { setModalOpen, modalOpen, setIsClosable } = useModal();
-  const { accountService, legacyAccountService, precomputedDeclinedLabels } = useAccountContext();
+  const { accountService, legacyAccountService, precomputedDeclinedLabels, loadLegacyReviewStatuses } =
+    useAccountContext();
   const { submitMigration } = useMigrationRelayer();
   const goTo = useGoTo();
 
@@ -56,15 +57,19 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
       return;
     }
 
-    if (!precomputedDeclinedLabels) return;
-
-    declinedLabelsRef.current = precomputedDeclinedLabels;
-
+    // New accounts and already migrated accounts need no legacy ASP lookup.
+    // Only unresolved legacy balances require the explicit migration action.
+    const labels = precomputedDeclinedLabels ?? new Set<string>();
     const readiness = buildMigrationReadinessSnapshot({
       accountService,
       legacyAccountService,
-      declinedLabels: precomputedDeclinedLabels,
+      declinedLabels: labels,
     });
+    if (!precomputedDeclinedLabels && readiness.requiresMigration && !readiness.isFullyMigrated) {
+      setMigrationReadiness(null);
+      return;
+    }
+    declinedLabelsRef.current = labels;
     setMigrationReadiness(readiness);
   }, [accountService, canBuildMigrationReadiness, legacyAccountService, precomputedDeclinedLabels]);
 
@@ -134,8 +139,7 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
     if (isCompletingMigration) return;
     if (isMigrationInFlightRef.current) return;
 
-    // Fail closed while readiness is unresolved, but only execute once migration is confirmed.
-    if (!migrationReadiness || !requiresRealMigration || !accountService || !legacyAccountService) return;
+    if (!accountService || !legacyAccountService) return;
 
     isMigrationInFlightRef.current = true;
     hasDeferredInvalidationRef.current = false;
@@ -144,6 +148,21 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
       setFlowState('migrating');
       setErrorMessage(null);
       setRetryCount(0);
+
+      // Label-keyed legacy requests start only after Continue with Migration.
+      const labels = await loadLegacyReviewStatuses();
+      if (hasDeferredInvalidationRef.current) return;
+      declinedLabelsRef.current = labels;
+      const readiness = buildMigrationReadinessSnapshot({
+        accountService,
+        legacyAccountService,
+        declinedLabels: labels,
+      });
+      setMigrationReadiness(readiness);
+      if (!readiness.requiresMigration || readiness.isFullyMigrated) {
+        setFlowState('intro');
+        return;
+      }
 
       await executeMigrationFlow({
         accountService,
@@ -183,9 +202,8 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
     runtime.maxBackoffMs,
     runtime.maxRetries,
     legacyAccountService,
-    migrationReadiness,
+    loadLegacyReviewStatuses,
     resetMigrationFlowState,
-    requiresRealMigration,
     submitMigration,
   ]);
 
