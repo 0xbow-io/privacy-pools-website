@@ -43,16 +43,23 @@ interface PoolStatsResponse {
 interface PoolDepositSummary {
   label: string;
   amount: string;
+  id?: number;
+  eventStatus?: string;
+  // Must describe the latest decision, never an arbitrary historical approval.
+  reviewStatus?: string;
 }
 
 // Shape of GET /:chainId/public/deposits (paginated).
 interface DepositsPageResponse {
   page: number;
   perPage: number;
-  total: number;
+  total?: number;
   depositEvents: Array<{
     label?: string | null;
     publicAmount?: string | null;
+    id?: number;
+    eventStatus?: string;
+    reviewStatus?: string;
   }>;
 }
 
@@ -135,6 +142,13 @@ const postWithBody = async <T>(url: string, body: unknown): Promise<T> => {
   return response.json();
 };
 
+const validateLeaves = (leaves: unknown): string[] => {
+  if (!Array.isArray(leaves) || leaves.some((leaf) => typeof leaf !== 'string' || !/^[0-9]+$/.test(leaf))) {
+    throw new Error('Invalid ASP leaf snapshot');
+  }
+  return leaves.map((leaf) => BigInt(leaf).toString());
+};
+
 const aspClient = {
   fetchPoolInfo: (aspUrl: string, chainId: number, scope: string) =>
     fetchWithHeaders<PoolResponse>(`${aspUrl}/${chainId}/public/pool-info`, {
@@ -163,10 +177,12 @@ const aspClient = {
       'X-Pool-Scope': scope,
     }),
 
-  fetchMtLeaves: (aspUrl: string, chainId: number, scope: string) =>
-    fetchWithHeaders<MtLeavesResponse>(`${aspUrl}/${chainId}/public/mt-leaves`, {
+  fetchMtLeaves: async (aspUrl: string, chainId: number, scope: string): Promise<MtLeavesResponse> => {
+    const data = await fetchWithHeaders<MtLeavesResponse>(`${aspUrl}/${chainId}/public/mt-leaves`, {
       'X-Pool-Scope': scope,
-    }),
+    });
+    return { aspLeaves: validateLeaves(data?.aspLeaves), stateTreeLeaves: validateLeaves(data?.stateTreeLeaves) };
+  },
 
   fetchPoolStats: (aspUrl: string, chainId: number | 'all') =>
     fetchWithHeaders<PoolStatsResponse>(`${aspUrl}/${chainId}/public/pools-stats`),
@@ -174,46 +190,98 @@ const aspClient = {
   fetchGlobalEvents: (aspUrl: string, page = 1, perPage = ITEMS_PER_PAGE) =>
     fetchWithHeaders<GlobalEventsResponse>(`${aspUrl}/global/public/events?page=${page}&perPage=${perPage}`),
 
-  // Caller-independent bulk deposit feed.
-  //
-  // Replaces the old `deposits-larger-than?amount=` call. That endpoint took the
-  // amount the user was about to withdraw, so the ASP learned the withdrawal
-  // value seconds before the matching `Withdrawn` event appeared on chain, from
-  // a session that had already identified the caller's deposits. This feed is
-  // the same for every caller: the client downloads the pool's deposits once and
-  // answers "how many deposits are >= X?" locally, so no amount leaves the
-  // browser.
-  //
-  // `/public/deposits` is paginated and caps perPage at 100 server-side, so page
-  // until `total` is covered. `maxPages` is a runaway guard, not a policy: if it
-  // trips we return what we have and the caller falls back to the leaf count.
+  // Caller-independent, 1-based feed. Fetch bounded batches and require a
+  // terminal short page; totals alone are not reliable evidence of completion.
+  // Any failure or inconsistent snapshot rejects the entire result.
   fetchAllPoolDeposits: async (
     aspUrl: string,
     chainId: number,
     scope: string,
     maxPages = 100,
   ): Promise<PoolDepositSummary[]> => {
+    if (!Number.isSafeInteger(maxPages) || maxPages < 1) throw new Error('Invalid page limit');
     const perPage = 100;
     const collected: PoolDepositSummary[] = [];
+    const seenLabels = new Set<string>();
+    const seenIds = new Set<number>();
+    let total: number | undefined;
+    let rows = 0;
 
-    for (let page = 1; page <= maxPages; page++) {
-      const response = await fetchWithHeaders<DepositsPageResponse>(
-        `${aspUrl}/${chainId}/public/deposits?page=${page}&perPage=${perPage}`,
-        { 'X-Pool-Scope': scope },
+    for (let firstPage = 1; firstPage <= maxPages; ) {
+      // Start with one page so small pools only cost one request. Thereafter
+      // use at most five concurrent requests, including a terminal probe.
+      const lastExpectedPage = total === undefined ? maxPages : Math.floor(total / perPage) + 1;
+      const batchSize = firstPage === 1 ? 1 : Math.min(5, Math.max(1, lastExpectedPage - firstPage + 1));
+      const pages = Array.from({ length: Math.min(batchSize, maxPages - firstPage + 1) }, (_, i) => firstPage + i);
+      const responses = await Promise.allSettled(
+        pages.map((page) =>
+          fetchWithHeaders<DepositsPageResponse>(
+            `${aspUrl}/${chainId}/public/deposits?page=${page}&perPage=${perPage}`,
+            { 'X-Pool-Scope': scope },
+          ),
+        ),
       );
-
-      const events = response.depositEvents ?? [];
-      for (const event of events) {
-        if (event.label === undefined || event.label === null) continue;
-        if (event.publicAmount === undefined || event.publicAmount === null) continue;
-        collected.push({ label: event.label.toString(), amount: event.publicAmount.toString() });
+      for (const [index, result] of responses.entries()) {
+        if (result.status === 'rejected') throw new Error('Deposit snapshot unavailable');
+        const response = result.value;
+        if (
+          !response ||
+          response.page !== pages[index] ||
+          response.perPage !== perPage ||
+          !Array.isArray(response.depositEvents) ||
+          response.depositEvents.length > perPage
+        ) {
+          throw new Error('Invalid deposit page');
+        }
+        if (response.total !== undefined) {
+          if (
+            !Number.isSafeInteger(response.total) ||
+            response.total < 0 ||
+            (total !== undefined && total !== response.total)
+          )
+            throw new Error('Inconsistent deposit total');
+          total = response.total;
+        }
+        const events = response.depositEvents;
+        // This feed is used for the privacy indicator. The current ASP omits the
+        // latest review decision, so stop early rather than downloading dozens
+        // of pages that still cannot produce a safe count.
+        if (events.some((event) => !event || typeof event.reviewStatus !== 'string')) {
+          throw new Error('Latest deposit review status unavailable');
+        }
+        rows += events.length;
+        for (const event of events) {
+          if (!event || typeof event !== 'object') throw new Error('Invalid deposit row');
+          if (event.id !== undefined) {
+            if (!Number.isSafeInteger(event.id) || seenIds.has(event.id))
+              throw new Error('Duplicate or invalid deposit ID');
+            seenIds.add(event.id);
+          }
+          if (event.label == null || event.publicAmount == null) continue;
+          if (typeof event.label !== 'string' || !/^[0-9]+$/.test(event.label))
+            throw new Error('Invalid deposit label');
+          const label = BigInt(event.label).toString();
+          if (seenLabels.has(label)) throw new Error('Duplicate deposit label');
+          seenLabels.add(label);
+          // Numeric JSON amounts may already have lost wei precision.
+          if (typeof event.publicAmount !== 'string') throw new Error('Invalid deposit amount');
+          collected.push({
+            label,
+            amount: event.publicAmount,
+            id: event.id,
+            eventStatus: event.eventStatus,
+            reviewStatus: event.reviewStatus,
+          });
+        }
+        if (events.length < perPage) {
+          if (total !== undefined && rows !== total) throw new Error('Incomplete deposit snapshot');
+          return collected;
+        }
+        if (total !== undefined && rows > total) throw new Error('Inconsistent deposit total');
       }
-
-      if (events.length < perPage) break;
-      if (typeof response.total === 'number' && collected.length >= response.total) break;
+      firstPage += pages.length;
     }
-
-    return collected;
+    throw new Error('Deposit snapshot exceeds page limit');
   },
 
   fetchPoolStatistics: (aspUrl: string, chainId: number, scope: string) =>
@@ -233,7 +301,11 @@ const aspClient = {
     ),
 
   // Brevis ASP endpoints
-  fetchBrevisAspLeaves: (brevisAspUrl: string) => fetchWithHeaders<BrevisAspLeavesResponse>(`${brevisAspUrl}/leaves`),
+  fetchBrevisAspLeaves: async (brevisAspUrl: string): Promise<BrevisAspLeavesResponse> => {
+    const data = await fetchWithHeaders<BrevisAspLeavesResponse>(`${brevisAspUrl}/leaves`);
+    if (!data || data.err != null) throw new Error('Brevis approval snapshot unavailable');
+    return { ...data, aspLeaves: validateLeaves(data.aspLeaves) };
+  },
 
   fetchBrevisAspRoot: (brevisAspUrl: string) => fetchWithHeaders<BrevisAspRootResponse>(`${brevisAspUrl}/root`),
 

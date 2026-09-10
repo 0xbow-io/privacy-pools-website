@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { addBreadcrumb, captureException, withScope } from '@sentry/nextjs';
+import { captureException, withScope } from '@sentry/nextjs';
 import { getAddress, Hex, parseUnits, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
 import { usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
@@ -97,7 +97,7 @@ export const useWithdraw = () => {
   const stateLeaves = aspData.mtLeavesData?.stateTreeLeaves;
 
   const logErrorToSentry = useCallback(
-    (error: Error | unknown, context: Record<string, unknown>) => {
+    (error: Error | unknown) => {
       // Filter out expected user behavior errors
       if (error && typeof error === 'object') {
         const message = (error as { message?: string }).message || '';
@@ -129,23 +129,9 @@ export const useWithdraw = () => {
       }
 
       withScope((scope) => {
-        // Deliberately no user identity and no transaction detail.
-        //
-        // This block used to attach the connected wallet address, the withdrawal
-        // amount and the recipient address to every failed withdrawal, which
-        // handed our error backend the same depositor-to-recipient link the pool
-        // exists to hide -- for the subset of users unlucky enough to hit an
-        // error. beforeSend in instrumentation-client.ts filters by error type
-        // only and never scrubbed any of it.
-        //
-        // What stays is the shape of the failure, which is what actually makes a
-        // report actionable: which chain, which pool, and which inputs were
-        // present. If you add a field here, ask whether it identifies a person
-        // or a transaction; if it does, it does not belong in telemetry.
+        // Discard inherited breadcrumbs and identity before recording flags.
+        scope.clear();
         scope.setContext('withdrawal_context', {
-          chainId,
-          poolAddress: selectedPoolInfo?.address,
-          entryPointAddress: selectedPoolInfo?.entryPointAddress,
           hasAmount: !!amount,
           hasTarget: !!target,
           hasPoolAccount: !!poolAccount,
@@ -153,9 +139,7 @@ export const useWithdraw = () => {
           hasAspLeaves: !!aspLeaves,
           hasStateLeaves: !!stateLeaves,
           hasSelectedRelayer: !!selectedRelayer?.url,
-          relayerUrl: selectedRelayer?.url,
           testMode: TEST_MODE,
-          ...context,
         });
 
         // Set tags for filtering
@@ -164,21 +148,10 @@ export const useWithdraw = () => {
         scope.setTag('test_mode', TEST_MODE.toString());
 
         // Log the error
-        captureException(error);
+        captureException(new Error('Withdrawal operation failed'));
       });
     },
-    [
-      chainId,
-      selectedPoolInfo?.address,
-      selectedPoolInfo?.entryPointAddress,
-      selectedRelayer,
-      amount,
-      target,
-      poolAccount,
-      commitment,
-      aspLeaves,
-      stateLeaves,
-    ],
+    [chainId, selectedRelayer, amount, target, poolAccount, commitment, aspLeaves, stateLeaves],
   );
 
   const getPrivacyPoolErrorMessage = useCallback((errorMessage: string): string | null => {
@@ -254,7 +227,6 @@ export const useWithdraw = () => {
       let poolScope: Hash | bigint | undefined;
       let stateMerkleProof: Awaited<ReturnType<typeof getMerkleProof>>;
       let aspMerkleProof: Awaited<ReturnType<typeof getMerkleProof>>;
-      let merkleProofGenerated = false;
 
       try {
         const newWithdrawal = prepareWithdrawRequest(
@@ -281,7 +253,6 @@ export const useWithdraw = () => {
           secret,
           nullifier,
         );
-        if (aspMerkleProof && stateMerkleProof) merkleProofGenerated = true;
 
         // Use worker for progress updates, but still call actual SDK for proof generation
         const workerPromise = new Promise((resolve, reject) => {
@@ -347,13 +318,7 @@ export const useWithdraw = () => {
         const error = err as TransactionExecutionError;
 
         // Log proof generation error to Sentry
-        logErrorToSentry(error, {
-          operation_step: 'proof_generation',
-          error_type: error?.name || 'unknown',
-          has_pool_scope: !!poolScope,
-          merkle_proof_generated: merkleProofGenerated,
-          proof_verified: false,
-        });
+        logErrorToSentry(error);
 
         const errorMessage = getDefaultErrorMessage(error?.shortMessage || error?.message);
         addNotification('error', errorMessage);
@@ -436,12 +401,7 @@ export const useWithdraw = () => {
             const errorMessage = privacyPoolError || res.error || 'Relay failed';
 
             // Log relayer error to Sentry
-            logErrorToSentry(new Error(errorMessage), {
-              operation_step: 'relayer_execution',
-              relayer_error: res.error,
-              relayer_success: res.success,
-              scope: poolScope.toString(),
-            });
+            logErrorToSentry(new Error(errorMessage));
 
             throw new Error(errorMessage);
           }
@@ -496,32 +456,11 @@ export const useWithdraw = () => {
             txHash: res.txHash as Hex,
           });
 
-          // Log successful withdrawal to Sentry for analytics
-          addBreadcrumb({
-            message: 'Withdrawal successful',
-            category: 'transaction',
-            data: {
-              transactionHash: res.txHash,
-              blockNumber: receipt.blockNumber.toString(),
-              value: _value.toString(),
-            },
-            level: 'info',
-          });
-
           setModalOpen(ModalType.SUCCESS);
         } catch (err) {
           const error = err as TransactionExecutionError;
 
-          // Log withdrawal error to Sentry with full context
-          logErrorToSentry(error, {
-            operation_step: 'withdrawal_execution',
-            error_type: error?.name || 'unknown',
-            short_message: error?.shortMessage,
-            has_proof: !!currentProof,
-            has_withdrawal: !!currentWithdrawal,
-            has_new_secret_keys: !!currentNewSecretKeys,
-            pool_scope: poolScope?.toString(),
-          });
+          logErrorToSentry(error);
 
           // Try to get a user-friendly error message
           const privacyPoolError = getPrivacyPoolErrorMessage(error?.shortMessage || error?.message || '');

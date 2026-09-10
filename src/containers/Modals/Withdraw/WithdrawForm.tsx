@@ -1,9 +1,8 @@
 'use client';
 
-import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
+import { ChangeEvent, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Copy, Checkmark } from '@carbon/icons-react';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
   Box,
@@ -16,16 +15,12 @@ import {
   Stack,
   styled,
   TextField,
-  Avatar,
-  Tooltip,
   Typography,
-  useTheme,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
-import { useEnsAddress, useEnsAvatar, useEnsName, useSwitchChain } from 'wagmi';
+import { useSwitchChain } from 'wagmi';
 import { chainData, allPoolsChainData } from '~/config';
-import { getAspEndpointForChain } from '~/config/env';
 import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useQuoteContext } from '~/contexts/QuoteContext';
@@ -38,15 +33,8 @@ import {
   useExternalServices,
 } from '~/hooks';
 import { ModalType, ReviewStatus } from '~/types';
-import {
-  aspClient,
-  countDepositsAtLeast,
-  getUsdBalance,
-  mergeAndSortAspLeaves,
-  relayerClient,
-  truncateAddress,
-  useClipboard,
-} from '~/utils';
+import { aspClient, countDepositsAtLeast, getUsdBalance, relayerClient } from '~/utils';
+import { approvedLabelSet } from '~/utils/accountStatus';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -55,9 +43,8 @@ import { RelayerSelectorSection } from './RelayerSelectorSection';
 const minWithdrawCache = new Map<string, string>();
 
 export const WithdrawForm = () => {
-  const { setModalOpen } = useModal();
+  const { setModalOpen, modalOpen } = useModal();
   const { addNotification } = useNotifications();
-  const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -65,6 +52,7 @@ export const WithdrawForm = () => {
     balanceBN: { symbol, decimals: balanceDecimals },
     selectedPoolInfo,
     chainId,
+    chain: { aspUrl },
     selectedRelayer,
     setSelectedRelayer,
     relayersData,
@@ -77,7 +65,7 @@ export const WithdrawForm = () => {
     usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const {
-    aspData: { mtLeavesData },
+    aspData: { mtLeavesData, isLoading: isLoadingAsp },
   } = useExternalServices();
   const { setExtraGas, requestQuote, resetQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
@@ -97,15 +85,6 @@ export const WithdrawForm = () => {
     );
   }, [poolAccounts, chainId, selectedPoolInfo?.scope]);
 
-  // Auto-select the first pool account when filtered list changes and no account is selected
-  // All filtered accounts are already approved, so just pick the first one
-  useEffect(() => {
-    const currentAccountStillValid = poolAccount && filteredPoolAccounts.some((pa) => pa.name === poolAccount.name);
-    if (!currentAccountStillValid && filteredPoolAccounts.length > 0) {
-      setPoolAccount(filteredPoolAccounts[0]);
-    }
-  }, [filteredPoolAccounts, poolAccount, setPoolAccount]);
-
   // New state for minimum withdrawal amount and warning
   const [minWithdrawAmount, setMinWithdrawAmount] = useState<bigint | null>(null);
   const [isLoadingMinAmount, setIsLoadingMinAmount] = useState(false);
@@ -119,107 +98,8 @@ export const WithdrawForm = () => {
     setMinWithdrawAmount(null);
   }, [selectedPoolInfo?.scope]);
 
-  // ENS-related state
-  const [inputValue, setInputValue] = useState<string>(target);
-  const [ensName, setEnsName] = useState<string | null>(null);
-
-  // Restore target when cleared externally (e.g. by PoolAccountsProvider on asset change)
-  // but the user's inputValue still holds a valid address
-  useEffect(() => {
-    if (target === '' && inputValue && isAddress(inputValue)) {
-      setTarget(inputValue as Address);
-    }
-  }, [target, inputValue, setTarget]);
-
-  // Clipboard for copying resolved address
-  const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
-
-  // Handle copying resolved address
-  const handleCopyResolvedAddress = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    copyToClipboard(target);
-  };
-
-  // Resolved address display component
-  const ResolvedAddressDisplay = () => (
-    <Box component='span' sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-      <span>Resolved to: {truncateAddress(target)}</span>
-      <Tooltip title={`${target} (Click to copy)`}>
-        <Box
-          component='span'
-          onClick={handleCopyResolvedAddress}
-          sx={{
-            ml: 0.5,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-          }}
-        >
-          {copied ? (
-            <Checkmark size={12} color={theme.palette.text.disabled} />
-          ) : (
-            <Copy size={12} color={theme.palette.text.disabled} />
-          )}
-        </Box>
-      </Tooltip>
-    </Box>
-  );
-
   const balanceFormatted = formatUnits(poolAccount?.balance ?? BigInt(0), decimals);
   const balanceUSD = getUsdBalance(currentPrice, balanceFormatted, decimals);
-
-  // ENS hooks
-  const isEnsName = useMemo(() => {
-    // Must have at least one dot followed by 3+ characters
-    const dotIndex = inputValue.lastIndexOf('.');
-    if (dotIndex === -1) return false; // No dot found
-
-    const tld = inputValue.slice(dotIndex + 1);
-    return tld.length >= 3; // At least 3 characters after the dot
-  }, [inputValue]);
-
-  const normalizedName = useMemo(() => {
-    if (!isEnsName) return undefined;
-    // Simple normalization - just lowercase and trim
-    return inputValue.toLowerCase().trim();
-  }, [isEnsName, inputValue]);
-
-  const {
-    data: ensAddress,
-    isLoading: isLoadingEnsAddress,
-    error: ensError,
-  } = useEnsAddress({
-    name: normalizedName,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  const { data: ensAvatar } = useEnsAvatar({
-    name: normalizedName,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  const { data: reverseEnsName } = useEnsName({
-    address: isAddress(target) ? target : undefined,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  // Effect to handle ENS resolution
-  useEffect(() => {
-    if (isEnsName && ensAddress) {
-      setTarget(ensAddress as Address);
-      setTargetAddressHasError(false);
-      setEnsName(inputValue);
-      addNotification('success', `ENS name resolved to ${truncateAddress(ensAddress)}`);
-    } else if (isEnsName && !isLoadingEnsAddress && !ensAddress && normalizedName) {
-      if (ensError) {
-        console.error('ENS Resolution Error:', ensError);
-        addNotification('error', `ENS resolution failed: ${ensError.message || 'Unknown error'}`);
-      } else {
-        addNotification('error', `Could not resolve ENS name: ${inputValue}`);
-      }
-      setTargetAddressHasError(true);
-    }
-  }, [ensAddress, isEnsName, isLoadingEnsAddress, inputValue, normalizedName, ensError, setTarget, addNotification]);
 
   const amountBN = useMemo(() => {
     try {
@@ -305,32 +185,37 @@ export const WithdrawForm = () => {
   // value) and the ASP leaf set. Both are identical for every visitor, so
   // fetching them reveals nothing about who is asking or for how much, and the
   // count re-runs locally on each keystroke with no request at all.
-  const { data: poolDeposits, isLoading: isLoadingPoolDeposits } = useQuery({
-    queryKey: ['asp_all_pool_deposits', chainId, selectedPoolInfo?.scope?.toString()],
-    queryFn: () =>
-      aspClient.fetchAllPoolDeposits(getAspEndpointForChain(chainId), chainId, selectedPoolInfo.scope.toString()),
-    enabled: !!chainId && !!selectedPoolInfo?.scope,
+  const {
+    data: poolDeposits,
+    isLoading: isLoadingPoolDeposits,
+    isError: depositsError,
+  } = useQuery({
+    queryKey: ['asp_all_pool_deposits', chainId, selectedPoolInfo?.scope?.toString(), aspUrl],
+    queryFn: () => aspClient.fetchAllPoolDeposits(aspUrl, chainId, selectedPoolInfo.scope.toString()),
+    enabled: modalOpen === ModalType.WITHDRAW && !!chainId && !!selectedPoolInfo?.scope,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    retry: 1,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
-  const approvedLabels = useMemo(() => {
-    const leaves = mtLeavesData?.aspLeaves;
-    if (!leaves) return null;
-    // Chain 56 (BSC) is served by two ASPs; a deposit approved by either is in
-    // the tree the withdrawal proves against, so union them exactly as the
-    // account status check does.
-    const merged = chainId === 56 ? (mergeAndSortAspLeaves(leaves, mtLeavesData?.brevisAspLeaves) ?? leaves) : leaves;
-    return new Set(merged.map((leaf) => leaf.toString()));
-  }, [mtLeavesData?.aspLeaves, mtLeavesData?.brevisAspLeaves, chainId]);
-
-  const anonymitySet = useMemo(
-    () => countDepositsAtLeast(poolDeposits, approvedLabels, amountBN),
-    [amountBN, poolDeposits, approvedLabels],
+  const approvedLabels = useMemo(
+    () =>
+      approvedLabelSet(
+        mtLeavesData?.aspLeaves,
+        mtLeavesData?.brevisAspLeaves,
+        selectedPoolInfo.externalAsp?.provider === 'brevis',
+      ),
+    [mtLeavesData, selectedPoolInfo.externalAsp?.provider],
   );
 
-  const isLoadingAnonymitySet = !!amountBN && amountBN > 0n && (isLoadingPoolDeposits || !approvedLabels);
+  const anonymitySet = useMemo(
+    () => countDepositsAtLeast(depositsError ? undefined : poolDeposits, approvedLabels, amountBN),
+    [amountBN, poolDeposits, approvedLabels, depositsError],
+  );
+
+  const isLoadingAnonymitySet = amountBN > 0n && (isLoadingPoolDeposits || !!isLoadingAsp);
 
   const isValidAmount = useMemo(() => {
     return amountBN > 0n && amountBN <= (poolAccount?.balance ?? 0n);
@@ -417,58 +302,8 @@ export const WithdrawForm = () => {
 
   const handleTargetAddressChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setInputValue(value);
-
-    // Clear any previous errors when user is typing
-    setTargetAddressHasError(false);
-
-    // If it's a valid address, set it directly
-    if (isAddress(value)) {
-      setTarget(value as Address);
-      setEnsName(null);
-    } else {
-      // Check if it looks like a complete ENS name (dot + 3+ chars)
-      const dotIndex = value.lastIndexOf('.');
-      const isCompleteEns = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
-
-      if (!isCompleteEns) {
-        // If it's not a complete ENS name and not a valid address, clear the target
-        setTarget('' as Address);
-        setEnsName(null);
-      }
-    }
-    // ENS resolution will be handled by the useEffect
-  };
-
-  const handleTargetAddressBlur: FocusEventHandler<HTMLInputElement> = (e) => {
-    const value = e.target.value;
-    if (!value) {
-      setTargetAddressHasError(false);
-      return;
-    }
-
-    // Check if it's a valid address
-    if (isAddress(value)) {
-      setTargetAddressHasError(false);
-      return;
-    }
-
-    // Check if it's a valid ENS name format
-    const dotIndex = value.lastIndexOf('.');
-    const isValidEnsFormat = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
-
-    if (isValidEnsFormat) {
-      // If ENS is resolved or still loading, don't show error
-      if (ensAddress || isLoadingEnsAddress || ensName === value) {
-        setTargetAddressHasError(false);
-      } else {
-        // Only show error if ENS resolution failed
-        setTargetAddressHasError(!ensAddress && !isLoadingEnsAddress);
-      }
-    } else {
-      // Not a valid address or ENS format
-      setTargetAddressHasError(true);
-    }
+    setTarget(value as Address);
+    setTargetAddressHasError(value !== '' && !isAddress(value));
   };
 
   const handleRelayerChange = (e: SelectChangeEvent<unknown>) => {
@@ -596,7 +431,14 @@ export const WithdrawForm = () => {
           />
         ) : (
           <Typography variant='body2' color='error' sx={{ textAlign: 'center', py: 1 }}>
-            No approved deposits available for withdrawal in this pool. Please wait for your deposits to be approved.
+            {poolAccounts.some(
+              (pa) =>
+                pa.chainId === chainId &&
+                pa.scope === selectedPoolInfo.scope &&
+                pa.reviewStatus === ReviewStatus.UNAVAILABLE,
+            )
+              ? 'Approval status unavailable. Please try again later.'
+              : 'No approved deposits available for withdrawal in this pool. Please wait for your deposits to be approved.'}
           </Typography>
         )}
 
@@ -604,29 +446,14 @@ export const WithdrawForm = () => {
           <Box sx={{ position: 'relative' }}>
             <TextField
               id='target-address'
-              placeholder='Target Address or ENS name'
-              value={inputValue}
+              placeholder='Target Address'
+              value={target}
               error={targetAddressHasError}
               onChange={handleTargetAddressChange}
-              onBlur={handleTargetAddressBlur}
               spellCheck={false}
-              helperText={
-                targetAddressHasError ? (
-                  'Invalid address or ENS name'
-                ) : ensName ? (
-                  <ResolvedAddressDisplay />
-                ) : reverseEnsName ? (
-                  `ENS: ${reverseEnsName}`
-                ) : (
-                  ''
-                )
-              }
+              helperText={targetAddressHasError ? 'Invalid address' : ''}
               data-testid='target-address-input'
               fullWidth
-              InputProps={{
-                startAdornment: ensAvatar ? <Avatar src={ensAvatar} sx={{ width: 24, height: 24, mr: 1 }} /> : null,
-                endAdornment: isLoadingEnsAddress ? <CircularProgress size={20} /> : null,
-              }}
             />
           </Box>
         </FormControl>

@@ -1,9 +1,10 @@
 'use client';
 
 import { createContext, SetStateAction, Dispatch, useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { chainData } from '~/config/chainData';
 import { getEnv } from '~/config/env';
-import { useChainContext, useExternalServices, useNotifications, usePoolAccountsContext } from '~/hooks';
+import { useChainContext, useNotifications, usePoolAccountsContext } from '~/hooks';
 import { useAccountManager } from '~/hooks/useAccountManager';
 import { fetchDeclinedLabels } from '~/migration/utils/fetchDeclinedLabels';
 import { buildLegacyMigrationHistory } from '~/migration/utils/helpers';
@@ -15,8 +16,8 @@ import {
   buildDeclinedLegacyPoolAccounts,
   addRagequit,
   aspClient,
-  mergeAndSortAspLeaves,
 } from '~/utils';
+import { approvedLabelSet, updateAccountStatus } from '~/utils/accountStatus';
 
 const { TEST_MODE } = getEnv();
 
@@ -39,6 +40,7 @@ type ContextType = {
   addWithdrawal: (...params: Parameters<typeof addWithdrawal>) => void;
   addRagequit: (...params: Parameters<typeof addRagequit>) => void;
   resetGlobalState: () => void;
+  loadLegacyReviewStatuses: () => Promise<Set<string>>;
 
   allPools: number;
   amountPoolAsset: bigint;
@@ -70,9 +72,10 @@ export const AccountProvider = ({ children }: Props) => {
   const [precomputedDeclinedLabels, setPrecomputedDeclinedLabels] = useState<Set<string> | null>(null);
   const { selectedPoolInfo } = useChainContext();
   const { addNotification } = useNotifications();
-  const {
-    aspData: { mtLeavesData, refetchMtLeaves, isError: aspError, isLoading: aspIsLoading },
-  } = useExternalServices();
+  const queryClient = useQueryClient();
+  const sessionRef = useRef(0);
+  const refreshVersionRef = useRef<Record<string, number>>({});
+  const activeScopeKey = `${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`;
   const { poolAccount, setPoolAccount } = usePoolAccountsContext();
 
   const { loadAccount, createAccount } = useAccountManager(
@@ -107,316 +110,165 @@ export const AccountProvider = ({ children }: Props) => {
       (account) =>
         account.reviewStatus === ReviewStatus.APPROVED &&
         account.balance !== 0n &&
-        account.scope === selectedPoolInfo.scope,
+        account.scope === selectedPoolInfo.scope &&
+        account.chainId === selectedPoolInfo.chainId,
     );
-  }, [poolAccounts, selectedPoolInfo.scope]);
+  }, [poolAccounts, selectedPoolInfo.scope, selectedPoolInfo.chainId]);
 
   // Determine if there's any approved deposit
   const hasApprovedDeposit = useMemo(() => {
     return !!firstApprovedAccount;
   }, [firstApprovedAccount]);
 
-  // Effect to set the default pool account when appropriate
+  // Keep the selected commitment/status current after refreshes and scope changes.
   useEffect(() => {
-    // Set the first approved account as the default if none is selected yet
-    if (firstApprovedAccount && !poolAccount) {
-      setPoolAccount(firstApprovedAccount);
-    }
-  }, [firstApprovedAccount, poolAccount, setPoolAccount]);
+    const current =
+      poolAccount &&
+      poolAccounts.find(
+        (entry) =>
+          entry.label === poolAccount.label &&
+          entry.chainId === selectedPoolInfo.chainId &&
+          entry.scope === selectedPoolInfo.scope &&
+          entry.reviewStatus === ReviewStatus.APPROVED &&
+          entry.balance > 0n,
+      );
+    const next = current || firstApprovedAccount;
+    if (next !== poolAccount) setPoolAccount(next);
+  }, [
+    firstApprovedAccount,
+    poolAccount,
+    poolAccounts,
+    selectedPoolInfo.chainId,
+    selectedPoolInfo.scope,
+    setPoolAccount,
+  ]);
 
   const poolsByAssetAndChain = useMemo(() => {
     return poolAccountsByChainScope[`${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`];
   }, [poolAccountsByChainScope, selectedPoolInfo.chainId, selectedPoolInfo.scope]);
 
-  // Updates the review status of deposit entries in pool accounts.
-  //
-  // Approval is decided LOCALLY from the ASP leaf set. The previous version
-  // POSTed the caller's whole label set to the ASP (`X-Labels: A,B,C`) to read
-  // back a review status, which told a centralized party that those deposits
-  // belong to one person -- something no observer can derive from chain data.
-  // The leaf set is caller-independent, is already fetched alongside it, and is
-  // what the code trusted anyway: the old flow overrode the server's APPROVED
-  // with PENDING whenever the leaf was missing. So the request bought nothing
-  // except the PENDING/DECLINED split, which only toggles a disabled button.
-  const processDeposits = useCallback(
-    async (onFinish: () => void, chainId: string) => {
-      if (!mtLeavesData?.aspLeaves) throw Error('ASP leaves not found');
-
-      const scopeKey = `${chainId}-${selectedPoolInfo.scope}`;
-      const chainIdNum = parseInt(chainId, 10);
-
-      // Chain 56 (BSC) runs a second ASP (Brevis). Take its leaf set too -- also
-      // caller-independent -- instead of asking it about specific labels.
-      let brevisLeaves: string[] | undefined;
-      if (chainId === '56') {
-        const poolInfo = chainData[chainIdNum]?.poolInfo.find(
-          (p) => p.scope.toString() === selectedPoolInfo.scope.toString(),
-        );
-        if (poolInfo?.externalAsp?.provider === 'brevis') {
-          try {
-            const brevisLeavesResponse = await aspClient.fetchBrevisAspLeaves(poolInfo.externalAsp.baseUrl);
-            brevisLeaves = brevisLeavesResponse.aspLeaves;
-          } catch (err) {
-            console.error('Error fetching Brevis ASP leaves:', err);
-          }
-        }
-      }
-
-      // Update poolAccountsByChainScope by processing the accounts for the current scope
-      setPoolAccountsByChainScope((prev) => {
-        const accountsToUpdate = prev[scopeKey];
-        if (!accountsToUpdate) {
-          console.warn(`No accounts found for scope key: ${scopeKey}`);
-          onFinish();
-          return prev;
-        }
-
-        const updatedAccountsForScope = accountsToUpdate.map((entry) => {
-          if (entry.reviewStatus === ReviewStatus.EXITED) {
-            return {
-              ...entry,
-              reviewStatus: ReviewStatus.EXITED,
-              isValid: false,
-            };
-          }
-
-          // For chain 56 (BSC), merge ASP leaves from both 0xBow and Brevis sources, sorted ASC
-          // For other chains, use standard ASP leaves
-          const leavesToCheck =
-            chainId === '56' ? mergeAndSortAspLeaves(mtLeavesData.aspLeaves, brevisLeaves) : mtLeavesData.aspLeaves;
-          const aspLeaf = leavesToCheck?.find((leaf) => leaf.toString() === entry.label.toString());
-
-          // In the ASP tree => approved, and spendable: membership is exactly what
-          // the withdrawal proof needs. Absent => not spendable yet. That covers
-          // both PENDING and DECLINED; we no longer distinguish them, because
-          // doing so requires naming our labels to the ASP. A declined account
-          // keeps a disabled Withdraw button rather than gaining a "Re-Evaluate"
-          // one -- see the PR notes for the small ASP-side feed that would give
-          // the split back without a per-caller query.
-          const reviewStatus = aspLeaf ? ReviewStatus.APPROVED : ReviewStatus.PENDING;
-
-          const isWithdrawn = entry.balance === BigInt(0) && reviewStatus === ReviewStatus.APPROVED;
-
-          return {
-            ...entry,
-            reviewStatus: TEST_MODE ? ReviewStatus.APPROVED : isWithdrawn ? ReviewStatus.SPENT : reviewStatus,
-            isValid: reviewStatus === ReviewStatus.APPROVED,
-          };
-        });
-
-        // Deep clone the ENTIRE object to prevent reference sharing between scopes
-        const newPoolAccountsByChainScope: Record<string, PoolAccount[]> = {};
-        for (const [key, accounts] of Object.entries(prev)) {
-          newPoolAccountsByChainScope[key] =
-            key === scopeKey ? updatedAccountsForScope : accounts.map((pa) => ({ ...pa }));
-        }
-
-        // Also update the poolAccounts state for the current view
-        setPoolAccounts(updatedAccountsForScope.filter((pa) => pa.chainId === chainIdNum));
-
-        return newPoolAccountsByChainScope;
-      });
-
-      onFinish();
-    },
-    [mtLeavesData, selectedPoolInfo],
-  );
-
-  // This is executed before updatePoolAccounts updates the state
-  const fetchAndProcessDeposits = useCallback(
-    (scopeKeyOverride?: string) => {
+  // Each refresh resolves its own scope and waits for both ASPs before applying
+  // one verdict. Query keys match useASP so consumers share the same snapshot.
+  const refreshScopes = useCallback(
+    async (scopeKeys: string[]) => {
+      const session = sessionRef.current;
       setIsLoading(true);
-
-      // Determine which scope to fetch deposits for
-      const scopeKey = scopeKeyOverride ?? `${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`;
-      const accountsForScope = poolAccountsByChainScope[scopeKey];
-
-      if (!accountsForScope || accountsForScope.length === 0) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Extract chainId from the scope key
-      const chainId = scopeKey.split('-')[0];
-
-      processDeposits(() => setIsLoading(false), chainId).catch(() => {
-        setIsLoading(false);
-      });
-    },
-    [processDeposits, poolAccountsByChainScope, selectedPoolInfo.chainId, selectedPoolInfo.scope],
-  );
-
-  // Process deposits for ALL scopes (used on initial account load)
-  // This fetches from each chain's ASP endpoint separately since each ASP only returns deposits for its scope
-  const fetchAndProcessAllDeposits = useCallback(
-    async (poolAccountsByChainScopeToProcess: Record<string, PoolAccount[]>) => {
-      setIsLoading(true);
-
-      const allScopeKeys = Object.keys(poolAccountsByChainScopeToProcess);
-      if (allScopeKeys.length === 0) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Track the current scope key so we can update poolAccounts for the active view
-      const currentScopeKey = `${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`;
-
       try {
-        // Store MT leaves per scope for accurate leaf checks
-        const mtLeavesByScope: Record<string, string[]> = {};
-
-        for (const scopeKey of allScopeKeys) {
-          const accountsForScope = poolAccountsByChainScopeToProcess[scopeKey];
-          if (!accountsForScope || accountsForScope.length === 0) continue;
-
-          // Parse chainId and scope from the key (format: "chainId-scope")
-          const [chainIdStr, ...scopeParts] = scopeKey.split('-');
-          const scope = scopeParts.join('-'); // Rejoin in case scope contains dashes
-
-          // TODO: Update chainData and aspClient to support string chainIds for Starknet in V2
-          const chainIdNum = parseInt(chainIdStr, 10);
-
-          // Get the ASP URL for this chain
-          const chainInfo = chainData[chainIdNum];
-          if (!chainInfo) {
-            continue;
-          }
-
-          try {
-            // Only the caller-independent leaf set. The label-keyed request that
-            // used to sit next to it in this Promise.all told the ASP which
-            // deposits this browser owns; the leaf set answers the same question
-            // without naming anything.
-            const mtLeavesResponse = await aspClient.fetchMtLeaves(chainInfo.aspUrl, chainIdNum, scope);
-
-            // For chain 56 (BSC), merge ASP leaves from both 0xBow and Brevis sources, sorted ASC
-            const poolInfo = chainInfo.poolInfo.find((p) => p.scope.toString() === scope);
-            if (chainIdNum === 56 && poolInfo?.externalAsp?.provider === 'brevis') {
-              try {
-                const brevisLeavesResponse = await aspClient.fetchBrevisAspLeaves(poolInfo.externalAsp.baseUrl);
-                // Merge leaves from both sources and sort ASC for consistent Merkle root
-                mtLeavesByScope[scopeKey] =
-                  mergeAndSortAspLeaves(mtLeavesResponse.aspLeaves, brevisLeavesResponse.aspLeaves) || [];
-              } catch (brevisErr) {
-                console.error(`Error fetching Brevis ASP leaves for scope ${scopeKey}:`, brevisErr);
-                // Fallback to standard ASP leaves only
-                mtLeavesByScope[scopeKey] = mtLeavesResponse.aspLeaves || [];
+        await Promise.all(
+          scopeKeys.map(async (scopeKey) => {
+            const version = (refreshVersionRef.current[scopeKey] ?? 0) + 1;
+            refreshVersionRef.current[scopeKey] = version;
+            const [chainIdText, scope] = scopeKey.split('-');
+            const chainId = Number(chainIdText);
+            const chain = chainData[chainId];
+            const pool = chain?.poolInfo.find((p) => p.scope.toString() === scope);
+            let labels: Set<string> | null = null;
+            let canDetermineAbsence = false;
+            try {
+              if (!chain || !pool) throw new Error('Pool configuration unavailable');
+              const brevisUrl = pool.externalAsp?.provider === 'brevis' ? pool.externalAsp.baseUrl : undefined;
+              const [leaves, brevis] = await Promise.all([
+                queryClient.fetchQuery({
+                  queryKey: ['asp_mt_leaves', chainId, scope, chain.aspUrl],
+                  queryFn: () => aspClient.fetchMtLeaves(chain.aspUrl, chainId, scope),
+                  staleTime: 0,
+                  retry: false,
+                }),
+                brevisUrl
+                  ? queryClient.fetchQuery({
+                      queryKey: ['brevis_asp_leaves', brevisUrl],
+                      queryFn: () => aspClient.fetchBrevisAspLeaves(brevisUrl),
+                      staleTime: 0,
+                      retry: false,
+                    })
+                  : undefined,
+              ]);
+              canDetermineAbsence = leaves.aspLeaves.length > 0 && (!brevisUrl || !!brevis?.aspLeaves.length);
+              labels = approvedLabelSet(leaves.aspLeaves, brevis?.aspLeaves, !!brevisUrl);
+              if (!labels) throw new Error('Approval snapshot unavailable');
+            } catch {
+              if (session === sessionRef.current && !TEST_MODE) {
+                addNotification('error', 'Approval status unavailable. Please try again later.');
               }
-            } else {
-              // Store the standard ASP leaves for this scope
-              mtLeavesByScope[scopeKey] = mtLeavesResponse.aspLeaves || [];
             }
-          } catch (err) {
-            console.error(`Error fetching deposits for scope ${scopeKey}:`, err);
-          }
-        }
-
-        {
-          // Process each scope against its own leaf set
-          for (const scopeKey of allScopeKeys) {
-            const accountsForScope = poolAccountsByChainScopeToProcess[scopeKey];
-            if (!accountsForScope || accountsForScope.length === 0) continue;
-
-            // Get the MT leaves for THIS specific scope (not the globally selected chain)
-            const scopeAspLeaves = mtLeavesByScope[scopeKey] || [];
-
-            if (scopeAspLeaves.length > 0) {
-              // Update the scope in poolAccountsByChainScope
-              setPoolAccountsByChainScope((prev) => {
-                const accountsToUpdate = prev[scopeKey];
-                if (!accountsToUpdate) {
-                  return prev;
-                }
-
-                const updatedAccountsForScope = accountsToUpdate.map((entry) => {
-                  if (entry.reviewStatus === ReviewStatus.EXITED) {
-                    return {
-                      ...entry,
-                      reviewStatus: ReviewStatus.EXITED,
-                      isValid: false,
-                    };
-                  }
-
-                  // Use the MT leaves for THIS scope, not the globally selected chain.
-                  // Membership is the whole verdict: it is what the withdrawal
-                  // proof needs, and it costs the ASP no knowledge of who asked.
-                  const aspLeaf = scopeAspLeaves.find((leaf) => leaf.toString() === entry.label.toString());
-                  const reviewStatus = aspLeaf ? ReviewStatus.APPROVED : ReviewStatus.PENDING;
-
-                  const isWithdrawn = entry.balance === BigInt(0) && reviewStatus === ReviewStatus.APPROVED;
-
-                  return {
-                    ...entry,
-                    reviewStatus: TEST_MODE ? ReviewStatus.APPROVED : isWithdrawn ? ReviewStatus.SPENT : reviewStatus,
-                    isValid: reviewStatus === ReviewStatus.APPROVED,
-                  };
-                });
-
-                // Also update poolAccounts if this is the currently viewed scope
-                if (scopeKey === currentScopeKey) {
-                  setPoolAccounts(updatedAccountsForScope.map((pa) => ({ ...pa })));
-                }
-
-                const newPoolAccountsByChainScope: Record<string, PoolAccount[]> = {};
-                for (const [key, accounts] of Object.entries(prev)) {
-                  newPoolAccountsByChainScope[key] =
-                    key === scopeKey ? updatedAccountsForScope : accounts.map((pa) => ({ ...pa }));
-                }
-
-                return newPoolAccountsByChainScope;
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching deposits for all scopes:', error);
+            if (session !== sessionRef.current || version !== refreshVersionRef.current[scopeKey]) return;
+            setPoolAccountsByChainScope((prev) => {
+              if (session !== sessionRef.current) return prev;
+              const accounts = prev[scopeKey];
+              if (!accounts) return prev;
+              const updated = accounts.map((entry) =>
+                updateAccountStatus(entry, labels, TEST_MODE, canDetermineAbsence),
+              );
+              return updated.every((entry, index) => entry === accounts[index])
+                ? prev
+                : { ...prev, [scopeKey]: updated };
+            });
+          }),
+        );
       } finally {
-        setIsLoading(false);
-        setHasProcessedInitialDeposits(true);
+        if (session === sessionRef.current) setIsLoading(false);
       }
     },
-    [selectedPoolInfo.chainId, selectedPoolInfo.scope],
+    [queryClient, addNotification],
   );
+
+  const fetchAndProcessDeposits = useCallback(() => refreshScopes([activeScopeKey]), [refreshScopes, activeScopeKey]);
+
+  const fetchAndProcessAllDeposits = useCallback(
+    async (accounts: Record<string, PoolAccount[]>) => {
+      const session = sessionRef.current;
+      await refreshScopes(Object.keys(accounts).filter((key) => accounts[key].length > 0));
+      if (session === sessionRef.current) setHasProcessedInitialDeposits(true);
+    },
+    [refreshScopes],
+  );
+
+  const loadLegacyReviewStatuses = useCallback(async () => {
+    const session = sessionRef.current;
+    const legacyService = legacyAccountServiceRef.current;
+    if (legacyService) {
+      try {
+        const labels = await fetchDeclinedLabels(legacyService);
+        if (session !== sessionRef.current) throw new Error('Account changed');
+        declinedLabelsRef.current = labels;
+        setPrecomputedDeclinedLabels(labels);
+
+        if (labels.size > 0) {
+          const legacyPAs = await buildDeclinedLegacyPoolAccounts(legacyService, labels);
+          if (session !== sessionRef.current) throw new Error('Account changed');
+          setPoolAccountsByChainScope((prev) => {
+            const merged = { ...prev };
+            for (const [key, accounts] of Object.entries(legacyPAs)) {
+              const existing = merged[key] || [];
+              const existingLabels = new Set(existing.map((pa) => pa.label?.toString()));
+              const newAccounts = accounts.filter((pa) => !existingLabels.has(pa.label?.toString()));
+              merged[key] = [...existing, ...newAccounts];
+            }
+            return merged;
+          });
+        }
+      } catch (err) {
+        if (session !== sessionRef.current) throw err;
+        console.warn('[migration] failed to build declined legacy pool accounts:', err);
+        declinedLabelsRef.current = new Set();
+        setPrecomputedDeclinedLabels(new Set());
+      }
+    } else {
+      setPrecomputedDeclinedLabels(new Set());
+    }
+    return declinedLabelsRef.current;
+  }, []);
 
   const handleLoadAccount = useCallback(
     async (seed: string): Promise<void> => {
-      if (!seed) {
-        throw new Error('Seed not found');
-      }
-
+      if (!seed) throw new Error('Seed not found');
+      sessionRef.current++;
+      hasProcessedInitialDepositsRef.current = false;
+      setHasProcessedInitialDeposits(false);
+      declinedLabelsRef.current = new Set();
+      setPrecomputedDeclinedLabels(null);
+      setPoolAccountsByChainScope({});
       await loadAccount(seed);
-
-      if (legacyAccountServiceRef.current) {
-        try {
-          const labels = await fetchDeclinedLabels(legacyAccountServiceRef.current);
-          declinedLabelsRef.current = labels;
-          setPrecomputedDeclinedLabels(labels);
-
-          if (labels.size > 0) {
-            const legacyPAs = await buildDeclinedLegacyPoolAccounts(legacyAccountServiceRef.current, labels);
-            setPoolAccountsByChainScope((prev) => {
-              const merged = { ...prev };
-              for (const [key, accounts] of Object.entries(legacyPAs)) {
-                const existing = merged[key] || [];
-                const existingLabels = new Set(existing.map((pa) => pa.label?.toString()));
-                const newAccounts = accounts.filter((pa) => !existingLabels.has(pa.label?.toString()));
-                merged[key] = [...existing, ...newAccounts];
-              }
-              return merged;
-            });
-          }
-        } catch (err) {
-          console.warn('[migration] failed to build declined legacy pool accounts:', err);
-          declinedLabelsRef.current = new Set();
-          setPrecomputedDeclinedLabels(new Set());
-        }
-      } else {
-        setPrecomputedDeclinedLabels(new Set());
-      }
-
-      // Small delay to ensure poolAccountsByChainScope state is updated
-      // before we process deposits for all scopes
-      await new Promise((resolve) => setTimeout(resolve, 100));
     },
     [loadAccount],
   );
@@ -448,14 +300,15 @@ export const AccountProvider = ({ children }: Props) => {
   const handleUpdatePoolAccounts = useCallback(async () => {
     if (!accountServiceRef.current) throw new Error('Account service not found');
     setIsLoading(true);
+    const session = sessionRef.current;
 
-    const { poolAccounts, poolAccountsByChainScope } = await getPoolAccountsFromAccount(
+    const { poolAccountsByChainScope } = await getPoolAccountsFromAccount(
       accountServiceRef.current.account,
       selectedPoolInfo.chainId,
     );
 
     // Deep clone poolAccountsByChainScope to prevent mutation issues
-    const clonedPoolAccountsByChainScope: Record<string, typeof poolAccounts> = {};
+    const clonedPoolAccountsByChainScope: Record<string, PoolAccount[]> = {};
     for (const [key, accounts] of Object.entries(poolAccountsByChainScope)) {
       clonedPoolAccountsByChainScope[key] = accounts.map((pa) => ({ ...pa }));
     }
@@ -478,15 +331,14 @@ export const AccountProvider = ({ children }: Props) => {
       }
     }
 
+    if (session !== sessionRef.current) return;
     setPoolAccountsByChainScope(clonedPoolAccountsByChainScope);
-
-    // Also clone poolAccounts to maintain consistency and avoid shared references
-    const clonedPoolAccounts = poolAccounts.map((pa) => ({ ...pa }));
-    setPoolAccounts(clonedPoolAccounts);
 
     // Delay to allow ASP to process the transaction
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    await fetchAndProcessDeposits();
+    if (session !== sessionRef.current) return;
+    await refreshScopes(Object.keys(clonedPoolAccountsByChainScope));
+    if (session !== sessionRef.current) return;
 
     // Clear any previous delayed refetch
     if (delayedRefetchTimerRef.current) {
@@ -494,14 +346,10 @@ export const AccountProvider = ({ children }: Props) => {
     }
     // Second refetch for slower updates
     delayedRefetchTimerRef.current = setTimeout(() => {
-      try {
-        fetchAndProcessDeposits();
-      } catch (e) {
-        console.error('Delayed deposit refetch failed:', e);
-      }
+      if (session === sessionRef.current) void refreshScopes(Object.keys(clonedPoolAccountsByChainScope));
       delayedRefetchTimerRef.current = null;
     }, 10000);
-  }, [fetchAndProcessDeposits, selectedPoolInfo.chainId]);
+  }, [refreshScopes, selectedPoolInfo.chainId]);
 
   const handleAddPoolAccount = useCallback(
     (...params: Parameters<typeof addPoolAccount>) => {
@@ -528,6 +376,8 @@ export const AccountProvider = ({ children }: Props) => {
   );
 
   const resetGlobalState = () => {
+    sessionRef.current++;
+    if (delayedRefetchTimerRef.current) clearTimeout(delayedRefetchTimerRef.current);
     setPoolAccounts([]);
     setPoolAccountsByChainScope({});
     setSeed(null);
@@ -543,64 +393,19 @@ export const AccountProvider = ({ children }: Props) => {
     setHideEmptyPools((prev) => !prev);
   }, []);
 
+  // Derive the active view from the scope map. An older async refresh can only
+  // update its own map entry, never replace the currently selected scope.
   useEffect(() => {
-    if (!poolAccounts.length) return;
+    setPoolAccounts(poolAccountsByChainScope[activeScopeKey] ?? []);
+  }, [activeScopeKey, poolAccountsByChainScope]);
 
-    // Refetch deposits and leaves every 1 minute
-    const interval = setInterval(() => {
-      refetchMtLeaves();
-      fetchAndProcessDeposits();
-    }, 60000);
+  const hasScopeAccounts = !!poolAccountsByChainScope[activeScopeKey]?.length;
+  useEffect(() => {
+    if (!hasScopeAccounts || !seed) return;
+    void fetchAndProcessDeposits();
+    const interval = setInterval(() => void fetchAndProcessDeposits(), 60000);
     return () => clearInterval(interval);
-  }, [fetchAndProcessDeposits, poolAccounts, refetchMtLeaves]);
-
-  useEffect(() => {
-    if (!accountServiceRef.current) return; // Not initialized yet
-    if (selectedPoolInfo.chainId === poolAccounts[0]?.chainId && selectedPoolInfo.scope === poolAccounts[0]?.scope)
-      return;
-
-    const newPoolAccounts = poolAccountsByChainScope[`${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`];
-    if (!!newPoolAccounts) {
-      setIsLoading(true);
-      // Create a copy to avoid shared references
-      const copiedPoolAccounts = newPoolAccounts.map((pa) => ({ ...pa }));
-      setPoolAccounts(copiedPoolAccounts);
-      // Don't call fetchAndProcessDeposits if ASP is still loading the new scope data
-      if (!aspIsLoading) {
-        fetchAndProcessDeposits();
-      }
-    } else {
-      if (poolAccounts.length > 0) {
-        setPoolAccounts([]);
-      }
-    }
-  }, [
-    selectedPoolInfo.chainId,
-    selectedPoolInfo.scope,
-    poolAccounts,
-    poolAccountsByChainScope,
-    fetchAndProcessDeposits,
-    aspIsLoading,
-  ]);
-
-  // Handle when ASP loading completes
-  useEffect(() => {
-    if (!aspIsLoading && poolAccounts.length > 0 && accountServiceRef.current) {
-      // Check if we have pool accounts for the current scope that need processing
-      const scopeKey = `${selectedPoolInfo.chainId}-${selectedPoolInfo.scope}`;
-      const currentScopeAccounts = poolAccountsByChainScope[scopeKey];
-      if (currentScopeAccounts && currentScopeAccounts.length > 0) {
-        fetchAndProcessDeposits();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aspIsLoading, selectedPoolInfo.scope]);
-
-  useEffect(() => {
-    if (aspError) {
-      addNotification('error', 'ASP Error: Scheduled maintenance ongoing. Please try again later.');
-    }
-  }, [aspError, addNotification]);
+  }, [fetchAndProcessDeposits, hasScopeAccounts, seed]);
 
   const historyData = useMemo(() => {
     const { history, migratedLabels } = buildLegacyMigrationHistory(legacyAccountServiceRef.current);
@@ -679,6 +484,7 @@ export const AccountProvider = ({ children }: Props) => {
         addWithdrawal: handleAddWithdrawal,
         addRagequit: handleAddRagequit,
         resetGlobalState,
+        loadLegacyReviewStatuses,
         historyData,
         precomputedDeclinedLabels,
         hideEmptyPools,
