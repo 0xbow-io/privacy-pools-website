@@ -7,6 +7,7 @@ export * from './abi';
 export * from './fetchTokenPrice';
 export * from './proof';
 export * from './aspClient';
+export * from './anonymitySet';
 export * from './relayerClient';
 export * from './poolUtils';
 export * from './sdk';
