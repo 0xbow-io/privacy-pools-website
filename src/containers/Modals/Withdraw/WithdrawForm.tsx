@@ -21,6 +21,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useEnsAddress, useEnsAvatar, useEnsName, useSwitchChain } from 'wagmi';
 import { chainData, allPoolsChainData } from '~/config';
@@ -28,9 +29,24 @@ import { getAspEndpointForChain } from '~/config/env';
 import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useQuoteContext } from '~/contexts/QuoteContext';
-import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
+import {
+  useChainContext,
+  useAccountContext,
+  useModal,
+  usePoolAccountsContext,
+  useNotifications,
+  useExternalServices,
+} from '~/hooks';
 import { ModalType, ReviewStatus } from '~/types';
-import { aspClient, getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
+import {
+  aspClient,
+  countDepositsAtLeast,
+  getUsdBalance,
+  mergeAndSortAspLeaves,
+  relayerClient,
+  truncateAddress,
+  useClipboard,
+} from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -60,6 +76,9 @@ export const WithdrawForm = () => {
   const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount, setFeeCommitment, setFeeBPSForWithdraw } =
     usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
+  const {
+    aspData: { mtLeavesData },
+  } = useExternalServices();
   const { setExtraGas, requestQuote, resetQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
 
@@ -93,14 +112,11 @@ export const WithdrawForm = () => {
   const [targetAddressHasError, setTargetAddressHasError] = useState(false);
   const [receiveGasToken, setReceiveGasToken] = useState(false);
 
-  // Anonymity set state
-  const [anonymitySet, setAnonymitySet] = useState<number | null>(null);
-  const [isLoadingAnonymitySet, setIsLoadingAnonymitySet] = useState(false);
-
-  // Reset state when pool changes
+  // Reset state when pool changes. The anonymity set needs no reset: it is
+  // derived from the entered amount and this pool's own feeds, both of which
+  // are already keyed by scope.
   useEffect(() => {
     setMinWithdrawAmount(null);
-    setAnonymitySet(null);
   }, [selectedPoolInfo?.scope]);
 
   // ENS-related state
@@ -276,36 +292,45 @@ export const WithdrawForm = () => {
     }
   }, [amount, fetchMinWithdrawAmount, minWithdrawAmount, isLoadingMinAmount]);
 
-  // Fetch anonymity set when amount changes
-  useEffect(() => {
-    const fetchAnonymitySet = async () => {
-      if (!amountBN || amountBN <= 0n || !selectedPoolInfo?.scope || !chainId) {
-        setAnonymitySet(null);
-        return;
-      }
+  // Anonymity set, computed in the browser.
+  //
+  // This used to call `deposits-larger-than?amount=` on every amount the user
+  // paused on, which handed the ASP the exact value about to be withdrawn a few
+  // minutes before the matching `Withdrawn` event appeared on chain -- from a
+  // session that had already told it which deposits belonged to this browser.
+  // The two together link a depositor to a withdrawal, which is the one thing
+  // the pool exists to hide.
+  //
+  // The inputs are now caller-independent: every deposit in the pool (label +
+  // value) and the ASP leaf set. Both are identical for every visitor, so
+  // fetching them reveals nothing about who is asking or for how much, and the
+  // count re-runs locally on each keystroke with no request at all.
+  const { data: poolDeposits, isLoading: isLoadingPoolDeposits } = useQuery({
+    queryKey: ['asp_all_pool_deposits', chainId, selectedPoolInfo?.scope?.toString()],
+    queryFn: () =>
+      aspClient.fetchAllPoolDeposits(getAspEndpointForChain(chainId), chainId, selectedPoolInfo.scope.toString()),
+    enabled: !!chainId && !!selectedPoolInfo?.scope,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+  });
 
-      setIsLoadingAnonymitySet(true);
-      try {
-        const aspUrl = getAspEndpointForChain(chainId);
-        const response = await aspClient.fetchDepositsLargerThan(
-          aspUrl,
-          chainId,
-          selectedPoolInfo.scope.toString(),
-          amountBN.toString(),
-        );
-        setAnonymitySet(response.eligibleDeposits);
-      } catch (error) {
-        console.error('Failed to fetch anonymity set:', error);
-        setAnonymitySet(null);
-      } finally {
-        setIsLoadingAnonymitySet(false);
-      }
-    };
+  const approvedLabels = useMemo(() => {
+    const leaves = mtLeavesData?.aspLeaves;
+    if (!leaves) return null;
+    // Chain 56 (BSC) is served by two ASPs; a deposit approved by either is in
+    // the tree the withdrawal proves against, so union them exactly as the
+    // account status check does.
+    const merged = chainId === 56 ? (mergeAndSortAspLeaves(leaves, mtLeavesData?.brevisAspLeaves) ?? leaves) : leaves;
+    return new Set(merged.map((leaf) => leaf.toString()));
+  }, [mtLeavesData?.aspLeaves, mtLeavesData?.brevisAspLeaves, chainId]);
 
-    // Debounce the fetch to avoid too many requests while typing
-    const timeoutId = setTimeout(fetchAnonymitySet, 500);
-    return () => clearTimeout(timeoutId);
-  }, [amountBN, selectedPoolInfo?.scope, chainId]);
+  const anonymitySet = useMemo(
+    () => countDepositsAtLeast(poolDeposits, approvedLabels, amountBN),
+    [amountBN, poolDeposits, approvedLabels],
+  );
+
+  const isLoadingAnonymitySet = !!amountBN && amountBN > 0n && (isLoadingPoolDeposits || !approvedLabels);
 
   const isValidAmount = useMemo(() => {
     return amountBN > 0n && amountBN <= (poolAccount?.balance ?? 0n);
