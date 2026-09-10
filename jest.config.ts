@@ -19,7 +19,7 @@ const config: Config = {
       },
     ],
   },
-  extensionsToTreatAsEsm: ['.ts'],
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   testPathIgnorePatterns: ['/node_modules/'],
   testMatch: ['<rootDir>/src/__tests__/*.test.ts'],
 };

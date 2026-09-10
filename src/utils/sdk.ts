@@ -449,7 +449,7 @@ export const getPoolAccountsFromAccount = async (account: PrivacyPoolAccount, ch
         ...(poolAccount as PoolAccount),
         balance: lastCommitment!.value,
         lastCommitment: lastCommitment,
-        reviewStatus: ReviewStatus.PENDING,
+        reviewStatus: ReviewStatus.UNAVAILABLE,
         isValid: false,
         name: idx,
         scope: _scope,
