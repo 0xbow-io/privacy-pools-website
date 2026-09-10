@@ -38,15 +38,22 @@ interface PoolStatsResponse {
   [scope: string]: PoolStats | PoolStats[] | undefined;
 }
 
-// Define type for deposits-larger-than response
-interface DepositsLargerThanResponse {
-  eligibleDeposits: number;
-  totalDeposits: number;
-  percentage: number;
+// One deposit as the client needs it for local, caller-independent maths:
+// its label (to test membership in the ASP leaf set) and its value.
+interface PoolDepositSummary {
+  label: string;
   amount: string;
-  scope: string;
-  rank: number;
-  uniqueAmountsAbove: number;
+}
+
+// Shape of GET /:chainId/public/deposits (paginated).
+interface DepositsPageResponse {
+  page: number;
+  perPage: number;
+  total: number;
+  depositEvents: Array<{
+    label?: string | null;
+    publicAmount?: string | null;
+  }>;
 }
 
 // Define type for pool incentives stats response
@@ -139,6 +146,12 @@ const aspClient = {
       'X-Pool-Scope': scope,
     }),
 
+  // LEGACY MIGRATION ONLY. Sends the caller's whole label set to the ASP, which
+  // tells it that those deposits belong to one person. Do NOT call this from a
+  // normal user path: derive approval from the ASP leaf set instead (see
+  // AccountProvider). The migration flow still needs it because it must tell
+  // DECLINED apart from PENDING to decide what can be migrated, and no bulk feed
+  // exposes that today.
   fetchDepositsByLabel: (aspUrl: string, chainId: number, scope: string, labels: string[]) =>
     fetchWithHeaders<DepositsByLabelResponse>(`${aspUrl}/${chainId}/public/deposits-by-label`, {
       'X-Pool-Scope': scope,
@@ -161,10 +174,47 @@ const aspClient = {
   fetchGlobalEvents: (aspUrl: string, page = 1, perPage = ITEMS_PER_PAGE) =>
     fetchWithHeaders<GlobalEventsResponse>(`${aspUrl}/global/public/events?page=${page}&perPage=${perPage}`),
 
-  fetchDepositsLargerThan: (aspUrl: string, chainId: number, scope: string, amount: string) =>
-    fetchWithHeaders<DepositsLargerThanResponse>(`${aspUrl}/${chainId}/public/deposits-larger-than?amount=${amount}`, {
-      'X-Pool-Scope': scope,
-    }),
+  // Caller-independent bulk deposit feed.
+  //
+  // Replaces the old `deposits-larger-than?amount=` call. That endpoint took the
+  // amount the user was about to withdraw, so the ASP learned the withdrawal
+  // value seconds before the matching `Withdrawn` event appeared on chain, from
+  // a session that had already identified the caller's deposits. This feed is
+  // the same for every caller: the client downloads the pool's deposits once and
+  // answers "how many deposits are >= X?" locally, so no amount leaves the
+  // browser.
+  //
+  // `/public/deposits` is paginated and caps perPage at 100 server-side, so page
+  // until `total` is covered. `maxPages` is a runaway guard, not a policy: if it
+  // trips we return what we have and the caller falls back to the leaf count.
+  fetchAllPoolDeposits: async (
+    aspUrl: string,
+    chainId: number,
+    scope: string,
+    maxPages = 100,
+  ): Promise<PoolDepositSummary[]> => {
+    const perPage = 100;
+    const collected: PoolDepositSummary[] = [];
+
+    for (let page = 1; page <= maxPages; page++) {
+      const response = await fetchWithHeaders<DepositsPageResponse>(
+        `${aspUrl}/${chainId}/public/deposits?page=${page}&perPage=${perPage}`,
+        { 'X-Pool-Scope': scope },
+      );
+
+      const events = response.depositEvents ?? [];
+      for (const event of events) {
+        if (event.label === undefined || event.label === null) continue;
+        if (event.publicAmount === undefined || event.publicAmount === null) continue;
+        collected.push({ label: event.label.toString(), amount: event.publicAmount.toString() });
+      }
+
+      if (events.length < perPage) break;
+      if (typeof response.total === 'number' && collected.length >= response.total) break;
+    }
+
+    return collected;
+  },
 
   fetchPoolStatistics: (aspUrl: string, chainId: number, scope: string) =>
     fetchWithHeaders<PoolStatisticsResponse>(`${aspUrl}/${chainId}/public/pool-statistics`, {
@@ -187,6 +237,9 @@ const aspClient = {
 
   fetchBrevisAspRoot: (brevisAspUrl: string) => fetchWithHeaders<BrevisAspRootResponse>(`${brevisAspUrl}/root`),
 
+  // LEGACY MIGRATION ONLY, and worse than the 0xbow equivalent: the labels go to
+  // a third party as URL query parameters, which land in access logs by default.
+  // Same rule as fetchDepositsByLabel above: never on a normal user path.
   fetchBrevisDepositReviewStatus: (labels: string[]) => {
     const queryParams = labels.map((label) => `label=${encodeURIComponent(label)}`).join('&');
     return fetchWithHeaders<{
@@ -204,7 +257,8 @@ export { aspClient };
 export type {
   PoolStats,
   PoolStatsResponse,
-  DepositsLargerThanResponse,
+  PoolDepositSummary,
+  DepositsPageResponse,
   PoolStatisticsResponse,
   PoolIncentivesStats,
   PoolIncentivesStatsResponse,

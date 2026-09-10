@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { addBreadcrumb, captureException, withScope } from '@sentry/nextjs';
 import { getAddress, Hex, parseUnits, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
-import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
+import { usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import { getConfig } from '~/config';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import {
@@ -95,7 +95,6 @@ export const useWithdraw = () => {
       ? mergeAndSortAspLeaves(aspData.mtLeavesData?.aspLeaves, aspData.mtLeavesData?.brevisAspLeaves)
       : aspData.mtLeavesData?.aspLeaves;
   const stateLeaves = aspData.mtLeavesData?.stateTreeLeaves;
-  const { address } = useAccount();
 
   const logErrorToSentry = useCallback(
     (error: Error | unknown, context: Record<string, unknown>) => {
@@ -130,23 +129,31 @@ export const useWithdraw = () => {
       }
 
       withScope((scope) => {
-        scope.setUser({
-          address: address,
-        });
-
-        // Set additional context
+        // Deliberately no user identity and no transaction detail.
+        //
+        // This block used to attach the connected wallet address, the withdrawal
+        // amount and the recipient address to every failed withdrawal, which
+        // handed our error backend the same depositor-to-recipient link the pool
+        // exists to hide -- for the subset of users unlucky enough to hit an
+        // error. beforeSend in instrumentation-client.ts filters by error type
+        // only and never scrubbed any of it.
+        //
+        // What stays is the shape of the failure, which is what actually makes a
+        // report actionable: which chain, which pool, and which inputs were
+        // present. If you add a field here, ask whether it identifies a person
+        // or a transaction; if it does, it does not belong in telemetry.
         scope.setContext('withdrawal_context', {
           chainId,
           poolAddress: selectedPoolInfo?.address,
           entryPointAddress: selectedPoolInfo?.entryPointAddress,
-          amount: amount?.toString(),
-          target,
+          hasAmount: !!amount,
+          hasTarget: !!target,
           hasPoolAccount: !!poolAccount,
           hasCommitment: !!commitment,
           hasAspLeaves: !!aspLeaves,
           hasStateLeaves: !!stateLeaves,
           hasSelectedRelayer: !!selectedRelayer?.url,
-          selectedRelayer,
+          relayerUrl: selectedRelayer?.url,
           testMode: TEST_MODE,
           ...context,
         });
@@ -161,7 +168,6 @@ export const useWithdraw = () => {
       });
     },
     [
-      address,
       chainId,
       selectedPoolInfo?.address,
       selectedPoolInfo?.entryPointAddress,
