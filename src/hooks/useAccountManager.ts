@@ -1,6 +1,7 @@
 'use client';
 
 import { RefObject, useCallback } from 'react';
+import { describeCustomRpcFailure } from '~/config';
 import { resolveLegacyTimestamps } from '~/migration/utils/helpers';
 import { AccountService, PoolAccount } from '~/types';
 import { createAccount as sdkCreateAccount, getPoolAccountsFromAccount, loadAccount as sdkLoadAccount } from '~/utils';
@@ -13,6 +14,8 @@ export function useAccountManager(
   legacyAccountServiceRef: RefObject<AccountService | null>,
   chainId: number,
   setIncompleteScopes: (scopes: string[]) => void,
+  /** Optional so existing callers and tests keep working unchanged. */
+  notify?: (severity: 'error' | 'warning', message: string) => void,
 ) {
   const createAccount = useCallback(
     (_seed: string) => {
@@ -38,6 +41,13 @@ export function useAccountManager(
 
     if (errors.length > 0) {
       console.warn('Some pools failed to load during account initialization:', errors);
+      // With a custom endpoint, a failed scan is not a log line, it is a screen
+      // that says the user has no pools and no balances. Say which endpoint is
+      // at fault and what to do about it, rather than leaving them to conclude
+      // their money is gone (Pat, 2026-09-11). Silent when no custom endpoint
+      // is set: a scan failure against ours is ours to fix.
+      const failure = describeCustomRpcFailure(errors as unknown as { chainId?: number; error?: unknown }[]);
+      if (failure) notify?.('error', failure.message);
     }
 
     // Record which scopes we could not reconstruct so the UI can block actions

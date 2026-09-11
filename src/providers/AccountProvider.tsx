@@ -96,6 +96,7 @@ export const AccountProvider = ({ children }: Props) => {
     legacyAccountServiceRef,
     selectedPoolInfo.chainId,
     setIncompleteScopes,
+    addNotification,
   );
 
   const isScopeComplete = useCallback(

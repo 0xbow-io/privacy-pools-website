@@ -1,5 +1,6 @@
 import { Address, parseEther, parseUnits } from 'viem';
 import { arbitrum, base, bsc, Chain, mainnet, optimism, optimismSepolia, sepolia } from 'viem/chains';
+import { readCustomRpcMap } from '~/config/customRpc';
 import { getAspEndpointForChain, getEnv } from '~/config/env';
 import { sUSDSAbi } from '~/config/sUSDSAbi';
 import { woethAbi } from '~/config/woethAbi';
@@ -655,24 +656,53 @@ const testnetChainData: ChainData = {
   },
 };
 
+/**
+ * Swap in the RPC endpoints the user picked for themselves, if any.
+ *
+ * Read once at module load, which is also when wagmi builds its transports, so
+ * the setting takes effect on the next page load. Returns a copy: the literals
+ * above stay untouched. On the server there is no localStorage and this is a
+ * no-op.
+ */
+const applyCustomRpcOverrides = (data: ChainData): ChainData => {
+  const overrides = readCustomRpcMap();
+  const chainIds = Object.keys(overrides);
+  if (chainIds.length === 0) return data;
+
+  const next: ChainData = { ...data };
+  for (const key of chainIds) {
+    const chainId = Number(key);
+    const entry = next[chainId];
+    const rpcUrl = overrides[chainId];
+    if (!entry || !rpcUrl) continue;
+
+    // Both endpoints move together. Leaving sdkRpcUrl on our proxy would keep
+    // sending the user's queries to us while the menu claims otherwise.
+    next[chainId] = { ...entry, rpcUrl, sdkRpcUrl: rpcUrl };
+  }
+  return next;
+};
+
 // Export chain data based on environment
 // For All Pools page: show both mainnet and testnet if SHOW_TEST_CHAINS is true
 // For wallet operations: only show appropriate chains based on IS_TESTNET
-export const chainData = IS_TESTNET ? testnetChainData : mainnetChainData;
+export const chainData = applyCustomRpcOverrides(IS_TESTNET ? testnetChainData : mainnetChainData);
 
 // Chain data for All Pools table (includes test chains if SHOW_TEST_CHAINS is enabled)
-export const allPoolsChainData: ChainData = (() => {
-  if (IS_TESTNET) {
-    return testnetChainData;
-  }
+export const allPoolsChainData: ChainData = applyCustomRpcOverrides(
+  (() => {
+    if (IS_TESTNET) {
+      return testnetChainData;
+    }
 
-  if (SHOW_TEST_CHAINS) {
-    // Combine mainnet and testnet data
-    return {
-      ...mainnetChainData,
-      ...testnetChainData,
-    };
-  }
+    if (SHOW_TEST_CHAINS) {
+      // Combine mainnet and testnet data
+      return {
+        ...mainnetChainData,
+        ...testnetChainData,
+      };
+    }
 
-  return mainnetChainData;
-})();
+    return mainnetChainData;
+  })(),
+);

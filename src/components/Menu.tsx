@@ -1,7 +1,7 @@
 'use client';
 
 import { MouseEvent, useRef, useState } from 'react';
-import { Checkmark, Copy, Download, Logout, Menu as MenuIcon, Wallet, Warning } from '@carbon/icons-react';
+import { Checkmark, Copy, Download, Globe, Logout, Menu as MenuIcon, Wallet, Warning } from '@carbon/icons-react';
 import {
   ListItemIcon,
   Menu as MuiMenu,
@@ -15,6 +15,7 @@ import {
 import { captureException } from '@sentry/nextjs';
 import { formatUnits } from 'viem';
 import { useSignTypedData, useAccount } from 'wagmi';
+import { getCustomRpcUrl } from '~/config';
 import { useGoTo, useChainContext, useAuthContext, useAccountContext, useModal } from '~/hooks';
 import { ModalType } from '~/types';
 import {
@@ -33,6 +34,7 @@ export const Menu = () => {
 
   const {
     price,
+    chainId,
     balanceBN: { value, symbol, decimals },
   } = useChainContext();
   const { logout } = useAuthContext();
@@ -59,9 +61,14 @@ export const Menu = () => {
   const open = Boolean(anchorEl);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  // Read when the menu is opened rather than during render, so the label is
+  // correct after a reset and nothing touches localStorage on the server.
+  const [hasCustomRpc, setHasCustomRpc] = useState(false);
+
   const handleToggle = (event: MouseEvent<HTMLElement>) => {
     if (event) {
       setAnchorEl(event.currentTarget);
+      setHasCustomRpc(!!getCustomRpcUrl(chainId));
     }
     if (open) {
       handleClose();
@@ -191,6 +198,19 @@ export const Menu = () => {
             <Logout size={16} />
           </ListItemIcon>
           Logout
+        </SMenuItem>
+
+        <SMenuItem
+          data-testid='custom-rpc-menu-item'
+          onClick={() => {
+            handleClose();
+            setModalOpen(ModalType.CUSTOM_RPC);
+          }}
+        >
+          <ListItemIcon>
+            <Globe size={16} />
+          </ListItemIcon>
+          {hasCustomRpc ? 'Using custom RPC' : 'Use custom RPC'}
         </SMenuItem>
       </SMenu>
     </>
