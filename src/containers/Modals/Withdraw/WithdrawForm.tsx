@@ -17,7 +17,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useSwitchChain } from 'wagmi';
 import { chainData, allPoolsChainData } from '~/config';
@@ -33,8 +32,7 @@ import {
   useExternalServices,
 } from '~/hooks';
 import { ModalType, ReviewStatus } from '~/types';
-import { aspClient, countDepositsAtLeast, getUsdBalance, relayerClient } from '~/utils';
-import { approvedLabelSet } from '~/utils/accountStatus';
+import { countDepositsAtLeast, getUsdBalance, relayerClient } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -43,7 +41,7 @@ import { RelayerSelectorSection } from './RelayerSelectorSection';
 const minWithdrawCache = new Map<string, string>();
 
 export const WithdrawForm = () => {
-  const { setModalOpen, modalOpen } = useModal();
+  const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
   const router = useRouter();
   const pathname = usePathname();
@@ -52,7 +50,6 @@ export const WithdrawForm = () => {
     balanceBN: { symbol, decimals: balanceDecimals },
     selectedPoolInfo,
     chainId,
-    chain: { aspUrl },
     selectedRelayer,
     setSelectedRelayer,
     relayersData,
@@ -65,7 +62,7 @@ export const WithdrawForm = () => {
     usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const {
-    aspData: { mtLeavesData, isLoading: isLoadingAsp },
+    aspData: { depositAmountsData, isLoading: isLoadingAsp },
   } = useExternalServices();
   const { setExtraGas, requestQuote, resetQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
@@ -172,41 +169,14 @@ export const WithdrawForm = () => {
     }
   }, [amount, fetchMinWithdrawAmount, minWithdrawAmount, isLoadingMinAmount]);
 
-  // Anonymity set, computed in the browser from two shared feeds: the pool's
-  // deposits and the ASP leaf set. Both are the same for every visitor, are
-  // cached, and the count re-runs locally as the amount changes, so typing
-  // issues no requests.
-  const {
-    data: poolDeposits,
-    isLoading: isLoadingPoolDeposits,
-    isError: depositsError,
-  } = useQuery({
-    queryKey: ['asp_all_pool_deposits', chainId, selectedPoolInfo?.scope?.toString(), aspUrl],
-    queryFn: () => aspClient.fetchAllPoolDeposits(aspUrl, chainId, selectedPoolInfo.scope.toString()),
-    enabled: modalOpen === ModalType.WITHDRAW && !!chainId && !!selectedPoolInfo?.scope,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-
-  const approvedLabels = useMemo(
-    () =>
-      approvedLabelSet(
-        mtLeavesData?.aspLeaves,
-        mtLeavesData?.brevisAspLeaves,
-        selectedPoolInfo.externalAsp?.provider === 'brevis',
-      ),
-    [mtLeavesData, selectedPoolInfo.externalAsp?.provider],
-  );
-
+  // Counted in the browser against the pool's published amount list, which
+  // useASP loads with the other public feeds. Nothing is fetched from here.
   const anonymitySet = useMemo(
-    () => countDepositsAtLeast(depositsError ? undefined : poolDeposits, approvedLabels, amountBN),
-    [amountBN, poolDeposits, approvedLabels, depositsError],
+    () => countDepositsAtLeast(depositAmountsData?.amounts, amountBN),
+    [amountBN, depositAmountsData?.amounts],
   );
 
-  const isLoadingAnonymitySet = amountBN > 0n && (isLoadingPoolDeposits || !!isLoadingAsp);
+  const isLoadingAnonymitySet = amountBN > 0n && !!isLoadingAsp;
 
   const isValidAmount = useMemo(() => {
     return amountBN > 0n && amountBN <= (poolAccount?.balance ?? 0n);
