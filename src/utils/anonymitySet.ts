@@ -1,54 +1,42 @@
-import type { PoolDepositSummary } from './aspClient';
-
 /**
- * Conservative local count: latest APPROVED decision, completed/processed event,
- * non-technical deposit, and membership in the complete ASP leaf union.
- * The deployed public/deposits feed lacks reviewStatus. Until the ASP adds the
- * latest decision to that caller-independent feed, its count is unavailable.
- * Leaf membership alone can include a subsequently declined deposit.
+ * How many deposits in this pool a withdrawal of `amount` blends into.
+ *
+ * `amounts` is the pool's approved deposit values, ascending, exactly as the
+ * ASP publishes them: the same bytes for every caller, with no label, id or
+ * address attached. That is what makes the list shareable, and what lets this
+ * be answered here instead of asked.
+ *
+ * Binary search for the first value >= amount; everything from there to the
+ * end qualifies. Comparison is bigint throughout because these are wei values
+ * far beyond Number.MAX_SAFE_INTEGER, where two distinct deposits a wei apart
+ * would collapse into the same float.
  */
-/**
- * Mirrors a filter the server already applies to its own counts, kept here so a
- * local count matches a server-side one. It is a data quirk, not a rule: these
- * ids are a block of technical deposits, not a general category the client can
- * recognise. Delete this the moment the feed marks them itself -- a hardcoded id
- * range in a frontend goes stale silently.
- */
-const TECHNICAL_DEPOSIT_IDS = { from: 824, to: 1646 } as const;
+export const countDepositsAtLeast = (amounts: string[] | undefined, amount: bigint): number | null => {
+  if (!amounts) return null;
+  if (amount <= 0n) return null;
 
-const isTechnicalDeposit = (id: number): boolean => id >= TECHNICAL_DEPOSIT_IDS.from && id <= TECHNICAL_DEPOSIT_IDS.to;
+  let low = 0;
+  let high = amounts.length;
 
-export const countDepositsAtLeast = (
-  deposits: PoolDepositSummary[] | undefined,
-  approvedLabels: Set<string> | undefined | null,
-  amount: bigint,
-): number | null => {
-  if (!deposits || !approvedLabels || amount <= 0n) return null;
-  // Missing eligibility evidence is unknown, not a zero anonymity set.
-  if (
-    deposits.some(
-      (deposit) =>
-        !Number.isSafeInteger(deposit.id) ||
-        typeof deposit.eventStatus !== 'string' ||
-        typeof deposit.reviewStatus !== 'string',
-    )
-  )
-    return null;
-
-  const seen = new Set<string>();
-  let count = 0;
-  for (const deposit of deposits) {
-    if (seen.has(deposit.label)) return null;
-    seen.add(deposit.label);
-    if (
-      !approvedLabels.has(deposit.label) ||
-      isTechnicalDeposit(deposit.id!) ||
-      !['completed', 'processed'].includes(deposit.eventStatus!.toLowerCase()) ||
-      deposit.reviewStatus!.toLowerCase() !== 'approved' ||
-      !/^[0-9]+$/.test(deposit.amount)
-    )
-      continue;
-    if (BigInt(deposit.amount) >= amount) count++;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    const raw = amounts[mid];
+    let value: bigint;
+    try {
+      // Decimal digits only. BigInt() would happily accept '0x02' or ' 2 ',
+      // and a feed emitting those is not the sorted decimal list being
+      // searched, so tolerating them would silently return a wrong position.
+      if (!/^[0-9]+$/.test(raw)) throw new Error('non-decimal amount');
+      value = BigInt(raw);
+    } catch {
+      // A malformed entry means the array is not the sorted list of numbers we
+      // are searching, so the position of every other element is unproven too.
+      // Report nothing rather than a figure derived from a broken feed.
+      return null;
+    }
+    if (value < amount) low = mid + 1;
+    else high = mid;
   }
-  return count;
+
+  return amounts.length - low;
 };
