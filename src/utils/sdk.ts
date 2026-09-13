@@ -20,7 +20,7 @@ import {
   PoolEventsError,
 } from '@0xbow/privacy-pools-core-sdk';
 import { createPublicClient, Hex } from 'viem';
-import { ChainData, chainData, whitelistedChains } from '~/config';
+import { ChainData, chainData, getCustomRpcChunk, getCustomRpcUrl, whitelistedChains } from '~/config';
 import { transports } from '~/config/wagmiConfig';
 import { PoolAccount, ReviewStatus } from '~/types';
 import { getTimestampFromBlockNumber } from '~/utils';
@@ -140,6 +140,51 @@ const logFetchConfig = new Map<
     },
   ],
 ]);
+
+/**
+ * What a NORMAL node will serve.
+ *
+ * Every entry above is tuned for the hypersync proxy: 1.5M blocks per
+ * `eth_getLogs` on mainnet, 48M on Arbitrum. Nothing else on earth answers
+ * that. Alchemy, Infura, most public endpoints and nearly every self-hosted
+ * node cap a log range in the thousands, so with a custom endpoint the event
+ * scan fails, every pool errors, and `loadAccount` returns an account with no
+ * pools and no balances.
+ *
+ * That is the realistic stranded-funds shape of the custom-RPC feature. The
+ * funds are not lost and resetting the endpoint recovers them, but the user is
+ * looking at a screen that says their money is gone, and the save-time
+ * `eth_chainId` probe cannot predict it: a fast, correct, right-chain Alchemy
+ * endpoint passes the probe and then fails the scan. "Probe passed" must not
+ * imply "endpoint works" for the one operation that matters most.
+ *
+ * 10k blocks is the common floor across hosted providers (it is what QuickNode
+ * and Alchemy document). Slower than hypersync by a lot, which is the price of
+ * the endpoint being the user's choice rather than ours.
+ */
+const customRpcLogFetch = () => ({
+  // User-settable, defaulting to the SDK's own 10k. Someone running their own
+  // node, or pointing at another hypersync, can raise it; they are warned once
+  // in the form and then believed.
+  blockChunkSize: getCustomRpcChunk(),
+  // One request at a time. The per-chain entries above run 2 concurrent for
+  // every chain except mainnet, which is fine against a proxy we own and is
+  // the first thing a rate-limited endpoint punishes.
+  concurrency: 1,
+  // A pause between chunks. The SDK retries a 429 with exponential backoff
+  // but never slows the STEADY rate, so without this a scan hits the limit,
+  // waits, and hits it again (Artem, 2026-09-11).
+  chunkDelayMs: 100,
+  retryOnFailure: true,
+  maxRetries: 3,
+  // The SDK's own default. 500 was ours, chosen against an endpoint that does
+  // not rate limit us.
+  retryBaseDelayMs: 1_000,
+});
+
+for (const chainId of logFetchConfig.keys()) {
+  if (getCustomRpcUrl(chainId)) logFetchConfig.set(chainId, customRpcLogFetch());
+}
 
 const dataService = new DataService(dataServiceConfig, logFetchConfig);
 

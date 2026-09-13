@@ -85,6 +85,7 @@ export const AccountProvider = ({ children }: Props) => {
     accountServiceRef,
     legacyAccountServiceRef,
     selectedPoolInfo.chainId,
+    addNotification,
   );
 
   const allPools = poolAccounts.length;
