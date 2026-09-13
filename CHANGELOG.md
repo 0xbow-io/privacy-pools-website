@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.2] - 2026-09-13
+
+### Added
+
+- Custom RPC endpoints. The account menu has a new entry for pointing each network at your own node, one field per network, with a test button that checks an endpoint answers for the network it is set against
+- Endpoints from a recognised provider can fill the other networks for you, and every filled row can be checked before saving
+- Endpoints can be kept for this tab only, instead of saved
+- The number of blocks requested per call is adjustable, for nodes that allow more or less than the default
+
+### Changed
+
+- Requests to a custom endpoint are paced more conservatively, and a rate-limited or failing endpoint now says so instead of leaving the account looking empty
+- Server-side error reporting narrowed
+
 ## [2.15.1] - 2026-09-11
 
 ### Changed
