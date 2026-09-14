@@ -5,6 +5,7 @@ import { styled } from '@mui/material/styles';
 import { Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
 import { MaintenanceBanner } from '~/components/MaintenanceBanner';
+import { V2InviteBanner } from '~/components/V2InviteBanner';
 import { useAuthContext } from '~/hooks';
 import { MigrationBanner } from '~/migration';
 import { zIndex } from '~/utils';
@@ -14,6 +15,7 @@ export const Header = () => {
 
   return (
     <HeaderWrapper>
+      <V2InviteBanner />
       <Disclaimer />
       <MigrationBanner />
       <MaintenanceBanner />
