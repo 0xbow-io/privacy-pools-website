@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
 
   if (userConnected && !userLogged) {
     if (!request.nextUrl.pathname.startsWith(ROUTER.account.base)) {
-      NextResponse.redirect(new URL(ROUTER.account.base, request.url));
+      return NextResponse.redirect(new URL(ROUTER.account.base, request.url));
     }
   }
 
@@ -21,5 +21,5 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  NextResponse.next();
+  return NextResponse.next();
 }
