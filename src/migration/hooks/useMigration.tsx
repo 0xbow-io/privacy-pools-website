@@ -20,7 +20,8 @@ const MigrationContext = createContext<MigrationContextValue | undefined>(undefi
 
 export const MigrationProvider = ({ children }: { children: React.ReactNode }) => {
   const runtime = getMigrationRuntimeConfig();
-  const { isConnected, isLogged, logout } = useAuthContext();
+  // Migration runs on the account services and the relayer; no wallet is involved.
+  const { hasSession, logout } = useAuthContext();
   const { addNotification } = useNotifications();
   const { setModalOpen, modalOpen, setIsClosable } = useModal();
   const { accountService, legacyAccountService, precomputedDeclinedLabels, loadLegacyReviewStatuses } =
@@ -47,7 +48,7 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
     hasDeferredInvalidationRef.current = false;
   }, []);
 
-  const hasMigrationSession = runtime.isMigrationActive && isConnected && isLogged;
+  const hasMigrationSession = runtime.isMigrationActive && hasSession;
   const hasMigrationServices = !!accountService && !!legacyAccountService;
   const canBuildMigrationReadiness = hasMigrationSession && hasMigrationServices;
 
@@ -74,8 +75,7 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
   }, [accountService, canBuildMigrationReadiness, legacyAccountService, precomputedDeclinedLabels]);
 
   useEffect(() => {
-    const hasHardInvalidation =
-      !runtime.isMigrationActive || !isConnected || !isLogged || !accountService || !legacyAccountService;
+    const hasHardInvalidation = !runtime.isMigrationActive || !hasSession || !accountService || !legacyAccountService;
 
     if (hasHardInvalidation) {
       if (isMigrationInFlightRef.current) {
@@ -86,7 +86,7 @@ export const MigrationProvider = ({ children }: { children: React.ReactNode }) =
       resetMigrationFlowState();
       return;
     }
-  }, [accountService, isConnected, isLogged, legacyAccountService, resetMigrationFlowState, runtime.isMigrationActive]);
+  }, [accountService, hasSession, legacyAccountService, resetMigrationFlowState, runtime.isMigrationActive]);
 
   const requiresRealMigration = !!migrationReadiness?.requiresMigration && !migrationReadiness?.isFullyMigrated;
   const hasStartedMigrationFlow = flowState === 'migrating' || flowState === 'failed' || flowState === 'success';

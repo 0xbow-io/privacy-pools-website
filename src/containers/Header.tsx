@@ -10,7 +10,9 @@ import { MigrationBanner } from '~/migration';
 import { zIndex } from '~/utils';
 
 export const Header = () => {
-  const { isConnected } = useAuthContext();
+  const { hasWallet, hasSession } = useAuthContext();
+  // The menu holds logout and the recovery phrase, so a seed-only session needs it too.
+  const showMenu = hasWallet || hasSession;
 
   return (
     <HeaderWrapper>
@@ -27,8 +29,8 @@ export const Header = () => {
         <Actions>
           <ChainSelect />
 
-          {!isConnected && <SignInButton />}
-          {isConnected && <Menu />}
+          {!showMenu && <SignInButton />}
+          {showMenu && <Menu />}
         </Actions>
       </StyledHeader>
     </HeaderWrapper>

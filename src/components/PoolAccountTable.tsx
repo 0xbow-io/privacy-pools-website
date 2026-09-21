@@ -104,8 +104,9 @@ export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
     [],
   );
 
+  // Exit is a transaction from the depositing wallet; without one the item is disabled.
   const getExitHandler = (row: PoolAccount) => {
-    return row.balance !== 0n ? () => handleExit(row) : undefined;
+    return row.balance !== 0n && address ? () => handleExit(row) : undefined;
   };
 
   const getWithdrawHandler = (row: PoolAccount) => {

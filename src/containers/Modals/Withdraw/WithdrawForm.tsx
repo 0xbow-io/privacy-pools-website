@@ -30,6 +30,7 @@ import {
   usePoolAccountsContext,
   useNotifications,
   useExternalServices,
+  useAuthContext,
 } from '~/hooks';
 import { ModalType, ReviewStatus } from '~/types';
 import { countDepositsAtLeast, getUsdBalance, relayerClient } from '~/utils';
@@ -66,6 +67,7 @@ export const WithdrawForm = () => {
   } = useExternalServices();
   const { setExtraGas, requestQuote, resetQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
+  const { hasWallet } = useAuthContext();
 
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
@@ -287,18 +289,23 @@ export const WithdrawForm = () => {
     const selectedPool = targetChainData.poolInfo.find((p) => p.asset.toLowerCase() === selectedAsset.toLowerCase());
 
     if (selectedPool) {
-      // If selecting a pool from a different chain, trigger a wallet chain switch
+      // If selecting a pool from a different chain, move the wallet with it when there is one.
+      // A withdrawal is relayed, so a seed-only session just changes the app's chain.
       if (selectedChainId !== chainId) {
-        try {
-          addNotification('info', `Switching to ${targetChainData.name}...`);
-          await switchChainAsync({ chainId: selectedChainId });
-          // Update the app's chain context to match the wallet's chain
+        if (hasWallet) {
+          try {
+            addNotification('info', `Switching to ${targetChainData.name}...`);
+            await switchChainAsync({ chainId: selectedChainId });
+            // Update the app's chain context to match the wallet's chain
+            setChainId(selectedChainId);
+            addNotification('success', `Switched to ${targetChainData.name}`);
+          } catch (err) {
+            console.error('Failed to switch chain:', err);
+            addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
+            return; // Don't proceed with asset selection if chain switch failed
+          }
+        } else {
           setChainId(selectedChainId);
-          addNotification('success', `Switched to ${targetChainData.name}`);
-        } catch (err) {
-          console.error('Failed to switch chain:', err);
-          addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
-          return; // Don't proceed with asset selection if chain switch failed
         }
       }
 

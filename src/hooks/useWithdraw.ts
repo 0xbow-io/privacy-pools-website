@@ -13,6 +13,7 @@ import {
   usePoolAccountsContext,
   useChainContext,
   useSafeApp,
+  useAuthContext,
 } from '~/hooks';
 import { Hash, ModalType, Secret, ProofRelayerPayload, WithdrawalRelayerPayload } from '~/types';
 import {
@@ -65,6 +66,7 @@ export const useWithdraw = () => {
   const { aspData, relayerData } = useExternalServices();
   const { switchChainAsync } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
+  const { hasWallet } = useAuthContext();
   const { resetQuote } = useQuoteContext();
   const { isSafeApp } = useSafeApp();
   const {
@@ -392,8 +394,10 @@ export const useWithdraw = () => {
         )
           throw new Error('Missing required data to withdraw');
 
-        // Only switch chain if not already on the correct chain and not using Safe
-        if (!isSafeApp && walletClient?.chain?.id !== chainId) {
+        // Only switch chain if not already on the correct chain and not using Safe.
+        // The withdrawal is relayed and reads through `publicClient`, so a
+        // seed-only session (no wallet) needs no switch.
+        if (!isSafeApp && hasWallet && walletClient?.chain?.id !== chainId) {
           await switchChainAsync({ chainId });
         }
 
@@ -550,6 +554,7 @@ export const useWithdraw = () => {
       relayerData,
       resetQuote,
       isSafeApp,
+      hasWallet,
       walletClient?.chain?.id,
     ],
   );

@@ -37,7 +37,7 @@ export const Menu = () => {
     chainId,
     balanceBN: { value, symbol, decimals },
   } = useChainContext();
-  const { logout } = useAuthContext();
+  const { logout, hasWallet } = useAuthContext();
   const { seed } = useAccountContext();
   const { setModalOpen } = useModal();
   const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
@@ -49,7 +49,11 @@ export const Menu = () => {
   const signupMethod = typeof window !== 'undefined' ? localStorage.getItem('signupMethod') : null;
   const walletSeedVersion =
     typeof window !== 'undefined' ? (localStorage.getItem('walletSeedVersion') as 'v1' | 'v2' | null) : null;
-  const canDownloadSeedphrase = signupMethod === 'wallet';
+  // A wallet sign-up re-derives the phrase behind a fresh signature. A seed-only
+  // session has no wallet to ask, so it downloads the seed it already holds.
+  const canReDeriveFromWallet = signupMethod === 'wallet' && hasWallet;
+  const canDownloadFromMemory = !hasWallet && signupMethod !== 'wallet' && !!seed;
+  const canDownloadSeedphrase = canReDeriveFromWallet || canDownloadFromMemory;
 
   const ethBalanceBN = value.toString() ?? '0';
   const balance = formatDataNumber(ethBalanceBN, decimals, 2, false, false, false);
@@ -93,14 +97,19 @@ export const Menu = () => {
     }
   };
 
+  const handleConnectWallet = () => {
+    handleClose();
+    setModalOpen(ModalType.CONNECT);
+  };
+
   const handleDownloadSeedPhrase = async () => {
-    if (!seed || !address) return;
+    if (!seed || (canReDeriveFromWallet && !address)) return;
 
     try {
       setIsDownloading(true);
-      let mnemonic = '';
+      let mnemonic = canReDeriveFromWallet ? '' : seed;
 
-      if (signupMethod === 'wallet') {
+      if (canReDeriveFromWallet && address) {
         // Use stored version, or default to v1 for backward compatibility with users who signed in before version tracking
         const version: 'v1' | 'v2' = walletSeedVersion || 'v1';
 
@@ -119,12 +128,13 @@ export const Menu = () => {
       }
 
       // Download the seedphrase
-      const content = `Privacy Pools Recovery Phrase\n\nWallet Address: ${address}\n\nRecovery Phrase:\n${mnemonic}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
+      const addressLine = address ? `Wallet Address: ${address}\n\n` : '';
+      const content = `Privacy Pools Recovery Phrase\n\n${addressLine}Recovery Phrase:\n${mnemonic}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
       const blob = new Blob([content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `privacy-pools-recovery-${address}.txt`;
+      a.download = `privacy-pools-recovery-${address ?? 'account'}.txt`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -151,26 +161,37 @@ export const Menu = () => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         elevation={0}
       >
-        <Stack direction='column' alignItems='start'>
-          <EthText variant='h6'>
-            {balance}
-            <span>{symbol}</span>
-          </EthText>
-          {usdBalance && <BalanceUsd variant='body2'>{`~ ${usdBalance}`}</BalanceUsd>}
-        </Stack>
+        {hasWallet && (
+          <Stack direction='column' alignItems='start'>
+            <EthText variant='h6'>
+              {balance}
+              <span>{symbol}</span>
+            </EthText>
+            {usdBalance && <BalanceUsd variant='body2'>{`~ ${usdBalance}`}</BalanceUsd>}
+          </Stack>
+        )}
 
-        <SMenuItem onClick={handleCopyAddress}>
-          <ListItemIcon>
-            <Wallet size={16} />
-          </ListItemIcon>
-          {truncateAddress(address!)}
+        {address ? (
+          <SMenuItem onClick={handleCopyAddress}>
+            <ListItemIcon>
+              <Wallet size={16} />
+            </ListItemIcon>
+            {truncateAddress(address)}
 
-          {copied ? (
-            <Checkmark size={16} color={theme.palette.text.disabled} />
-          ) : (
-            <Copy size={16} color={theme.palette.text.disabled} />
-          )}
-        </SMenuItem>
+            {copied ? (
+              <Checkmark size={16} color={theme.palette.text.disabled} />
+            ) : (
+              <Copy size={16} color={theme.palette.text.disabled} />
+            )}
+          </SMenuItem>
+        ) : (
+          <SMenuItem onClick={handleConnectWallet} data-testid='menu-connect-wallet'>
+            <ListItemIcon>
+              <Wallet size={16} />
+            </ListItemIcon>
+            Connect Wallet
+          </SMenuItem>
+        )}
 
         {seed && canDownloadSeedphrase && (
           <SMenuItem onClick={handleDownloadSeedPhrase} disabled={isDownloading}>
@@ -181,17 +202,19 @@ export const Menu = () => {
           </SMenuItem>
         )}
 
-        <SMenuItem
-          onClick={() => {
-            handleClose();
-            setModalOpen(ModalType.SELF_REPORT);
-          }}
-        >
-          <ListItemIcon>
-            <Warning size={16} />
-          </ListItemIcon>
-          Report Compromised Address
-        </SMenuItem>
+        {hasWallet && (
+          <SMenuItem
+            onClick={() => {
+              handleClose();
+              setModalOpen(ModalType.SELF_REPORT);
+            }}
+          >
+            <ListItemIcon>
+              <Warning size={16} />
+            </ListItemIcon>
+            Report Compromised Address
+          </SMenuItem>
+        )}
 
         <SMenuItem onClick={handleLogout}>
           <ListItemIcon>
