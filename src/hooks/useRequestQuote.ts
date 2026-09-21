@@ -5,6 +5,7 @@ import { Address } from 'viem';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { QuoteRequestBody, QuoteResponse, FeeCommitment } from '~/types';
 import { calculateRemainingTime } from '~/utils';
+import { CommitOutcome, fetchCommitQuote, fetchPriceQuote, QuotePriceParams } from '~/utils/quotePhases';
 
 let globalTimerInstanceActive = false;
 
@@ -32,6 +33,9 @@ interface UseRequestQuoteReturn {
   baseFeeBPS: number | null;
   extraGasAmountETH: string | null;
   relayTxCostETH: string | null;
+  /** A price is stored for the current amount and relayer (phase 1 done). */
+  isPriceCurrent: boolean;
+  /** A signed commitment is stored and still within its clock (phase 2 done). */
   isQuoteValid: boolean;
   countdown: number;
   isQuoteLoading: boolean;
@@ -39,9 +43,19 @@ interface UseRequestQuoteReturn {
   isExpired: boolean;
   quotedAmount: string | null;
   canRequestQuote: boolean;
+  canCommitQuote: boolean;
   requestNewQuote: () => Promise<void>;
+  commitQuote: () => Promise<CommitOutcome>;
 }
 
+// Two requests to the relayer's /quote endpoint:
+//  - phase 1, when the review step opens: chain, asset, amount, extraGas and
+//    no recipient. The relayer returns the price (feeBPS + gas detail) and
+//    signs nothing, so no clock runs while the user reads the screen.
+//  - phase 2, on Confirm: the same fields plus the recipient. The relayer
+//    signs the fee commitment and its 60 s clock starts here, right before
+//    proving. The recipient is only sent once the user has decided to go
+//    ahead.
 export const useRequestQuote = ({
   getQuote,
   isQuoteLoading,
@@ -56,7 +70,8 @@ export const useRequestQuote = ({
   isRelayerSelected,
   addNotification,
 }: UseRequestQuoteParams): UseRequestQuoteReturn => {
-  const { quoteState, setQuoteData, updateCountdown, resetQuote, markAsExpired, setExtraGas } = useQuoteContext();
+  const { quoteState, setPriceData, setQuoteData, updateCountdown, resetQuote, markAsExpired, setExtraGas } =
+    useQuoteContext();
   const isFetchingRef = useRef(false);
   const previousExtraGasRef = useRef(quoteState.extraGas);
   const expiredNotificationSentRef = useRef<string | null>(null);
@@ -74,63 +89,36 @@ export const useRequestQuote = ({
     addNotificationRef.current = addNotification;
   }, [updateCountdown, markAsExpired, addNotification]);
 
+  // Phase 1 prerequisites: everything the price depends on. No recipient.
   const canRequestQuote = useMemo((): boolean => {
     return (
-      isValidAmount &&
-      !!recipient &&
-      isRecipientAddressValid &&
-      isRelayerSelected &&
-      !!relayerUrl &&
-      !!assetAddress &&
-      chainId !== undefined &&
-      amountBN > 0n
+      isValidAmount && isRelayerSelected && !!relayerUrl && !!assetAddress && chainId !== undefined && amountBN > 0n
     );
-  }, [
-    isValidAmount,
-    recipient,
-    isRecipientAddressValid,
-    isRelayerSelected,
-    relayerUrl,
-    assetAddress,
-    chainId,
-    amountBN,
-  ]);
+  }, [isValidAmount, isRelayerSelected, relayerUrl, assetAddress, chainId, amountBN]);
+
+  // Phase 2 prerequisites: the price prerequisites plus a valid recipient.
+  const canCommitQuote = useMemo(
+    (): boolean => canRequestQuote && !!recipient && isRecipientAddressValid,
+    [canRequestQuote, recipient, isRecipientAddressValid],
+  );
 
   const executeFetchAndSetQuote = useCallback(async () => {
-    if (!canRequestQuote || !chainId || !assetAddress || !recipient || !relayerUrl || isFetchingRef.current) {
+    if (!canRequestQuote || !chainId || !assetAddress || !relayerUrl || isFetchingRef.current) {
       return;
     }
 
     isFetchingRef.current = true;
     const requestedAmount = amountBN.toString();
+    const params: QuotePriceParams = {
+      chainId,
+      amount: requestedAmount,
+      asset: assetAddress,
+      extraGas: quoteState.extraGas,
+    };
     try {
-      const quoteInput = {
-        chainId,
-        amount: requestedAmount,
-        asset: assetAddress,
-        recipient,
-        extraGas: quoteState.extraGas,
-      };
-      const newQuoteData = await getQuote(quoteInput);
-
-      const remainingTime = calculateRemainingTime(newQuoteData.feeCommitment.expiration);
-
-      if (remainingTime <= 0) {
-        addNotification('warning', 'Quote expired immediately. Your system clock may be inaccurate.');
-      }
-
+      const price = await fetchPriceQuote(getQuote, params);
       expiredNotificationSentRef.current = null;
-
-      setQuoteData(
-        newQuoteData.feeCommitment,
-        Number(newQuoteData.feeBPS),
-        Number(newQuoteData.baseFeeBPS),
-        newQuoteData.detail?.extraGasFundAmount?.eth || null,
-        newQuoteData.detail?.relayTxCost?.eth || null,
-        remainingTime,
-        requestedAmount,
-        relayerUrl,
-      );
+      setPriceData(price, requestedAmount, relayerUrl);
     } catch (err) {
       // If extraGas was requested but the relayer doesn't support it for this chain,
       // automatically retry without extraGas
@@ -139,26 +127,9 @@ export const useRequestQuote = ({
         setExtraGas(false);
         previousExtraGasRef.current = false;
         try {
-          const retryInput = {
-            chainId,
-            amount: requestedAmount,
-            asset: assetAddress,
-            recipient,
-            extraGas: false,
-          };
-          const retryData = await getQuote(retryInput);
-          const remainingTime = calculateRemainingTime(retryData.feeCommitment.expiration);
+          const price = await fetchPriceQuote(getQuote, { ...params, extraGas: false });
           expiredNotificationSentRef.current = null;
-          setQuoteData(
-            retryData.feeCommitment,
-            Number(retryData.feeBPS),
-            Number(retryData.baseFeeBPS),
-            retryData.detail?.extraGasFundAmount?.eth || null,
-            retryData.detail?.relayTxCost?.eth || null,
-            remainingTime,
-            requestedAmount,
-            relayerUrl,
-          );
+          setPriceData(price, requestedAmount, relayerUrl);
           return;
         } catch (retryErr) {
           const retryMessage = `Failed to get quote: ${retryErr instanceof Error ? retryErr.message : 'Unknown error'}`;
@@ -181,13 +152,12 @@ export const useRequestQuote = ({
     chainId,
     amountBN,
     assetAddress,
-    recipient,
     relayerUrl,
     quoteState.extraGas,
     getQuote,
     addNotification,
     resetQuote,
-    setQuoteData,
+    setPriceData,
     setExtraGas,
   ]);
 
@@ -203,18 +173,13 @@ export const useRequestQuote = ({
     }
   }, [canRequestQuote, resetQuote]);
 
-  // Effect to refetch quote when extraGas changes (only if we already have a quote)
+  // Effect to refetch the price when extraGas changes (only if we already have one)
   useEffect(() => {
-    if (
-      canRequestQuote &&
-      quoteState.quoteCommitment &&
-      !quoteState.isExpired &&
-      previousExtraGasRef.current !== quoteState.extraGas
-    ) {
+    if (canRequestQuote && quoteState.feeBPS !== null && previousExtraGasRef.current !== quoteState.extraGas) {
       executeFetchAndSetQuote();
       previousExtraGasRef.current = quoteState.extraGas;
     }
-  }, [quoteState.extraGas, canRequestQuote, quoteState.quoteCommitment, quoteState.isExpired, executeFetchAndSetQuote]);
+  }, [quoteState.extraGas, canRequestQuote, quoteState.feeBPS, executeFetchAndSetQuote]);
 
   const startTimer = useCallback((quoteId: string, initialCountdown: number) => {
     if (timerIdRef.current || globalTimerInstanceActive) {
@@ -286,6 +251,14 @@ export const useRequestQuote = ({
     relayerUrl,
   ]);
 
+  const isPriceCurrent = useMemo(
+    () =>
+      quoteState.feeBPS !== null &&
+      quoteState.quotedRelayerUrl === relayerUrl &&
+      quoteState.quotedAmount === amountBN.toString(),
+    [quoteState.feeBPS, quoteState.quotedRelayerUrl, quoteState.quotedAmount, relayerUrl, amountBN],
+  );
+
   const isQuoteValid = useMemo(
     () =>
       quoteState.quoteCommitment !== null &&
@@ -303,12 +276,63 @@ export const useRequestQuote = ({
     }
   }, [canRequestQuote, executeFetchAndSetQuote, resetQuote]);
 
+  // Phase 2. Sends the recipient to the relayer that produced the shown price
+  // (same relayerUrl) and stores the signed commitment. If the relayer's fee
+  // is now above the shown one, nothing is stored but the new price, and the
+  // caller asks the user to confirm again. Throws on a relayer error.
+  const commitQuote = useCallback(async (): Promise<CommitOutcome> => {
+    if (!canCommitQuote || !chainId || !assetAddress || !recipient || !relayerUrl) {
+      throw new Error('Missing withdrawal details for the fee commitment');
+    }
+    if (quoteState.feeBPS === null || !isPriceCurrent) {
+      throw new Error('No fee shown for this amount and relayer');
+    }
+
+    const requestedAmount = amountBN.toString();
+    const params: QuotePriceParams = {
+      chainId,
+      amount: requestedAmount,
+      asset: assetAddress,
+      extraGas: quoteState.extraGas,
+    };
+
+    const outcome = await fetchCommitQuote(getQuote, params, recipient, quoteState.feeBPS);
+
+    if (outcome.kind === 'fee-increased') {
+      setPriceData(outcome.price, requestedAmount, relayerUrl);
+      return outcome;
+    }
+
+    const remainingTime = calculateRemainingTime(outcome.feeCommitment.expiration);
+    if (remainingTime <= 0) {
+      addNotification('warning', 'Quote expired immediately. Your system clock may be inaccurate.');
+    }
+    expiredNotificationSentRef.current = null;
+    setQuoteData(outcome.feeCommitment, outcome.price, remainingTime, requestedAmount, relayerUrl);
+    return outcome;
+  }, [
+    canCommitQuote,
+    chainId,
+    assetAddress,
+    recipient,
+    relayerUrl,
+    amountBN,
+    quoteState.feeBPS,
+    quoteState.extraGas,
+    isPriceCurrent,
+    getQuote,
+    setPriceData,
+    setQuoteData,
+    addNotification,
+  ]);
+
   return {
     quoteCommitment: quoteState.quoteCommitment,
     feeBPS: quoteState.feeBPS,
     baseFeeBPS: quoteState.baseFeeBPS,
     extraGasAmountETH: quoteState.extraGasAmountETH,
     relayTxCostETH: quoteState.relayTxCostETH,
+    isPriceCurrent,
     isQuoteValid,
     countdown: quoteState.countdown,
     isQuoteLoading,
@@ -316,6 +340,8 @@ export const useRequestQuote = ({
     isExpired: quoteState.isExpired,
     quotedAmount: quoteState.quotedAmount,
     canRequestQuote,
+    canCommitQuote,
     requestNewQuote,
+    commitQuote,
   };
 };

@@ -188,9 +188,9 @@ export const useWithdraw = () => {
       }) => void,
       onComplete?: (proof: unknown, withdrawal: unknown, newSecretKeys: unknown) => void,
     ) => {
-      // Check for valid quote data immediately
+      // The signed fee commitment and its feeBPS are set by the Review Confirm click.
       if (!feeBPSForWithdraw || feeBPSForWithdraw === 0n || !feeCommitment) {
-        throw new Error('No valid quote available. Please ensure you have a valid quote before withdrawing.');
+        throw new Error('No fee commitment for this withdrawal. Please confirm the review step again.');
       }
 
       if (TEST_MODE) return;
@@ -206,6 +206,7 @@ export const useWithdraw = () => {
       if (!relayerDetails) missingFields.push('relayerDetails');
       if (!relayerDetails?.relayerAddress) missingFields.push('relayerAddress');
       if (!feeBPSForWithdraw) missingFields.push('feeBPS');
+      if (!feeCommitment) missingFields.push('feeCommitment');
       if (!accountService) missingFields.push('accountService');
 
       if (missingFields.length > 0) {

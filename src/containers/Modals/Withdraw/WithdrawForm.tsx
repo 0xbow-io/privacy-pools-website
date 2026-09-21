@@ -326,7 +326,8 @@ export const WithdrawForm = () => {
   const handleWithdraw = useCallback(() => {
     // Set extraGas based on checkbox state
     setExtraGas(receiveGasToken);
-    // Signal that a quote should be requested when Review screen opens
+    // Signal that the price should be requested when Review screen opens.
+    // The recipient goes to the relayer only on Confirm, with the commitment request.
     requestQuote();
     // Go to Review screen
     setModalOpen(ModalType.REVIEW);

@@ -29,9 +29,9 @@ export const ReviewModal = () => {
   const { deposit, isLoading: isDepositLoading } = useDeposit();
   const { isLoading: isWithdrawLoading } = useWithdraw();
   const { isLoading: isExitLoading } = useExit();
-  const { actionType, feeCommitment, amount, target } = usePoolAccountsContext();
+  const { actionType, amount, target, setFeeCommitment, setFeeBPSForWithdraw } = usePoolAccountsContext();
   const [isConfirmClicked, setIsConfirmClicked] = useState(false);
-  const { quoteState, clearPendingQuoteRequest } = useQuoteContext();
+  const { quoteState, clearPendingQuoteRequest, clearCommitment } = useQuoteContext();
 
   // Quote logic for withdrawals
   const {
@@ -44,7 +44,7 @@ export const ReviewModal = () => {
 
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading } = relayerData || {};
-  const { isQuoteValid, isExpired, quotedAmount, canRequestQuote, requestNewQuote } = useRequestQuote({
+  const { isPriceCurrent, canRequestQuote, requestNewQuote, commitQuote } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
     quoteError: null,
@@ -61,28 +61,29 @@ export const ReviewModal = () => {
 
   const isLoading = isDepositLoading || isExitLoading || isWithdrawLoading;
 
-  // For withdrawals, check if we have a valid fee commitment and quote
-  // For exits and deposits, no fee commitment check is needed
-  const isActionReady = actionType === EventType.WITHDRAWAL ? !!feeCommitment && isQuoteValid : true;
+  // For withdrawals, Confirm needs the price for the current amount and relayer
+  // (phase 1). The signed commitment (phase 2) is fetched by the click itself.
+  // For exits and deposits, no quote is involved.
+  const isActionReady = actionType === EventType.WITHDRAWAL ? isPriceCurrent : true;
   const isConfirmDisabled =
     isLoading || isConfirmClicked || !isActionReady || (isQuoteLoading && actionType === EventType.WITHDRAWAL);
 
-  // Request quote when pendingQuoteRequest is true (triggered by clicking "Review Withdrawal").
-  //
-  // Timing constraint: the relayer signs the commitment for 60 s and rejects
-  // it at relay time once expired, and the proof binds `withdrawalData`, so
-  // the quote has to precede proving. Firing it here is what lets this step
-  // show the exact fee before Confirm; the only later trigger is the Confirm
-  // click itself, which would need an indicative fee here and a second click.
+  // Request the price when pendingQuoteRequest is true (triggered by clicking
+  // "Review Withdrawal"). This request carries no recipient, so the relayer
+  // signs nothing and no clock runs while the user reads this step. The
+  // commitment, which the proof binds via `withdrawalData` and which the
+  // relayer rejects 60 s after signing, is requested on Confirm, right before
+  // proving.
   useEffect(() => {
     if (actionType === EventType.WITHDRAWAL && canRequestQuote && quoteState.pendingQuoteRequest) {
       clearPendingQuoteRequest();
 
-      const currentAmountStr = amountBN.toString();
-      const hasValidQuoteForAmount = quotedAmount === currentAmountStr && !isExpired && isQuoteValid;
-
-      // Only request new quote if amount changed or quote is expired/invalid
-      if (!hasValidQuoteForAmount) {
+      // Only request a new price if the amount or relayer changed. A
+      // commitment left over from an earlier Confirm is dropped either way;
+      // the next Confirm fetches a fresh one.
+      if (isPriceCurrent) {
+        clearCommitment();
+      } else {
         requestNewQuote();
       }
     }
@@ -91,11 +92,9 @@ export const ReviewModal = () => {
     canRequestQuote,
     quoteState.pendingQuoteRequest,
     clearPendingQuoteRequest,
+    clearCommitment,
     requestNewQuote,
-    amountBN,
-    quotedAmount,
-    isExpired,
-    isQuoteValid,
+    isPriceCurrent,
   ]);
 
   const handleConfirm = useCallback(async () => {
@@ -103,19 +102,33 @@ export const ReviewModal = () => {
       setIsConfirmClicked(true);
       deposit();
     } else if (actionType === EventType.WITHDRAWAL) {
-      const currentAmountStr = amountBN.toString();
-      // Check if quote is valid and matches current amount
-      const needsNewQuote = quotedAmount !== currentAmountStr || !isQuoteValid || isExpired;
-      if (needsNewQuote) {
-        // Quote invalid or amount changed, need to refetch
+      if (!isPriceCurrent) {
+        // The shown fee is not for the current amount or relayer: re-price
+        // and let the user confirm again against the new number.
         await requestNewQuote();
-        // Don't proceed - user will need to click confirm again with the new quote
         addNotification('warning', 'Quote refreshed. Please review and confirm.');
         return;
       }
+      // Disables the button until this click resolves one way or the other.
       setIsConfirmClicked(true);
-      // Open proof generation modal for withdrawals
-      setModalOpen(ModalType.GENERATE_ZK_PROOF);
+      try {
+        const outcome = await commitQuote();
+        if (outcome.kind === 'fee-increased') {
+          // The relayer's fee moved above the shown one. The new fee is now on
+          // screen and nothing was committed; the user confirms again.
+          setIsConfirmClicked(false);
+          addNotification('warning', 'The relayer fee went up. Please review the new fee and confirm.');
+          return;
+        }
+        setFeeCommitment(outcome.feeCommitment);
+        setFeeBPSForWithdraw(BigInt(outcome.price.feeBPS));
+        // Open proof generation modal for withdrawals
+        setModalOpen(ModalType.GENERATE_ZK_PROOF);
+      } catch (err) {
+        setIsConfirmClicked(false);
+        console.error('commitQuote error:', err);
+        addNotification('error', `Failed to get quote: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
     } else if (actionType === EventType.EXIT) {
       setIsConfirmClicked(true);
       // Open proof generation modal for exits
@@ -123,19 +136,15 @@ export const ReviewModal = () => {
     }
   }, [
     actionType,
-    amountBN,
-    quotedAmount,
-    isQuoteValid,
-    isExpired,
+    isPriceCurrent,
     requestNewQuote,
+    commitQuote,
+    setFeeCommitment,
+    setFeeBPSForWithdraw,
     addNotification,
     deposit,
     setModalOpen,
   ]);
-
-  const handleRequestNewQuote = async () => {
-    await requestNewQuote();
-  };
 
   const handleGoBack = () => {
     if (actionType === EventType.WITHDRAWAL) {
@@ -193,32 +202,21 @@ export const ReviewModal = () => {
 
         {actionType === EventType.EXIT && <ExitMessage />}
 
-        {actionType === EventType.WITHDRAWAL && isExpired ? (
-          <PulsingButton
-            disabled={isQuoteLoading}
-            onClick={handleRequestNewQuote}
-            data-testid='request-new-quote-button'
-          >
-            {isQuoteLoading && <CircularProgress size='1.6rem' />}
-            {isQuoteLoading ? 'Getting new quote...' : 'Request new quote'}
-          </PulsingButton>
-        ) : (
-          <SButton disabled={isConfirmDisabled} onClick={handleConfirm} data-testid='confirm-review-button'>
-            {(isLoading || isConfirmClicked || (isQuoteLoading && actionType === EventType.WITHDRAWAL)) && (
-              <CircularProgress size='1.6rem' sx={{ mr: 1 }} />
-            )}
-            {!isLoading &&
-              !isConfirmClicked &&
-              actionType === EventType.WITHDRAWAL &&
-              (isQuoteLoading || !feeCommitment) &&
-              'Getting quote...'}
-            {!isLoading &&
-              !isConfirmClicked &&
-              !isQuoteLoading &&
-              (actionType !== EventType.WITHDRAWAL || !!feeCommitment) &&
-              'Confirm'}
-          </SButton>
-        )}
+        <SButton disabled={isConfirmDisabled} onClick={handleConfirm} data-testid='confirm-review-button'>
+          {(isLoading || isConfirmClicked || (isQuoteLoading && actionType === EventType.WITHDRAWAL)) && (
+            <CircularProgress size='1.6rem' sx={{ mr: 1 }} />
+          )}
+          {!isLoading &&
+            !isConfirmClicked &&
+            actionType === EventType.WITHDRAWAL &&
+            (isQuoteLoading || !isPriceCurrent) &&
+            'Getting quote...'}
+          {!isLoading &&
+            !isConfirmClicked &&
+            !isQuoteLoading &&
+            (actionType !== EventType.WITHDRAWAL || isPriceCurrent) &&
+            'Confirm'}
+        </SButton>
         <PoolAccountSection />
 
         <LinksSection
@@ -260,23 +258,6 @@ const DecorativeCircle = styled(Box, {
 
 const SButton = styled(Button)({
   minWidth: '10rem',
-});
-
-const PulsingButton = styled(Button)({
-  minWidth: '10rem',
-  animation: 'pulse 1s 3',
-
-  '@keyframes pulse': {
-    '0%': {
-      transform: 'scale(1)',
-    },
-    '50%': {
-      transform: 'scale(1.05)',
-    },
-    '100%': {
-      transform: 'scale(1)',
-    },
-  },
 });
 
 const GasTokenDropSection = styled(Box)(() => ({

@@ -41,17 +41,8 @@ export const DataSection = () => {
     chainId,
   } = useChainContext();
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
-  const {
-    amount,
-    target,
-    actionType,
-    poolAccount,
-    vettingFeeBPS,
-    feeBPSForWithdraw,
-    setFeeCommitment,
-    setFeeBPSForWithdraw,
-    selectedAlternativeToken,
-  } = usePoolAccountsContext();
+  const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw, selectedAlternativeToken } =
+    usePoolAccountsContext();
   const { addNotification } = useNotifications();
   const isDeposit = actionType === EventType.DEPOSIT;
   const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
@@ -76,18 +67,15 @@ export const DataSection = () => {
     fetchPreview();
   }, [isDeposit, selectedAlternativeToken, amount, decimals, publicClient]);
 
-  // Add quote timer for withdrawals
+  // The relayer's price for this withdrawal (phase 1, no commitment yet).
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading, quoteError } = relayerData || {};
   const {
-    countdown,
-    isQuoteValid,
-    isExpired,
+    isPriceCurrent,
     feeBPS: quoteFeesBPS,
     baseFeeBPS: quoteBaseFeeBPS,
     extraGasAmountETH: quoteExtraGasAmountETH,
     relayTxCostETH: quoteRelayTxCostETH,
-    quoteCommitment,
   } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
@@ -103,13 +91,9 @@ export const DataSection = () => {
     addNotification,
   });
 
-  // Set fee commitment when valid quote is available for withdrawals
-  useEffect(() => {
-    if (actionType === EventType.WITHDRAWAL && isQuoteValid && quoteCommitment && quoteFeesBPS) {
-      setFeeCommitment(quoteCommitment);
-      setFeeBPSForWithdraw(BigInt(quoteFeesBPS));
-    }
-  }, [actionType, isQuoteValid, quoteCommitment, quoteFeesBPS, setFeeCommitment, setFeeBPSForWithdraw]);
+  // The fee commitment and feeBPSForWithdraw are set by the Review Confirm
+  // click (phase 2), once the relayer has signed for the shown price.
+  const showsRelayerFee = actionType === EventType.WITHDRAWAL && isPriceCurrent;
   const aspDataFees = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
   const aspOrRelayer = {
     label: isDeposit ? 'ASP' : 'Relayer',
@@ -256,16 +240,6 @@ export const DataSection = () => {
               <Value variant='body2'>{feesCollector}</Value>
             </Tooltip>
           </Row>
-          {actionType === EventType.WITHDRAWAL && (isQuoteValid || isExpired) && (
-            <Row>
-              <Label variant='body2'>Quote expires:</Label>
-              {countdown > 0 ? (
-                <QuoteTimer variant='body2'>in {countdown}s</QuoteTimer>
-              ) : (
-                <FlashingExpiredTimer variant='body2'>Expired</FlashingExpiredTimer>
-              )}
-            </Row>
-          )}
           {actionType !== EventType.WITHDRAWAL && (
             <Row>
               <Label variant='body2'>Value:</Label>
@@ -275,7 +249,7 @@ export const DataSection = () => {
             </Row>
           )}
           {/* Net Fee row with dropdown for withdrawals */}
-          {actionType === EventType.WITHDRAWAL && isQuoteValid && quoteFeesBPS !== null && quoteBaseFeeBPS !== null && (
+          {showsRelayerFee && quoteFeesBPS !== null && quoteBaseFeeBPS !== null && (
             <>
               <Row>
                 <Label variant='body2'>Net Fee:</Label>
@@ -395,29 +369,6 @@ const AddressValue = styled('div')(({ theme }) => ({
 
   [theme.breakpoints.down('sm')]: {
     fontSize: theme.typography.body2.fontSize,
-  },
-}));
-
-const QuoteTimer = styled(Value)(({ theme }) => ({
-  fontWeight: 500,
-  color: theme.palette.warning.main,
-}));
-
-const FlashingExpiredTimer = styled(Value)(({ theme }) => ({
-  fontWeight: 500,
-  color: theme.palette.error.main,
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.spacing(1),
-  animation: 'flash 2s 3',
-
-  '@keyframes flash': {
-    '0%, 50%': {
-      opacity: 1,
-    },
-    '25%, 75%': {
-      opacity: 0.3,
-    },
   },
 }));
 

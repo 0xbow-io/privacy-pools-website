@@ -103,4 +103,43 @@ describe('relayerClient', () => {
       expect(result).toEqual(MOCK_RELAYER.relayResponse);
     });
   });
+
+  describe('fetchQuote', () => {
+    const quoteFields = { chainId, amount: '100000000000000000', asset: assetAddress, extraGas: false };
+    const recipient = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+    const sentBody = () => JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+
+    it('phase 1: the body on the wire has no recipient key', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ baseFeeBPS: '100', feeBPS: '250', gasPrice: '1', detail: {} }),
+      } as Response);
+
+      const result = await relayerClient.fetchQuote(relayerUrl, quoteFields);
+
+      expect(mockFetch.mock.calls[0][0]).toBe(`${relayerUrl}/relayer/quote`);
+      expect(sentBody()).toEqual(quoteFields);
+      expect(Object.keys(sentBody())).not.toContain('recipient');
+      expect(result.feeCommitment).toBeUndefined();
+    });
+
+    it('phase 2: the body on the wire carries the recipient', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            baseFeeBPS: '100',
+            feeBPS: '250',
+            gasPrice: '1',
+            detail: {},
+            feeCommitment: MOCK_RELAYER.feeCommitment,
+          }),
+      } as Response);
+
+      const result = await relayerClient.fetchQuote(relayerUrl, { ...quoteFields, recipient });
+
+      expect(sentBody()).toEqual({ ...quoteFields, recipient });
+      expect(result.feeCommitment).toEqual(MOCK_RELAYER.feeCommitment);
+    });
+  });
 });
