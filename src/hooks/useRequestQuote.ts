@@ -5,7 +5,7 @@ import { Address } from 'viem';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import { QuoteRequestBody, QuoteResponse, FeeCommitment } from '~/types';
 import { calculateRemainingTime } from '~/utils';
-import { CommitOutcome, fetchCommitQuote, fetchPriceQuote, QuotePriceParams } from '~/utils/quotePhases';
+import { CommitOutcome, fetchCommitQuote, fetchPriceWithFallback, QuotePriceParams } from '~/utils/quotePhases';
 
 let globalTimerInstanceActive = false;
 
@@ -56,6 +56,10 @@ interface UseRequestQuoteReturn {
 //    signs the fee commitment and its 60 s clock starts here, right before
 //    proving. The recipient is only sent once the user has decided to go
 //    ahead.
+// A relayer that rejects the phase-1 body without a recipient gets the
+// recipient in phase 1 after all (see fetchPriceWithFallback); for it the
+// request at review time is the one made before the split, and only the
+// clock moves to Confirm.
 export const useRequestQuote = ({
   getQuote,
   isQuoteLoading,
@@ -115,8 +119,11 @@ export const useRequestQuote = ({
       asset: assetAddress,
       extraGas: quoteState.extraGas,
     };
+    // Only for the fallback: a relayer that rejects a body without a recipient
+    // gets it at this step, as before the split.
+    const fallbackRecipient = canCommitQuote && recipient ? recipient : null;
     try {
-      const price = await fetchPriceQuote(getQuote, params);
+      const { price } = await fetchPriceWithFallback(getQuote, params, fallbackRecipient, relayerUrl);
       expiredNotificationSentRef.current = null;
       setPriceData(price, requestedAmount, relayerUrl);
     } catch (err) {
@@ -127,7 +134,12 @@ export const useRequestQuote = ({
         setExtraGas(false);
         previousExtraGasRef.current = false;
         try {
-          const price = await fetchPriceQuote(getQuote, { ...params, extraGas: false });
+          const { price } = await fetchPriceWithFallback(
+            getQuote,
+            { ...params, extraGas: false },
+            fallbackRecipient,
+            relayerUrl,
+          );
           expiredNotificationSentRef.current = null;
           setPriceData(price, requestedAmount, relayerUrl);
           return;
@@ -149,9 +161,11 @@ export const useRequestQuote = ({
     }
   }, [
     canRequestQuote,
+    canCommitQuote,
     chainId,
     amountBN,
     assetAddress,
+    recipient,
     relayerUrl,
     quoteState.extraGas,
     getQuote,

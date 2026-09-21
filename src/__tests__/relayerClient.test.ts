@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { MOCK_RELAYER } from '~/__tests__/__mocks__';
 import { chainData, whitelistedChains } from '~/config/chainData';
 import { FeesResponse, RelayerResponse } from '~/types';
-import { relayerClient } from '~/utils/relayerClient';
+import { relayerClient, RelayerRequestError } from '~/utils/relayerClient';
 
 const chainId = whitelistedChains[0].id;
 const relayerUrl = chainData[chainId].relayers[0].url;
@@ -140,6 +140,23 @@ describe('relayerClient', () => {
 
       expect(sentBody()).toEqual({ ...quoteFields, recipient });
       expect(result.feeCommitment).toEqual(MOCK_RELAYER.feeCommitment);
+    });
+
+    it('a non-2xx answer throws with the status and body kept', async () => {
+      const body = '{"message":"body must have required property \'recipient\'"}';
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: () => Promise.resolve(body),
+      } as Response);
+
+      const err = await relayerClient.fetchQuote(relayerUrl, quoteFields).catch((e) => e);
+
+      expect(err).toBeInstanceOf(RelayerRequestError);
+      expect(err.status).toBe(400);
+      expect(err.body).toBe(body);
+      expect(err.message).toBe(`Failed to fetch quote: 400 Bad Request - ${body}`);
     });
   });
 });
