@@ -1,4 +1,4 @@
-import { formatUnits, parseUnits, PublicClient } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import { CreateConnectorFn, Connector } from 'wagmi';
 import { EventType, ReviewStatus, StatusObject } from '~/types';
 
@@ -79,18 +79,6 @@ export const formatSmallNumber = (value: number, currency?: boolean, significant
   const trimmedResult = roundedValue.toString().replace(/\.?0+$/, '');
 
   return currency ? `$${trimmedResult}` : trimmedResult;
-};
-
-export const getTimestampFromBlockNumber = async (blockNumber: bigint, publicClient: PublicClient) => {
-  if (!publicClient) throw new Error('Public client not found');
-
-  const block = await publicClient.getBlock({
-    blockNumber,
-  });
-
-  if (!block) throw new Error('Block required to get timestamp');
-
-  return block.timestamp;
 };
 
 export const getUniqueConnectors = (connectors: readonly Connector<CreateConnectorFn>[]) => {

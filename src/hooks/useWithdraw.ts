@@ -27,6 +27,12 @@ import {
   getScope,
   createWithdrawalSecrets,
   mergeAndSortAspLeaves,
+  decodeRelayedWithdrawalFee,
+  nowSeconds,
+  recordWithdrawalFee,
+  relayedReceiptClient,
+  relayedReceiptLookback,
+  waitForRelayedReceipt,
 } from '~/utils';
 
 const {
@@ -424,12 +430,26 @@ export const useWithdraw = () => {
           setTransactionHash(res.txHash as Hex);
           setModalOpen(ModalType.PROCESSING);
 
-          const receipt = await publicClient?.waitForTransactionReceipt({
-            hash: res.txHash as Hex,
-            timeout: 300_000, // 5 minutes timeout for withdrawal transactions
+          if (!publicClient) throw new Error('Public client not found');
+
+          // PRIVACY: never poll the relayed hash. `waitForTransactionReceipt`
+          // would send eth_getTransactionReceipt(hash) to the RPC provider every
+          // few seconds and tie this client to the relayer's transaction. The
+          // wait below reads new blocks' transaction lists and the pool's and
+          // entrypoint's logs by address and range, and matches locally.
+          // See utils/relayedReceipt.ts.
+          const receipt = await waitForRelayedReceipt(res.txHash as Hex, relayedReceiptClient(publicClient), {
+            addresses: [getAddress(selectedPoolInfo.address), getAddress(selectedPoolInfo.entryPointAddress)],
+            lookbackBlocks: relayedReceiptLookback(chainId),
+            budgetMs: 300_000, // 5 minutes, as before
           });
 
-          if (!receipt) throw new Error('Receipt not found');
+          if (receipt.status === 'reverted') {
+            throw new Error('The relayed withdrawal was mined but reverted. Your funds have not moved.');
+          }
+
+          const relayedFee = decodeRelayedWithdrawalFee(receipt.logs, getAddress(selectedPoolInfo.entryPointAddress));
+          if (relayedFee) recordWithdrawalFee(res.txHash, relayedFee);
 
           const events = decodeEventsFromReceipt(receipt, withdrawEventAbi);
           const withdrawnEvents = events.filter((event) => event.eventName === 'Withdrawn');
@@ -467,6 +487,9 @@ export const useWithdraw = () => {
             secret: (currentNewSecretKeys as { secret?: unknown })?.secret as Secret,
             blockNumber: receipt.blockNumber,
             txHash: res.txHash as Hex,
+            // The block header's timestamp when the walk read it, else "now":
+            // the transaction was observed seconds ago. Never looked up by hash.
+            timestamp: receipt.timestamp ?? nowSeconds(),
           });
 
           setModalOpen(ModalType.SUCCESS);

@@ -6,15 +6,22 @@ export const truncateAddress = (address?: string) => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
+/**
+ * Parses a unix timestamp in seconds (<= 10 digits) or milliseconds. An
+ * unknown date (empty, 0, NaN) is null: the account model leaves a timestamp
+ * unset rather than look it up, and 1970 is not a date to show.
+ */
+const parseTimestamp = (timestamp?: string): Date | null => {
+  if (!timestamp) return null;
+  const value = Number(timestamp);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const date = new Date(timestamp.length <= 10 ? value * 1000 : value);
+  return isNaN(date.getTime()) ? null : date;
+};
+
 export const formatTimestamp = (timestamp?: string, full?: boolean): string => {
-  if (!timestamp) return '-';
-
-  // Convert timestamp to milliseconds if needed
-  const timestampMs = timestamp.length <= 10 ? Number(timestamp) * 1000 : Number(timestamp);
-  const date = new Date(timestampMs);
-
-  // Check if date is valid
-  if (isNaN(date.getTime())) return '-';
+  const date = parseTimestamp(timestamp);
+  if (!date) return '-';
 
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -33,14 +40,8 @@ export const formatTimestamp = (timestamp?: string, full?: boolean): string => {
 };
 
 export const getTimeAgo = (timestamp?: string): string => {
-  if (!timestamp) return '-';
-
-  // Convert timestamp to milliseconds if needed
-  const timestampMs = timestamp.length <= 10 ? Number(timestamp) * 1000 : Number(timestamp);
-  const date = new Date(timestampMs);
-
-  // Check if date is valid
-  if (isNaN(date.getTime())) return '-';
+  const date = parseTimestamp(timestamp);
+  if (!date) return '-';
 
   const now = new Date();
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -66,7 +67,10 @@ export const getTimeAgo = (timestamp?: string): string => {
   return `${years} ${years === 1 ? 'year' : 'years'} ago`;
 };
 
-export const decodeEventsFromReceipt = (receipt: TransactionReceipt, eventAbi: string) => {
+/** What decoding needs from a receipt; a relayed receipt built from bulk logs (utils/relayedReceipt.ts) also fits. */
+export type DecodableReceipt = Pick<TransactionReceipt, 'logs' | 'transactionHash' | 'blockNumber' | 'status'>;
+
+export const decodeEventsFromReceipt = (receipt: DecodableReceipt, eventAbi: string) => {
   const parsedAbiItem = parseAbiItem(eventAbi);
 
   return receipt.logs
