@@ -24,7 +24,10 @@ const RULES: Rule[] = [
   {
     pattern: /getTimestampFromBlockNumber|\.getBlock\(/,
     reason: 'a block lookup keyed on a note. Dates come from utils/blockTimestamps.ts (bulk).',
-    allow: ['src/utils/relayedReceipt.ts'], // walks NEW blocks by number, never by hash
+    allow: [
+      'src/utils/relayedReceipt.ts', // walks NEW blocks by number, never by hash
+      'src/utils/blockAnchors.ts', // head, the deployment block and bisection midpoints: chosen by the chain, not by an event
+    ],
   },
   {
     pattern: /eth_getTransactionReceipt|eth_getTransactionByHash|trace_transaction|debug_traceTransaction/,
@@ -97,6 +100,17 @@ describe('no request keyed on a note (privacy ratchet)', () => {
     expect(call).toMatch(/refetchOnWindowFocus:\s*false\s*,/);
     expect(call).toMatch(/refetchOnReconnect:\s*false\s*,/);
     expect(call).not.toMatch(/enabled:/);
+  });
+
+  it('sends no balance read without an address: wagmi gates the query on it, so the call needs no enabled key', () => {
+    // A recovery-phrase session has no wallet address. wagmi's useBalance
+    // computes `enabled = Boolean(address && (query.enabled ?? true))` itself,
+    // so eth_getBalance is never issued with `address` undefined. Pinned here
+    // so a wagmi upgrade that drops the gate shows up as a failing test rather
+    // than an unaddressed request.
+    const wagmi = readFileSync(join(ROOT, 'node_modules/wagmi/dist/esm/hooks/useBalance.js'), 'utf8');
+    expect(wagmi).toMatch(/const enabled = Boolean\(address && \(query\.enabled \?\? true\)\);/);
+    expect(wagmi).toMatch(/useQuery\(\{ \.\.\.query, \.\.\.options, enabled \}\)/);
   });
 
   it('keeps the allow-list honest: every allow-listed file still exists and still uses the pattern', () => {

@@ -22,8 +22,12 @@ import { captureException, withScope } from '@sentry/nextjs';
 import { Hex } from 'viem';
 import { ChainData, chainData, getCustomRpcChunk, getCustomRpcUrl, whitelistedChains } from '~/config';
 import { PoolAccount, ReviewStatus } from '~/types';
+import { anchorChains, anchorTargets } from '~/utils/blockAnchors';
 import { nowSeconds, recordTransactionTimestamp, resolveAccountTimestamps } from '~/utils/blockTimestamps';
 import { createDataService } from '~/utils/dataService';
+
+// How long anchoring may keep going after the event scan has finished.
+const ANCHOR_GRACE_MS = 10_000;
 
 const chainDataByWhitelistedChains = Object.values(chainData).filter(
   (chain) => chain.poolInfo.length > 0 && whitelistedChains.some((c) => c.id === chain.poolInfo[0].chainId),
@@ -279,7 +283,21 @@ export const loadAccount = async (
   errors: PoolEventsError[];
   incompleteScopes: string[];
 }> => {
-  const result = await AccountService.initializeWithEvents(dataService, { mnemonic: seed }, pools);
+  // A user endpoint returns eth_getLogs rows without blockTimestamp (only our
+  // proxy completes them), so those chains are anchored alongside the scan:
+  // head, the earliest deployment block and bisection midpoints, the same
+  // blocks for every user of the chain. See utils/blockAnchors.ts. Runs
+  // during the scan and gets a short grace once the scan is done.
+  const anchoring = new AbortController();
+  const anchors = anchorChains(anchorTargets(chainData, getCustomRpcUrl), { signal: anchoring.signal });
+
+  let result: Awaited<ReturnType<typeof AccountService.initializeWithEvents>>;
+  try {
+    result = await AccountService.initializeWithEvents(dataService, { mnemonic: seed }, pools);
+  } finally {
+    setTimeout(() => anchoring.abort(), ANCHOR_GRACE_MS);
+  }
+  await anchors;
 
   // Scopes whose event history failed to load. Reconstructed state for these is
   // ABSENT, not empty: the account may hold notes we cannot see, and any deposit

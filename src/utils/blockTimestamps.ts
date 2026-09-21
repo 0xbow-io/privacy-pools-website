@@ -41,6 +41,9 @@ import type { PrivacyPoolAccount } from '~/types';
  *    chain's mean block time over the span, capped at now. Anchors sit a few
  *    hundred blocks apart on mainnet, so the error is seconds, well under what
  *    a history row shows. `resolveEventTimestampSource` says which path fired.
+ *    A custom endpoint dates no row at all; those chains get anchors fetched
+ *    for blocks the chain picks (head, deployment block, bisection midpoints),
+ *    see `blockAnchors.ts`, so this path still has something to interpolate.
  *
  * Anything none of the three knows stays `undefined` and renders as "-".
  * Unknown is strictly better than a lookup.
