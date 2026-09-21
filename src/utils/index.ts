@@ -19,3 +19,4 @@ export * from './eip7702';
 export * from './blockTimestamps';
 export * from './relayedReceipt';
 export * from './quotePhases';
+export * from './priceFreshness';

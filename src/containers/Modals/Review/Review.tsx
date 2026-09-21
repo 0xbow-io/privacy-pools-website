@@ -44,7 +44,7 @@ export const ReviewModal = () => {
 
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading } = relayerData || {};
-  const { isPriceCurrent, canRequestQuote, requestNewQuote, commitQuote } = useRequestQuote({
+  const { isPriceCurrent, isPriceStale, canRequestQuote, requestNewQuote, commitQuote } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
     quoteError: null,
@@ -146,6 +146,11 @@ export const ReviewModal = () => {
     setModalOpen,
   ]);
 
+  // One phase-1 request, on the user's click, restarting the freshness window.
+  const handleRefreshPrice = async () => {
+    await requestNewQuote();
+  };
+
   const handleGoBack = () => {
     if (actionType === EventType.WITHDRAWAL) {
       setModalOpen(ModalType.WITHDRAW);
@@ -202,21 +207,37 @@ export const ReviewModal = () => {
 
         {actionType === EventType.EXIT && <ExitMessage />}
 
-        <SButton disabled={isConfirmDisabled} onClick={handleConfirm} data-testid='confirm-review-button'>
-          {(isLoading || isConfirmClicked || (isQuoteLoading && actionType === EventType.WITHDRAWAL)) && (
-            <CircularProgress size='1.6rem' sx={{ mr: 1 }} />
+        <Stack direction='row' gap={2} justifyContent='center' flexWrap='wrap'>
+          {/* The price's freshness window ran out. Refresh is one phase-1
+              request on the user's click; the clock itself requests nothing.
+              Confirm stays enabled: phase 2 re-prices and refuses a fee above
+              the one shown, so an aged figure cannot lead to an overcharge. */}
+          {actionType === EventType.WITHDRAWAL && isPriceStale && (
+            <PulsingButton
+              disabled={isQuoteLoading || isConfirmClicked}
+              onClick={handleRefreshPrice}
+              data-testid='refresh-price-button'
+            >
+              {isQuoteLoading && <CircularProgress size='1.6rem' sx={{ mr: 1 }} />}
+              {isQuoteLoading ? 'Refreshing price...' : 'Refresh price'}
+            </PulsingButton>
           )}
-          {!isLoading &&
-            !isConfirmClicked &&
-            actionType === EventType.WITHDRAWAL &&
-            (isQuoteLoading || !isPriceCurrent) &&
-            'Getting quote...'}
-          {!isLoading &&
-            !isConfirmClicked &&
-            !isQuoteLoading &&
-            (actionType !== EventType.WITHDRAWAL || isPriceCurrent) &&
-            'Confirm'}
-        </SButton>
+          <SButton disabled={isConfirmDisabled} onClick={handleConfirm} data-testid='confirm-review-button'>
+            {(isLoading || isConfirmClicked || (isQuoteLoading && actionType === EventType.WITHDRAWAL)) && (
+              <CircularProgress size='1.6rem' sx={{ mr: 1 }} />
+            )}
+            {!isLoading &&
+              !isConfirmClicked &&
+              actionType === EventType.WITHDRAWAL &&
+              (isQuoteLoading || !isPriceCurrent) &&
+              'Getting quote...'}
+            {!isLoading &&
+              !isConfirmClicked &&
+              !isQuoteLoading &&
+              (actionType !== EventType.WITHDRAWAL || isPriceCurrent) &&
+              'Confirm'}
+          </SButton>
+        </Stack>
         <PoolAccountSection />
 
         <LinksSection
@@ -258,6 +279,23 @@ const DecorativeCircle = styled(Box, {
 
 const SButton = styled(Button)({
   minWidth: '10rem',
+});
+
+const PulsingButton = styled(Button)({
+  minWidth: '10rem',
+  animation: 'pulse 1s 3',
+
+  '@keyframes pulse': {
+    '0%': {
+      transform: 'scale(1)',
+    },
+    '50%': {
+      transform: 'scale(1.05)',
+    },
+    '100%': {
+      transform: 'scale(1)',
+    },
+  },
 });
 
 const GasTokenDropSection = styled(Box)(() => ({

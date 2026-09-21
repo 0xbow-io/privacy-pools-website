@@ -35,6 +35,8 @@ interface UseRequestQuoteReturn {
   relayTxCostETH: string | null;
   /** A price is stored for the current amount and relayer (phase 1 done). */
   isPriceCurrent: boolean;
+  /** The stored price's freshness window has run out. Confirm stays enabled. */
+  isPriceStale: boolean;
   /** A signed commitment is stored and still within its clock (phase 2 done). */
   isQuoteValid: boolean;
   countdown: number;
@@ -195,7 +197,12 @@ export const useRequestQuote = ({
     }
   }, [quoteState.extraGas, canRequestQuote, quoteState.feeBPS, executeFetchAndSetQuote]);
 
-  const startTimer = useCallback((quoteId: string, initialCountdown: number) => {
+  // Counts the current window down once a second and marks it expired at
+  // zero. It only writes state: no request is made by the clock. Running
+  // out of the price window shows the figure as out of date and offers a
+  // manual refresh; running out of a commitment window (only possible
+  // between Confirm and relay) also notifies.
+  const startTimer = useCallback((quoteId: string, initialCountdown: number, notifyAtZero: boolean) => {
     if (timerIdRef.current || globalTimerInstanceActive) {
       return;
     }
@@ -220,7 +227,9 @@ export const useRequestQuote = ({
         if (quoteId && !alreadyNotified) {
           expiredNotificationSentRef.current = quoteId;
           markAsExpiredRef.current();
-          addNotificationRef.current('warning', 'Quote has expired. Please request a new quote.');
+          if (notifyAtZero) {
+            addNotificationRef.current('warning', 'Quote has expired. Please request a new quote.');
+          }
         }
 
         currentQuoteIdRef.current = null;
@@ -237,29 +246,33 @@ export const useRequestQuote = ({
     currentQuoteIdRef.current = null;
   }, []);
 
-  // effect to handle the countdown timer
+  // effect to handle the countdown timer. The window being counted is the
+  // commitment's once one exists, otherwise the stored price's freshness
+  // window (see utils/priceFreshness).
   useEffect(() => {
-    const currentQuoteId = quoteState.quoteCommitment?.signedRelayerCommitment || null;
+    const commitmentId = quoteState.quoteCommitment?.signedRelayerCommitment || null;
+    const priceId = quoteState.priceStoredAt !== null ? `price:${quoteState.priceStoredAt}` : null;
+    const currentQuoteId = commitmentId ?? priceId;
 
     if (
-      quoteState.quoteCommitment &&
+      currentQuoteId &&
       quoteState.countdown > 0 &&
       !quoteState.isExpired &&
       quoteState.quotedRelayerUrl === relayerUrl &&
-      currentQuoteId &&
       currentQuoteId !== currentQuoteIdRef.current &&
       !globalTimerInstanceActive
     ) {
-      startTimer(currentQuoteId, quoteState.countdown);
+      startTimer(currentQuoteId, quoteState.countdown, commitmentId !== null);
     }
 
-    if (!quoteState.quoteCommitment || quoteState.quotedRelayerUrl !== relayerUrl) {
+    if (!currentQuoteId || quoteState.quotedRelayerUrl !== relayerUrl) {
       stopTimer();
     }
 
     return stopTimer;
   }, [
     quoteState.quoteCommitment?.signedRelayerCommitment,
+    quoteState.priceStoredAt,
     quoteState.isExpired,
     quoteState.quotedRelayerUrl,
     relayerUrl,
@@ -271,6 +284,13 @@ export const useRequestQuote = ({
       quoteState.quotedRelayerUrl === relayerUrl &&
       quoteState.quotedAmount === amountBN.toString(),
     [quoteState.feeBPS, quoteState.quotedRelayerUrl, quoteState.quotedAmount, relayerUrl, amountBN],
+  );
+
+  // The shown price's freshness window has run out. Informational only:
+  // Confirm stays enabled, phase 2 re-prices and refuses a higher fee.
+  const isPriceStale = useMemo(
+    () => isPriceCurrent && quoteState.quoteCommitment === null && quoteState.isExpired,
+    [isPriceCurrent, quoteState.quoteCommitment, quoteState.isExpired],
   );
 
   const isQuoteValid = useMemo(
@@ -347,6 +367,7 @@ export const useRequestQuote = ({
     extraGasAmountETH: quoteState.extraGasAmountETH,
     relayTxCostETH: quoteState.relayTxCostETH,
     isPriceCurrent,
+    isPriceStale,
     isQuoteValid,
     countdown: quoteState.countdown,
     isQuoteLoading,

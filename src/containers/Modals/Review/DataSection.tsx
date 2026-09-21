@@ -72,6 +72,8 @@ export const DataSection = () => {
   const { getQuote, isQuoteLoading, quoteError } = relayerData || {};
   const {
     isPriceCurrent,
+    isPriceStale,
+    countdown,
     feeBPS: quoteFeesBPS,
     baseFeeBPS: quoteBaseFeeBPS,
     extraGasAmountETH: quoteExtraGasAmountETH,
@@ -249,13 +251,23 @@ export const DataSection = () => {
             </Row>
           )}
           {/* Net Fee row with dropdown for withdrawals */}
+          {showsRelayerFee && (
+            <Row>
+              <Label variant='body2'>Price valid for:</Label>
+              {isPriceStale ? (
+                <FlashingExpiredTimer variant='body2'>Out of date</FlashingExpiredTimer>
+              ) : (
+                <QuoteTimer variant='body2'>{countdown}s</QuoteTimer>
+              )}
+            </Row>
+          )}
           {showsRelayerFee && quoteFeesBPS !== null && quoteBaseFeeBPS !== null && (
             <>
               <Row>
                 <Label variant='body2'>Net Fee:</Label>
                 <FeeRow>
                   <Tooltip title={netFeeTooltip} placement='top'>
-                    <NetFeeValue isExtraGasEnabled={quoteState.extraGas} variant='body2'>
+                    <NetFeeValue isExtraGasEnabled={quoteState.extraGas} isStale={isPriceStale} variant='body2'>
                       {netFeeText}
                     </NetFeeValue>
                   </Tooltip>
@@ -378,11 +390,36 @@ const FeeRow = styled('div')({
   gap: '4px',
 });
 
+const QuoteTimer = styled(Value)(({ theme }) => ({
+  fontWeight: 500,
+  color: theme.palette.warning.main,
+}));
+
+const FlashingExpiredTimer = styled(Value)(({ theme }) => ({
+  fontWeight: 500,
+  color: theme.palette.error.main,
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+  animation: 'flash 2s 3',
+
+  '@keyframes flash': {
+    '0%, 50%': {
+      opacity: 1,
+    },
+    '25%, 75%': {
+      opacity: 0.3,
+    },
+  },
+}));
+
 const NetFeeValue = styled(Value, {
-  shouldForwardProp: (prop) => prop !== 'isExtraGasEnabled',
-})<{ isExtraGasEnabled?: boolean }>(({ theme, isExtraGasEnabled }) => ({
+  shouldForwardProp: (prop) => prop !== 'isExtraGasEnabled' && prop !== 'isStale',
+})<{ isExtraGasEnabled?: boolean; isStale?: boolean }>(({ theme, isExtraGasEnabled, isStale }) => ({
   color: isExtraGasEnabled ? theme.palette.success.main : theme.palette.text.primary,
   fontWeight: isExtraGasEnabled ? 600 : 400,
+  opacity: isStale ? 0.5 : 1,
+  fontStyle: isStale ? 'italic' : 'normal',
 }));
 
 const ExpandIconButton = styled(IconButton, {
