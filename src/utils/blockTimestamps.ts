@@ -33,8 +33,17 @@ import type { PrivacyPoolAccount } from '~/types';
  *    landed and seeds an approximate timestamp for it so the new row is dated
  *    immediately. The exact value replaces it on the next scan.
  *
- * Anything neither source knows stays `undefined` and renders as "-". Unknown
- * is strictly better than a lookup.
+ * 3. Derived from neighbours. The RPC dates only part of the rows in a range
+ *    (the proxy completes them from the hypersync query API, see
+ *    `logTimestampFill.ts`, but a custom endpoint or a fill that ran out of
+ *    time leaves gaps). A block between two recorded blocks of the same chain
+ *    is placed by linear interpolation; outside the recorded span, by the
+ *    chain's mean block time over the span, capped at now. Anchors sit a few
+ *    hundred blocks apart on mainnet, so the error is seconds, well under what
+ *    a history row shows. `resolveEventTimestampSource` says which path fired.
+ *
+ * Anything none of the three knows stays `undefined` and renders as "-".
+ * Unknown is strictly better than a lookup.
  */
 
 type LogLike = {
@@ -46,6 +55,8 @@ type LogLike = {
 const byChainAndBlock = new Map<number, Map<string, bigint>>();
 /** lowercase txHash -> unix seconds seeded by this session's own confirmations. */
 const byTransaction = new Map<string, bigint>();
+/** chainId -> recorded blocks in ascending order; rebuilt lazily after a record. */
+const sortedAnchors = new Map<number, { blocks: bigint[]; stamps: bigint[] }>();
 
 const toBigInt = (value: bigint | number | string): bigint | null => {
   try {
@@ -66,6 +77,7 @@ export const recordBlockTimestamp = (chainId: number, blockNumber: bigint, times
     byChainAndBlock.set(chainId, blocks);
   }
   blocks.set(blockNumber.toString(), timestamp);
+  sortedAnchors.delete(chainId);
 };
 
 /**
@@ -98,48 +110,112 @@ export const nowSeconds = (): bigint => BigInt(Math.floor(Date.now() / 1000));
 export const getBlockTimestamp = (chainId: number, blockNumber: bigint): bigint | undefined =>
   byChainAndBlock.get(chainId)?.get(blockNumber.toString());
 
+const anchorsFor = (chainId: number): { blocks: bigint[]; stamps: bigint[] } | undefined => {
+  const cached = sortedAnchors.get(chainId);
+  if (cached) return cached;
+  const recorded = byChainAndBlock.get(chainId);
+  if (!recorded || recorded.size < 2) return undefined;
+  const blocks = [...recorded.keys()].map(BigInt).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const anchors = { blocks, stamps: blocks.map((b) => recorded.get(b.toString()) as bigint) };
+  sortedAnchors.set(chainId, anchors);
+  return anchors;
+};
+
+/** Index of the first recorded block >= blockNumber (== length when none). */
+const lowerBound = (blocks: bigint[], blockNumber: bigint): number => {
+  let lo = 0;
+  let hi = blocks.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (blocks[mid] < blockNumber) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+};
+
 /**
- * Timestamp for one event: the chain-derived block timestamp when the bulk
- * scan saw that block, else the session seed for that transaction, else
+ * A DERIVED timestamp for a block the scan never saw dated, from the recorded
+ * blocks of the same chain: linear between the nearest recorded block on each
+ * side, else along the chain's mean block time over the recorded span, never
+ * past now. Needs two recorded blocks; `undefined` otherwise. No request.
+ */
+export const estimateBlockTimestamp = (chainId: number, blockNumber: bigint): bigint | undefined => {
+  const anchors = anchorsFor(chainId);
+  if (!anchors) return undefined;
+  const { blocks, stamps } = anchors;
+  const idx = lowerBound(blocks, blockNumber);
+  if (idx < blocks.length && blocks[idx] === blockNumber) return stamps[idx];
+  const last = blocks.length - 1;
+  if (idx > 0 && idx <= last) {
+    const lo = idx - 1;
+    const hi = idx;
+    return stamps[lo] + ((stamps[hi] - stamps[lo]) * (blockNumber - blocks[lo])) / (blocks[hi] - blocks[lo]);
+  }
+  const span = blocks[last] - blocks[0];
+  if (span <= 0n) return undefined;
+  const near = idx === 0 ? 0 : last;
+  const estimate = stamps[near] + ((stamps[last] - stamps[0]) * (blockNumber - blocks[near])) / span;
+  if (estimate <= 0n) return undefined;
+  const now = nowSeconds();
+  return estimate > now ? now : estimate;
+};
+
+export type TimestampSource = 'chain' | 'session' | 'estimated';
+
+/**
+ * Timestamp for one event and where it came from: the chain-derived block
+ * timestamp when the bulk scan saw that block dated, else the session seed for
+ * that transaction, else an estimate between recorded blocks, else
  * `undefined`. Never issues a request.
  */
+export const resolveEventTimestampSource = (
+  chainId: number | undefined,
+  blockNumber: bigint | undefined,
+  txHash: string | undefined,
+): { timestamp: bigint; source: TimestampSource } | undefined => {
+  if (chainId !== undefined && blockNumber !== undefined) {
+    const fromChain = getBlockTimestamp(chainId, blockNumber);
+    if (fromChain !== undefined) return { timestamp: fromChain, source: 'chain' };
+  }
+  if (txHash) {
+    const seeded = byTransaction.get(txHash.toLowerCase());
+    if (seeded !== undefined) return { timestamp: seeded, source: 'session' };
+  }
+  if (chainId !== undefined && blockNumber !== undefined) {
+    const estimated = estimateBlockTimestamp(chainId, blockNumber);
+    if (estimated !== undefined) return { timestamp: estimated, source: 'estimated' };
+  }
+  return undefined;
+};
+
 export const resolveEventTimestamp = (
   chainId: number | undefined,
   blockNumber: bigint | undefined,
   txHash: string | undefined,
-): bigint | undefined => {
-  if (chainId !== undefined && blockNumber !== undefined) {
-    const fromChain = getBlockTimestamp(chainId, blockNumber);
-    if (fromChain !== undefined) return fromChain;
-  }
-  if (txHash) return byTransaction.get(txHash.toLowerCase());
-  return undefined;
-};
+): bigint | undefined => resolveEventTimestampSource(chainId, blockNumber, txHash)?.timestamp;
 
 type Dated = { blockNumber?: bigint; txHash?: string; transactionHash?: string; timestamp?: bigint };
+type Counts = { resolved: number; estimated: number; unknown: number };
 
-const dateEvent = (
-  chainId: number | undefined,
-  event: Dated | undefined,
-  counts: { resolved: number; unknown: number },
-) => {
+const dateEvent = (chainId: number | undefined, event: Dated | undefined, counts: Counts) => {
   if (!event) return;
-  const resolved = resolveEventTimestamp(chainId, event.blockNumber, event.txHash ?? event.transactionHash);
-  if (resolved !== undefined) event.timestamp = resolved;
+  const resolved = resolveEventTimestampSource(chainId, event.blockNumber, event.txHash ?? event.transactionHash);
+  if (resolved !== undefined) event.timestamp = resolved.timestamp;
   if (event.timestamp === undefined) counts.unknown++;
+  else if (resolved?.source === 'estimated') counts.estimated++;
   else counts.resolved++;
 };
 
 /**
  * Fills `timestamp` on every deposit, child and ragequit of the account, in
- * place, from the registry. Events the registry does not know keep whatever
+ * place, from the registry. Events the registry cannot place keep whatever
  * they had (normally `undefined`). Pure over the registry: no request.
  */
 export const resolveAccountTimestamps = (
   account: Pick<PrivacyPoolAccount, 'poolAccounts'>,
   chainIdForScope: (scope: bigint) => number | undefined,
-): { resolved: number; unknown: number } => {
-  const counts = { resolved: 0, unknown: 0 };
+): Counts => {
+  const counts: Counts = { resolved: 0, estimated: 0, unknown: 0 };
   for (const [scope, poolAccounts] of account.poolAccounts.entries()) {
     const chainId = chainIdForScope(scope);
     for (const poolAccount of poolAccounts) {
@@ -155,4 +231,5 @@ export const resolveAccountTimestamps = (
 export const clearBlockTimestamps = (): void => {
   byChainAndBlock.clear();
   byTransaction.clear();
+  sortedAnchors.clear();
 };
