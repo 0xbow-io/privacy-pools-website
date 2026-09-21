@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.1] - 2026-09-11
+
+### Changed
+
+- The withdraw form works from data the app already has and computes what it needs locally
+- One response under 100KB replaces roughly fifty, and several hundred KB
+
+## [2.15.0] - 2026-09-10
+
+### Changed
+
+- Account approval is derived from the ASP leaf set the client already downloads, rather than a second per-account request returning the same verdict
+- The withdraw form computes its anonymity figure locally from shared pool feeds instead of fetching it per amount, so typing issues no requests
+- A failed or empty approval snapshot is treated as unavailable rather than as a review verdict, and both configured sources must resolve before status updates
+- Deposit pagination rejects duplicate, malformed and inconsistent pages instead of accepting a partial list, and fetches in small concurrent batches
+- The legacy status lookup runs only from the explicit migration action
+- Outgoing error reports carry fixed messages and boolean flags
+- Recipients resolve locally
+
+### Notes
+
+- The status chip no longer separates the two non-approved states
+- The anonymity figure reads unavailable until the deposits feed carries review data
+
+## [2.14.10] - 2026-09-09
+
+### Security
+
+- Bumped Next.js 15.5.23 -> 15.5.25, patching two critical unauthenticated remote-code-execution advisories fixed in 15.5.24: GHSA-2xp9-vwfh-vxw4 (Image Optimization API, via AVIF files) and GHSA-p293-qw3h-jr36 / CVE-2026-75604 (windows-hosted servers). Dependency change only, no source changes
+
 ## [2.14.9] - 2026-08-12
 
 ### Security

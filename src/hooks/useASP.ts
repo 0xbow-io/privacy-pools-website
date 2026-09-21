@@ -11,7 +11,7 @@ import {
   ExtendedMtLeavesResponse,
   ExtendedMtRootResponse,
 } from '~/types';
-import { aspClient, PoolStatsResponse } from '~/utils';
+import { aspClient, DepositAmountsResponse, PoolStatsResponse } from '~/utils';
 import { approvedLabelSet } from '~/utils/accountStatus';
 
 export const useASP = (
@@ -25,6 +25,7 @@ export const useASP = (
   poolsData: PoolResponse | undefined;
   rootsData: ExtendedMtRootResponse | undefined;
   mtLeavesData: ExtendedMtLeavesResponse | undefined;
+  depositAmountsData: DepositAmountsResponse | undefined;
   allEventsData: AllEventsResponse | undefined;
   poolStatsData: PoolStatsResponse | undefined;
   brevisAspLeavesData: BrevisAspLeavesResponse | undefined;
@@ -57,6 +58,20 @@ export const useASP = (
     staleTime: 60000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+  });
+
+  // Loaded here with the other public pool feeds, at boot. The response is
+  // the same bytes for every caller, so it belongs with mt-leaves and
+  // pool-info rather than on any screen's own path.
+  const depositAmountsQuery = useQuery({
+    queryKey: ['asp_deposit_amounts', chainId, scope, aspUrl],
+    queryFn: () => aspClient.fetchDepositAmounts(aspUrl, chainId, scope),
+    staleTime: 60000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    // The endpoint is newer than some deployed ASPs. Where it is absent the
+    // figure is simply unavailable; there is no second route to try.
+    retry: false,
   });
 
   // Brevis ASP leaves query - only enabled if externalAsp is configured with brevis provider
@@ -144,6 +159,7 @@ export const useASP = (
       poolsData: poolInfoQuery.data,
       rootsData: mergedRootsData,
       mtLeavesData: mergedMtLeavesData,
+      depositAmountsData: depositAmountsQuery.data,
       allEventsData: allEventsQuery.data,
       poolStatsData: poolStatsQuery.data,
       brevisAspLeavesData: brevisAspLeavesQuery.data,
@@ -156,6 +172,7 @@ export const useASP = (
       poolInfoQuery.data,
       mergedRootsData,
       mergedMtLeavesData,
+      depositAmountsQuery.data,
       allEventsQuery.data,
       poolStatsQuery.data,
       brevisAspLeavesQuery.data,
