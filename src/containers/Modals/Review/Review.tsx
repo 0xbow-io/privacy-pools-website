@@ -67,7 +67,13 @@ export const ReviewModal = () => {
   const isConfirmDisabled =
     isLoading || isConfirmClicked || !isActionReady || (isQuoteLoading && actionType === EventType.WITHDRAWAL);
 
-  // Request quote when pendingQuoteRequest is true (triggered by clicking "Review Withdrawal")
+  // Request quote when pendingQuoteRequest is true (triggered by clicking "Review Withdrawal").
+  //
+  // Timing constraint: the relayer signs the commitment for 60 s and rejects
+  // it at relay time once expired, and the proof binds `withdrawalData`, so
+  // the quote has to precede proving. Firing it here is what lets this step
+  // show the exact fee before Confirm; the only later trigger is the Confirm
+  // click itself, which would need an indicative fee here and a second click.
   useEffect(() => {
     if (actionType === EventType.WITHDRAWAL && canRequestQuote && quoteState.pendingQuoteRequest) {
       clearPendingQuoteRequest();

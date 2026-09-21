@@ -10,6 +10,11 @@ import { join, relative } from 'node:path';
  * of a hash the user's own wallet broadcast is fine: the provider saw it arrive
  * from this client already. Those files are allow-listed by name.
  *
+ * A second shape is held here too: a poll's cadence is a literal. The wallet
+ * balance read in ChainProvider is pinned to one interval with the focus,
+ * background and reconnect refetches off, so it fires the same way whatever
+ * the user is doing.
+ *
  * Comments are stripped before matching so the rules can be explained in code.
  */
 
@@ -33,6 +38,12 @@ const RULES: Rule[] = [
     pattern: /waitForTransactionReceipt\(/,
     reason: 'receipt polling. Allowed only for a hash THIS wallet broadcast; relayed hashes use waitForRelayedReceipt.',
     allow: ['src/hooks/useDeposit.ts', 'src/hooks/useExit.ts'],
+  },
+  {
+    // `refetchInterval: 30_000` passes; `refetchInterval: busy ? false : 30_000` does not.
+    pattern: /refetchInterval:(?!\s*\d[\d_]*\s*(,|\}|$))/,
+    reason:
+      'a poll whose cadence is not a literal. A cadence that changes with state times requests to what the user is doing.',
   },
 ];
 
@@ -73,6 +84,20 @@ describe('no request keyed on a note (privacy ratchet)', () => {
       expect(violations).toEqual([]);
     });
   }
+
+  it('polls the wallet balance on a fixed cadence with the focus, background and reconnect triggers off', () => {
+    // The interval must be the ONLY trigger of this read. React Query's
+    // defaults refetch on window focus and pause the interval in a hidden tab,
+    // so each option has to be spelled out on the call.
+    const code = stripComments(readFileSync(join(SRC, 'providers/ChainProvider.tsx'), 'utf8'));
+    const call = code.match(/useBalance\(\{[\s\S]*?\n {2}\}\);/)?.[0];
+    expect(call).toBeDefined();
+    expect(call).toMatch(/refetchInterval:\s*30_000\s*,/);
+    expect(call).toMatch(/refetchIntervalInBackground:\s*true\s*,/);
+    expect(call).toMatch(/refetchOnWindowFocus:\s*false\s*,/);
+    expect(call).toMatch(/refetchOnReconnect:\s*false\s*,/);
+    expect(call).not.toMatch(/enabled:/);
+  });
 
   it('keeps the allow-list honest: every allow-listed file still exists and still uses the pattern', () => {
     for (const rule of RULES) {
