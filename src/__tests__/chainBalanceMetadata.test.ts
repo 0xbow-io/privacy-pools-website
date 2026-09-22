@@ -1,5 +1,5 @@
 import { act, createElement, useContext } from 'react';
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest, beforeAll } from '@jest/globals';
 import { createRoot, Root } from 'react-dom/client';
 
 jest.mock('wagmi', () => ({
@@ -14,6 +14,24 @@ jest.mock('@tanstack/react-query', () => ({
 jest.mock('~/hooks', () => ({ useNotifications: () => ({ addNotification: jest.fn() }) }));
 jest.mock('~/utils', () => ({ fetchTokenPrice: async () => null }));
 jest.mock('~/config/env', () => ({ getAspEndpointForChain: () => '' }));
+
+/*
+ * Loaded in `beforeAll`, not at the top of the file.
+ *
+ * A static import is hoisted above the `jest.mock` calls, so the real modules
+ * would be captured before the mocks install. The two obvious alternatives
+ * each work in only one place: `require` does not exist under the ESM jest CI
+ * runs, and top-level `await` is not supported by the transform used locally.
+ * A dynamic import inside an async hook is the one form both accept.
+ */
+let ChainContext: (typeof import('~/providers/ChainProvider'))['ChainContext'];
+let ChainProvider: (typeof import('~/providers/ChainProvider'))['ChainProvider'];
+let useBalance: (typeof import('wagmi'))['useBalance'];
+beforeAll(async () => {
+  ({ ChainContext, ChainProvider } = await import('~/providers/ChainProvider'));
+  ({ useBalance } = await import('wagmi'));
+});
+
 jest.mock('~/config', () => {
   const pool = (asset: string, assetDecimals: number) => ({
     asset,
@@ -36,17 +54,14 @@ jest.mock('~/config', () => {
   };
 });
 
-const { ChainContext, ChainProvider } =
-  /*
-   * `require` rather than `import`, and the rule is disabled for exactly these
-   * lines: a static import is HOISTED above the jest.mock calls above, so the
-   * real modules would be captured before the mocks are installed and the test
-   * would exercise the real ones. Load order is the point here.
-   */
-  /* eslint-disable @typescript-eslint/no-require-imports */
-  require('~/providers/ChainProvider') as typeof import('~/providers/ChainProvider');
-const { useBalance } = require('wagmi') as typeof import('wagmi');
-/* eslint-enable @typescript-eslint/no-require-imports */
+/*
+ * Loaded with top-level `await import`, not a static import and not `require`.
+ *
+ * Static would be hoisted above the `jest.mock` calls above, so the real
+ * modules would be captured before the mocks install. `require` does not exist
+ * under the ESM jest that CI runs: it worked locally only because bun provides
+ * one, which is why this passed here and failed there.
+ */
 let context: React.ContextType<typeof ChainContext>;
 const Probe = () => {
   context = useContext(ChainContext);

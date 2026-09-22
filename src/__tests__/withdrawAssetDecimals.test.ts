@@ -1,5 +1,5 @@
 import { act, createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest, beforeAll } from '@jest/globals';
 import { createRoot, Root } from 'react-dom/client';
 import { parseUnits } from 'viem';
 
@@ -33,16 +33,32 @@ jest.mock('~/utils', () => ({
 }));
 
 /*
- * `require` rather than `import`, and the rule is disabled for exactly these
- * lines: a static import is HOISTED above the jest.mock calls above, so the
- * real modules would be captured before the mocks are installed and the test
- * would exercise the real ones. Load order is the point here.
+ * Loaded in `beforeAll`, not at the top of the file.
+ *
+ * A static import is hoisted above the `jest.mock` calls, so the real modules
+ * would be captured before the mocks install. The two obvious alternatives
+ * each work in only one place: `require` does not exist under the ESM jest CI
+ * runs, and top-level `await` is not supported by the transform used locally.
+ * A dynamic import inside an async hook is the one form both accept.
  */
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { useWithdraw } = require('~/hooks/useWithdraw') as typeof import('~/hooks/useWithdraw');
-const { useChainContext, usePoolAccountsContext } = require('~/hooks') as typeof import('~/hooks');
-const { prepareWithdrawalProofInput } = require('~/utils') as typeof import('~/utils');
-/* eslint-enable @typescript-eslint/no-require-imports */
+let useWithdraw: (typeof import('~/hooks/useWithdraw'))['useWithdraw'];
+let useChainContext: (typeof import('~/hooks'))['useChainContext'];
+let usePoolAccountsContext: (typeof import('~/hooks'))['usePoolAccountsContext'];
+let prepareWithdrawalProofInput: (typeof import('~/utils'))['prepareWithdrawalProofInput'];
+beforeAll(async () => {
+  ({ useWithdraw } = await import('~/hooks/useWithdraw'));
+  ({ useChainContext, usePoolAccountsContext } = await import('~/hooks'));
+  ({ prepareWithdrawalProofInput } = await import('~/utils'));
+});
+
+/*
+ * Loaded with top-level `await import`, not a static import and not `require`.
+ *
+ * Static would be hoisted above the `jest.mock` calls beside it, so the real
+ * modules would be captured before the mocks install. `require` does not exist
+ * at all under the ESM jest CI runs: it worked locally only because bun
+ * provides one, which is why this passed here twice and failed there twice.
+ */
 let withdrawal: ReturnType<typeof useWithdraw>;
 let chainContext: ReturnType<typeof useChainContext>;
 let root: Root;

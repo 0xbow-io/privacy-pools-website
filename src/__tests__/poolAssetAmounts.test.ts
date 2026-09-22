@@ -1,5 +1,5 @@
 import { act, createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest, beforeAll } from '@jest/globals';
 import { createTheme, ThemeProvider } from '@mui/material';
 import { createRoot, Root } from 'react-dom/client';
 import { parseUnits } from 'viem';
@@ -23,23 +23,38 @@ jest.mock('~/utils', () => ({
   getStatus: () => 'approved',
 }));
 
-const { PoolAccountTable } =
-  /*
-   * `require` rather than `import`, and the rule is disabled for exactly these
-   * lines: a static import is HOISTED above the jest.mock calls above, so the
-   * real modules would be captured before the mocks are installed and the test
-   * would exercise the real ones. Load order is the point here.
-   */
-  /* eslint-disable @typescript-eslint/no-require-imports */
-  require('~/components/PoolAccountTable') as typeof import('~/components/PoolAccountTable');
-const { FeeBreakdown } =
-  require('~/containers/Modals/Review/FeeBreakdown') as typeof import('~/containers/Modals/Review/FeeBreakdown');
-const { PoolAccountSection } =
-  require('~/containers/Modals/Review/PoolAccountSection') as typeof import('~/containers/Modals/Review/PoolAccountSection');
-const { ValueSection } =
-  require('~/containers/Modals/Success/ValueSection') as typeof import('~/containers/Modals/Success/ValueSection');
-const { useAccountContext, useChainContext, usePoolAccountsContext } = require('~/hooks') as typeof import('~/hooks');
-/* eslint-enable @typescript-eslint/no-require-imports */
+/*
+ * Loaded in `beforeAll`, not at the top of the file.
+ *
+ * A static import is hoisted above the `jest.mock` calls, so the real modules
+ * would be captured before the mocks install. The two obvious alternatives
+ * each work in only one place: `require` does not exist under the ESM jest CI
+ * runs, and top-level `await` is not supported by the transform used locally.
+ * A dynamic import inside an async hook is the one form both accept.
+ */
+let PoolAccountTable: (typeof import('~/components/PoolAccountTable'))['PoolAccountTable'];
+let FeeBreakdown: (typeof import('~/containers/Modals/Review/FeeBreakdown'))['FeeBreakdown'];
+let PoolAccountSection: (typeof import('~/containers/Modals/Review/PoolAccountSection'))['PoolAccountSection'];
+let ValueSection: (typeof import('~/containers/Modals/Success/ValueSection'))['ValueSection'];
+let useAccountContext: (typeof import('~/hooks'))['useAccountContext'];
+let useChainContext: (typeof import('~/hooks'))['useChainContext'];
+let usePoolAccountsContext: (typeof import('~/hooks'))['usePoolAccountsContext'];
+beforeAll(async () => {
+  ({ PoolAccountTable } = await import('~/components/PoolAccountTable'));
+  ({ FeeBreakdown } = await import('~/containers/Modals/Review/FeeBreakdown'));
+  ({ PoolAccountSection } = await import('~/containers/Modals/Review/PoolAccountSection'));
+  ({ ValueSection } = await import('~/containers/Modals/Success/ValueSection'));
+  ({ useAccountContext, useChainContext, usePoolAccountsContext } = await import('~/hooks'));
+});
+
+/*
+ * Loaded with top-level `await import`, not a static import and not `require`.
+ *
+ * Static would be hoisted above the `jest.mock` calls above, so the real
+ * modules would be captured before the mocks install. `require` does not exist
+ * under the ESM jest that CI runs: it worked locally only because bun provides
+ * one, which is why this passed here and failed there.
+ */
 
 let root: Root;
 let container: HTMLDivElement;
