@@ -298,21 +298,52 @@ export const CUSTOM_CHUNK_STORAGE_KEY = 'privacy-pools.custom-rpc-chunk';
 /**
  * Blocks per `eth_getLogs` when a custom endpoint is in force.
  *
- * 10,000 is the SDK's OWN default, not a number we picked. The 1.5M mainnet /
- * 48M Arbitrum entries in utils/sdk.ts are OUR override, tuned for the
- * hypersync proxy, and they are what made a normal endpoint fail: hosted
- * providers cap a log range in the thousands, so the event scan died and the
- * account loaded with no pools and no balances.
+ * 10,000 was the SDK's own default and it is SAFE rather than good: hosted
+ * providers cap a log range in the thousands, so a bigger number made the
+ * event scan die and the account load with no pools and no balances. The cost
+ * of being that careful is time. Discovery is thousands of requests, and at
+ * 10k blocks each QA sat through about twenty minutes for one account on an
+ * endpoint that was answering perfectly (2026-09-22).
+ *
+ * 500,000 is what a node or a gateway that is not rate limiting you will
+ * actually serve, measured on Tenderly, and it turns that wait into something
+ * closer to a normal load. The endpoints that cannot take it are the hosted
+ * ones this app can already recognise, so they keep the careful number rather
+ * than everyone paying for them: see `defaultChunkForEndpoint`.
  */
-export const DEFAULT_CUSTOM_RPC_CHUNK = 10_000;
+export const DEFAULT_CUSTOM_RPC_CHUNK = 500_000;
+
+/** What a provider with a documented low cap gets instead. */
+export const HOSTED_PROVIDER_CHUNK = 10_000;
 
 /**
- * Above this, most hosted providers refuse. Not a hard limit: someone running
- * their own node, or pointing at another hypersync, can legitimately go far
- * higher and should not be stopped by our guess about their provider. They are
- * warned once and then believed.
+ * Providers known to refuse a large range. Anything not on this list is
+ * assumed to be a node, a gateway or a proxy the user controls, which is the
+ * common case for someone bothering to set a custom endpoint at all.
  */
-export const CUSTOM_RPC_CHUNK_WARN_ABOVE = 10_000;
+const LOW_CAP_PROVIDERS: ReadonlySet<RpcProvider> = new Set(['alchemy', 'ankr', 'drpc']);
+
+/**
+ * The chunk size to propose for an endpoint, before the user overrides it.
+ *
+ * PURE and exported so the form and the tests agree on the number rather than
+ * each deciding for themselves.
+ */
+export const defaultChunkForEndpoint = (raw: string | undefined): number => {
+  const provider = raw ? detectRpcProvider(raw) : undefined;
+  return provider && LOW_CAP_PROVIDERS.has(provider) ? HOSTED_PROVIDER_CHUNK : DEFAULT_CUSTOM_RPC_CHUNK;
+};
+
+/**
+ * Above this, even a self-hosted endpoint is unusual. Not a hard limit:
+ * someone pointing at a hypersync can legitimately go far higher and should
+ * not be stopped by our guess. They are warned once and then believed.
+ *
+ * Raised with the default so the default does not warn about itself. A hosted
+ * provider that caps lower is warned about separately, by name, which is more
+ * use than a blanket number.
+ */
+export const CUSTOM_RPC_CHUNK_WARN_ABOVE = 500_000;
 
 /** Bounded so a typo cannot ask for a range no endpoint will ever answer. */
 export const MAX_CUSTOM_RPC_CHUNK = 100_000_000;

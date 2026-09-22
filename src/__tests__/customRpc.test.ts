@@ -17,6 +17,8 @@ import {
   parseChainIdResponse,
   type CustomRpcMap,
   parseCustomRpcMap,
+  defaultChunkForEndpoint,
+  CUSTOM_RPC_CHUNK_WARN_ABOVE,
   queryableChainIds,
   skippedChainIds,
   probeRpcUrl,
@@ -279,9 +281,14 @@ describe('custom RPC normalization', () => {
 });
 
 describe('custom RPC block range', () => {
-  it("defaults to the SDK's own 10k rather than a number we invented", () => {
-    expect(DEFAULT_CUSTOM_RPC_CHUNK).toBe(10_000);
-    expect(validateCustomRpcChunk('')).toEqual({ ok: true, value: 10_000 });
+  it('defaults to a range a self-hosted endpoint will actually serve', () => {
+    // Was the SDK's own 10,000, which is safe rather than good: it is what a
+    // rate-limiting hosted provider tolerates, and paying that cost by default
+    // cost QA a twenty minute account load on an endpoint answering perfectly
+    // (2026-09-22). The providers that genuinely cap low keep 10,000, by name,
+    // through defaultChunkForEndpoint.
+    expect(DEFAULT_CUSTOM_RPC_CHUNK).toBe(500_000);
+    expect(validateCustomRpcChunk('')).toEqual({ ok: true, value: 500_000 });
   });
 
   it('accepts a number and rejects anything that is not one', () => {
@@ -528,5 +535,38 @@ describe('queryableChainIds / skippedChainIds', () => {
       expect([...queryable, ...skipped].sort()).toEqual([...ALL].sort());
       expect(queryable.filter((id) => skipped.includes(id))).toEqual([]);
     }
+  });
+});
+
+describe('block chunk defaults', () => {
+  it('proposes a large range for an endpoint we do not recognise', () => {
+    // The common case for someone setting a custom endpoint at all: their own
+    // node, a gateway, or a proxy. 10,000 made QA wait twenty minutes for one
+    // account on an endpoint that was answering perfectly (2026-09-22).
+    expect(defaultChunkForEndpoint('https://gateway.tenderly.co/public/mainnet')).toBe(500_000);
+    expect(defaultChunkForEndpoint('http://localhost:8545')).toBe(500_000);
+    expect(defaultChunkForEndpoint(undefined)).toBe(500_000);
+  });
+
+  it('keeps the careful number for providers with a documented low cap', () => {
+    // These refuse a large range, and the failure is not a slow scan, it is an
+    // account that loads with no pools and no balances.
+    expect(defaultChunkForEndpoint('https://eth-mainnet.g.alchemy.com/v2/key')).toBe(10_000);
+    expect(defaultChunkForEndpoint('https://rpc.ankr.com/eth/key')).toBe(10_000);
+    expect(defaultChunkForEndpoint('https://lb.drpc.org/ogrpc?network=ethereum')).toBe(10_000);
+  });
+
+  it('a dappnode endpoint is a node, so it gets the large range', () => {
+    // Recognised, but recognised as something the user runs themselves.
+    expect(defaultChunkForEndpoint('http://ethereum.dappnode:8545')).toBe(500_000);
+  });
+
+  it('an unparseable value falls back rather than throwing', () => {
+    expect(defaultChunkForEndpoint('not a url')).toBe(500_000);
+  });
+
+  it('the default does not warn about itself', () => {
+    // A threshold that fires on the value we ship trains people to ignore it.
+    expect(DEFAULT_CUSTOM_RPC_CHUNK).toBeLessThanOrEqual(CUSTOM_RPC_CHUNK_WARN_ABOVE);
   });
 });

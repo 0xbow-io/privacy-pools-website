@@ -16,6 +16,8 @@ import {
 import { BaseModal } from '~/components';
 import {
   CUSTOM_RPC_CHUNK_WARN_ABOVE,
+  HOSTED_PROVIDER_CHUNK,
+  defaultChunkForEndpoint,
   DEFAULT_CUSTOM_RPC_CHUNK,
   deriveSiblingRpcUrls,
   detectRpcProvider,
@@ -306,10 +308,25 @@ const CustomRpcForm = () => {
    */
   const skipped = anyFilled ? chains.filter((chain) => (rows[chain.id]?.value?.trim() ?? '').length === 0) : [];
   const chunkValue = validateCustomRpcChunk(chunk);
-  const chunkWarning =
-    chunkValue.ok && chunkValue.value > CUSTOM_RPC_CHUNK_WARN_ABOVE
-      ? `Most hosted providers refuse more than ${CUSTOM_RPC_CHUNK_WARN_ABOVE.toLocaleString('en-US')} blocks per request. Raise this only if your node allows it.`
-      : '';
+
+  /*
+   * Warn by PROVIDER first, then by size.
+   *
+   * The blanket threshold was the only signal, and once the default rose to
+   * 500,000 it would have fired on the default itself, which trains people to
+   * ignore it. A named provider with a documented low cap is the case actually
+   * worth interrupting for, and it is the one this app can recognise.
+   */
+  const lowCapEndpoint = chains
+    .map((chain) => rows[chain.id]?.value?.trim())
+    .find((value) => !!value && defaultChunkForEndpoint(value) === HOSTED_PROVIDER_CHUNK);
+  const chunkWarning = !chunkValue.ok
+    ? ''
+    : lowCapEndpoint && chunkValue.value > HOSTED_PROVIDER_CHUNK
+      ? `${PROVIDER_LABELS[detectRpcProvider(lowCapEndpoint) ?? ''] ?? 'That provider'} refuses more than ${HOSTED_PROVIDER_CHUNK.toLocaleString('en-US')} blocks per request. Lower this or the account scan will fail.`
+      : chunkValue.value > CUSTOM_RPC_CHUNK_WARN_ABOVE
+        ? `Most endpoints refuse more than ${CUSTOM_RPC_CHUNK_WARN_ABOVE.toLocaleString('en-US')} blocks per request. Raise this only if yours allows it.`
+        : '';
 
   return (
     <ModalContainer>
