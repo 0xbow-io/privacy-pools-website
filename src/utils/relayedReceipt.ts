@@ -129,39 +129,92 @@ export const waitForRelayedReceipt = async (
   const now = opts.now ?? Date.now;
   const deadline = now() + budgetMs;
 
-  let head = await client.getBlockNumber();
+  /**
+   * A transient RPC failure is not an answer.
+   *
+   * Nothing here used to be guarded, so a single 429 or dropped socket threw
+   * out of the loop. The UI showed a generic error and dropped back to the
+   * withdraw modal while the transaction was landing on chain, and because the
+   * flow never completed, the fee and the withdrawal were never recorded
+   * locally, so the user could reasonably try again. `waitForTransactionReceipt`
+   * retried internally; this has to do the same. Only the budget ends the wait.
+   */
+  const attempt = async <T>(read: () => Promise<T>): Promise<T | undefined> => {
+    try {
+      return await read();
+    } catch {
+      return undefined;
+    }
+  };
+
+  let head = (await attempt(() => client.getBlockNumber())) ?? 0n;
   let next = head > lookback ? head - lookback : 0n;
+  /**
+   * A block that carries the transaction but whose logs came back empty.
+   *
+   * Providers serve blocks and logs from different nodes, and the log node is
+   * routinely a little behind. Believing the first such observation reports a
+   * SUCCESSFUL withdrawal as reverted and tells the user their funds have not
+   * moved, which is the worst thing this function can say and is unrecoverable
+   * once said. So a revert has to be seen twice, a poll apart, with the logs
+   * for that exact block re-read in between. A real revert costs one extra
+   * interval; a lagging index gets the time it needs.
+   */
+  let revertCandidate: { blockNumber: bigint; timestamp: bigint | null } | undefined;
 
   for (;;) {
-    if (next <= head) {
+    // A candidate from an earlier poll is settled first, and on its own block,
+    // so the verdict does not wait for the chain to produce a new one.
+    if (revertCandidate) {
+      const at = revertCandidate.blockNumber;
+      const confirm = await attempt(() => client.getLogs({ address: opts.addresses, fromBlock: at, toBlock: at }));
+      const late = (confirm ?? []).filter((log) => log.transactionHash && sameHash(log.transactionHash, hash));
+      if (late.length > 0) {
+        // The log node had simply not caught up. This is the false revert.
+        const found = late.find((log) => log.blockNumber !== null)?.blockNumber ?? at;
+        return { transactionHash: hash, blockNumber: found, status: 'success', logs: late, timestamp: null };
+      }
+      if (confirm !== undefined) {
+        return {
+          transactionHash: hash,
+          blockNumber: at,
+          status: 'reverted',
+          logs: [],
+          timestamp: revertCandidate.timestamp,
+        };
+      }
+      // The re-read itself failed; keep the candidate and try again next poll.
+    } else if (next <= head) {
       // Success: our logs are in the pool's / entrypoint's logs for the new blocks.
-      const logs = await client.getLogs({ address: opts.addresses, fromBlock: next, toBlock: head });
-      const mine = logs.filter((log) => log.transactionHash && sameHash(log.transactionHash, hash));
+      const logs = await attempt(() => client.getLogs({ address: opts.addresses, fromBlock: next, toBlock: head }));
+      const mine = (logs ?? []).filter((log) => log.transactionHash && sameHash(log.transactionHash, hash));
       const minedAt = mine.find((log) => log.blockNumber !== null)?.blockNumber;
       if (mine.length > 0 && minedAt !== undefined && minedAt !== null) {
         return { transactionHash: hash, blockNumber: minedAt, status: 'success', logs: mine, timestamp: null };
       }
 
-      // Revert: the transaction is in a block's own list but touched neither contract.
-      for (let blockNumber = next; blockNumber <= head; blockNumber += 1n) {
-        const block = await client.getBlock({ blockNumber });
-        const mined = block.transactions.some((tx) => sameHash(typeof tx === 'string' ? tx : tx.hash, hash));
-        if (mined) {
-          return {
-            transactionHash: hash,
-            blockNumber,
-            status: 'reverted',
-            logs: [],
-            timestamp: block.timestamp ?? null,
-          };
+      // Only advance past blocks we actually READ. A failed getLogs that moved
+      // the cursor would skip the window the transaction landed in and leave
+      // the wait to time out on a withdrawal that succeeded.
+      if (logs !== undefined) {
+        // The transaction is in a block's own list but touched neither
+        // contract. Do not answer yet: hold it and re-read its logs next poll.
+        for (let blockNumber = next; blockNumber <= head; blockNumber += 1n) {
+          const block = await attempt(() => client.getBlock({ blockNumber }));
+          if (!block) continue;
+          const mined = block.transactions.some((tx) => sameHash(typeof tx === 'string' ? tx : tx.hash, hash));
+          if (mined) {
+            revertCandidate = { blockNumber, timestamp: block.timestamp ?? null };
+            break;
+          }
         }
+        next = head + 1n;
       }
-      next = head + 1n;
     }
 
     if (now() >= deadline) throw new RelayedReceiptTimeout();
     await sleep(intervalMs);
-    head = await client.getBlockNumber();
+    head = (await attempt(() => client.getBlockNumber())) ?? head;
   }
 };
 

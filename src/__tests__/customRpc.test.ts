@@ -11,6 +11,7 @@ import {
   getCustomRpcChunk,
   getCustomRpcPersistence,
   saveCustomRpcUrls,
+  setCustomRpcChunk,
   validateCustomRpcChunk,
   getCustomRpcUrl,
   parseChainIdResponse,
@@ -412,5 +413,66 @@ describe('where the endpoint is kept', () => {
     window.sessionStorage.setItem(CUSTOM_RPC_STORAGE_KEY, JSON.stringify({ 1: 'https://new.example/' }));
     expect(getCustomRpcUrl(1)).toBe('https://new.example/');
     expect(getCustomRpcPersistence()).toBe('session');
+  });
+});
+
+describe('the blocks-per-request setting travels with the endpoints', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it('is written to the store the URLs are moving TO, not the one they are leaving', () => {
+    // The save order in the modal is chunk then URLs, so an unnamed store
+    // resolved to wherever the URLs still were. The value landed in the store
+    // being vacated, the reader followed the URLs to the new one and found
+    // nothing, and every log request silently fell back to 10,000 blocks: the
+    // account then loads with no pools for the very user who raised the limit
+    // because their provider refuses that range.
+    saveCustomRpcUrls({ 1: 'https://mine.example' }, 'local');
+    setCustomRpcChunk('50000', 'local');
+    expect(getCustomRpcChunk()).toBe(50_000);
+
+    // Now the user unticks "keep these": chunk first, as the modal does.
+    setCustomRpcChunk('50000', 'session');
+    saveCustomRpcUrls({ 1: 'https://mine.example' }, 'session');
+
+    expect(window.sessionStorage.getItem(CUSTOM_CHUNK_STORAGE_KEY)).toBe('50000');
+    expect(window.localStorage.getItem(CUSTOM_CHUNK_STORAGE_KEY)).toBeNull();
+    expect(getCustomRpcChunk()).toBe(50_000);
+  });
+
+  it('leaves no copy behind in the other store', () => {
+    setCustomRpcChunk('50000', 'session');
+    setCustomRpcChunk('20000', 'local');
+    expect(window.sessionStorage.getItem(CUSTOM_CHUNK_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(CUSTOM_CHUNK_STORAGE_KEY)).toBe('20000');
+  });
+
+  it('without a named store it still follows the endpoints, as before', () => {
+    saveCustomRpcUrls({ 1: 'https://mine.example' }, 'session');
+    setCustomRpcChunk('30000');
+    expect(getCustomRpcChunk()).toBe(30_000);
+  });
+});
+
+describe('the custom RPC toast only speaks to users who set one', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it('stays silent on an error that names no chain when no endpoint is set', () => {
+    // The SDK's error objects carry no chainId, so "undefined means mine"
+    // passed every error through and anyone hitting an ordinary scan failure
+    // against OUR endpoint was told to fix a setting they never touched.
+    expect(describeCustomRpcFailure([{ error: new Error('429 Too Many Requests') }])).toBeUndefined();
+    expect(describeCustomRpcFailure([{ message: 'block range is too large' }])).toBeUndefined();
+  });
+
+  it('speaks up for the same error once the user has an endpoint of their own', () => {
+    setCustomRpcUrl(1, 'https://mine.example');
+    expect(describeCustomRpcFailure([{ error: new Error('429 Too Many Requests') }])?.kind).toBe('rate-limited');
+    clearCustomRpcUrl(1);
   });
 });

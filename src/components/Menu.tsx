@@ -52,7 +52,11 @@ export const Menu = () => {
   // A wallet sign-up re-derives the phrase behind a fresh signature. A seed-only
   // session has no wallet to ask, so it downloads the seed it already holds.
   const canReDeriveFromWallet = signupMethod === 'wallet' && hasWallet;
-  const canDownloadFromMemory = !hasWallet && signupMethod !== 'wallet' && !!seed;
+  // Holding the seed is the whole condition. Requiring `!hasWallet` as well
+  // lost the pair: a seed-only sign-up that later connects a wallet matched
+  // neither branch, so the menu item vanished while the phrase sat in memory
+  // and the user had to disconnect to get their own recovery phrase back.
+  const canDownloadFromMemory = signupMethod !== 'wallet' && !!seed;
   const canDownloadSeedphrase = canReDeriveFromWallet || canDownloadFromMemory;
 
   const ethBalanceBN = value.toString() ?? '0';

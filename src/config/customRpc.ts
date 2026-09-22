@@ -346,10 +346,31 @@ export const getCustomRpcChunk = (): number => {
   }
 };
 
-export const setCustomRpcChunk = (value: string): ChunkValidation => {
+/**
+ * `persistence` MUST be passed by any caller that is also moving the URLs.
+ *
+ * Without it the chunk goes wherever the URLs live at the moment of the call,
+ * which during a save is the store they are about to leave. `getCustomRpcChunk`
+ * then follows the URLs to the new store, finds nothing, and every log request
+ * silently reverts to the 10,000-block default. For a user who raised the
+ * setting because their provider refuses that range, the next load is an
+ * account with no pools and no balances, which is the exact failure the field
+ * exists to prevent.
+ *
+ * The chunk is cleared from the other store for the same reason `writeCustomRpcMap`
+ * clears it there: a value left behind comes back the moment the URLs move again.
+ */
+export const setCustomRpcChunk = (value: string, persistence?: CustomRpcPersistence): ChunkValidation => {
   const checked = validateCustomRpcChunk(value);
   if (!checked.ok) return checked;
-  const storage = getStorage();
+  const storage = persistence ? storageFor(persistence) : getStorage();
+  if (persistence) {
+    try {
+      storageFor(persistence === 'local' ? 'session' : 'local')?.removeItem(CUSTOM_CHUNK_STORAGE_KEY);
+    } catch {
+      /* blocked site data; the write below still stands */
+    }
+  }
   try {
     if (checked.value === DEFAULT_CUSTOM_RPC_CHUNK) storage?.removeItem(CUSTOM_CHUNK_STORAGE_KEY);
     else storage?.setItem(CUSTOM_CHUNK_STORAGE_KEY, String(checked.value));
@@ -422,7 +443,15 @@ export const CUSTOM_RPC_FAILURE_MESSAGES: Record<CustomRpcFailureKind, string> =
 export const describeCustomRpcFailure = (
   errors: readonly { chainId?: number; error?: unknown; message?: unknown }[],
 ): { kind: CustomRpcFailureKind; message: string } | undefined => {
-  const mine = errors.filter((entry) => entry.chainId === undefined || getCustomRpcUrl(entry.chainId));
+  // An entry that names its chain is ours only if THAT chain has a custom
+  // endpoint. An entry that names none (the SDK's error objects carry no
+  // chainId, so this is the common case, not the rare one) can only be
+  // attributed to a custom endpoint if the user has set one at all. Treating
+  // "no chainId" as "mine" made the filter pass everything, so anyone hitting
+  // an ordinary scan failure against OUR endpoint was told to fix or revert a
+  // setting they had never touched.
+  const anyCustom = Object.keys(readCustomRpcMap()).length > 0;
+  const mine = errors.filter((entry) => (entry.chainId === undefined ? anyCustom : !!getCustomRpcUrl(entry.chainId)));
   if (mine.length === 0) return undefined;
   const kinds = mine.map((entry) => classifyCustomRpcFailure(entry.error ?? entry.message ?? entry));
   const kind = kinds.find((k) => k === 'rate-limited') ?? kinds.find((k) => k === 'range-too-large') ?? 'unknown';

@@ -224,3 +224,117 @@ describe('withdrawal fee registry', () => {
     expect(getWithdrawalFee(THEIRS)).toBeUndefined();
   });
 });
+
+/**
+ * Two ways the wait used to answer wrongly, both from treating one RPC
+ * response as the truth. Providers serve blocks and logs from different nodes,
+ * and any single call can fail on its own.
+ */
+describe('waitForRelayedReceipt under an unreliable provider', () => {
+  it('does not call a success a revert when the log index is behind the block index', async () => {
+    // The block node already lists the transaction; the log node serves it only
+    // on the second read. Believing the first read would tell the user their
+    // funds had not moved, on a withdrawal that went through.
+    let logReads = 0;
+    const client: RelayedReceiptClient = {
+      getBlockNumber: async () => 100n,
+      getLogs: async (args) => {
+        logReads += 1;
+        if (logReads === 1) return [];
+        const out: MinedLog[] = [];
+        for (let b = args.fromBlock; b <= args.toBlock; b += 1n) {
+          if (b === 99n) out.push(log(OURS, 99n));
+        }
+        return out;
+      },
+      getBlock: async ({ blockNumber }) => ({
+        transactions: blockNumber === 99n ? [OURS] : [],
+        timestamp: 1_790_000_000n + blockNumber,
+      }),
+    };
+
+    const receipt = await waitForRelayedReceipt(OURS, client, {
+      addresses: [POOL, ENTRYPOINT],
+      lookbackBlocks: 5n,
+      sleep: noSleep,
+    });
+
+    expect(receipt.status).toBe('success');
+    expect(receipt.blockNumber).toBe(99n);
+    expect(receipt.logs).toHaveLength(1);
+    expect(logReads).toBeGreaterThan(1);
+  });
+
+  it('still reports a real revert, once the second look agrees', async () => {
+    const { client } = fakeChain({ heads: [100n, 100n], txsByBlock: { '97': [OURS] } });
+    const receipt = await waitForRelayedReceipt(OURS, client, {
+      addresses: [POOL, ENTRYPOINT],
+      lookbackBlocks: 5n,
+      sleep: noSleep,
+    });
+    expect(receipt.status).toBe('reverted');
+    expect(receipt.blockNumber).toBe(97n);
+  });
+
+  it('survives a flaky response instead of throwing the withdrawal away', async () => {
+    // One 429 used to throw out of the loop: the UI showed a generic error and
+    // dropped back to the withdraw modal while the transaction was landing, and
+    // the fee and withdrawal were never recorded, so the user could retry.
+    let logReads = 0;
+    let headReads = 0;
+    const client: RelayedReceiptClient = {
+      getBlockNumber: async () => {
+        headReads += 1;
+        if (headReads === 2) throw new Error('429 Too Many Requests');
+        return 100n;
+      },
+      getLogs: async (args) => {
+        logReads += 1;
+        if (logReads <= 2) throw new Error('socket hang up');
+        const out: MinedLog[] = [];
+        for (let b = args.fromBlock; b <= args.toBlock; b += 1n) {
+          if (b === 99n) out.push(log(OURS, 99n));
+        }
+        return out;
+      },
+      getBlock: async ({ blockNumber }) => ({ transactions: [], timestamp: 1_790_000_000n + blockNumber }),
+    };
+
+    const receipt = await waitForRelayedReceipt(OURS, client, {
+      addresses: [POOL, ENTRYPOINT],
+      lookbackBlocks: 5n,
+      sleep: noSleep,
+    });
+
+    expect(receipt.status).toBe('success');
+    expect(receipt.blockNumber).toBe(99n);
+  });
+
+  it('does not skip the window a failed log read covered', async () => {
+    // The cursor may only advance past blocks actually read. Advancing on a
+    // failed read would step over the block the transaction landed in and time
+    // out on a withdrawal that succeeded.
+    const ranges: { fromBlock: bigint; toBlock: bigint }[] = [];
+    let logReads = 0;
+    const client: RelayedReceiptClient = {
+      getBlockNumber: async () => 100n,
+      getLogs: async (args) => {
+        ranges.push({ fromBlock: args.fromBlock, toBlock: args.toBlock });
+        logReads += 1;
+        if (logReads === 1) throw new Error('503');
+        return args.fromBlock <= 99n && 99n <= args.toBlock ? [log(OURS, 99n)] : [];
+      },
+      getBlock: async ({ blockNumber }) => ({ transactions: [], timestamp: 1_790_000_000n + blockNumber }),
+    };
+
+    const receipt = await waitForRelayedReceipt(OURS, client, {
+      addresses: [POOL, ENTRYPOINT],
+      lookbackBlocks: 5n,
+      sleep: noSleep,
+    });
+
+    expect(receipt.status).toBe('success');
+    expect(ranges[0]).toEqual({ fromBlock: 95n, toBlock: 100n });
+    expect(ranges[1]).toEqual({ fromBlock: 95n, toBlock: 100n });
+  });
+});

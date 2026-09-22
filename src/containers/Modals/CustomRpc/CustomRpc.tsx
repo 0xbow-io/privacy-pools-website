@@ -269,7 +269,9 @@ const CustomRpcForm = () => {
       }
     }
 
-    setCustomRpcChunk(chunk);
+    // Same store as the URLs, named explicitly: this save may be moving them
+    // between session and local, and the chunk has to travel with them.
+    setCustomRpcChunk(chunk, persist ? 'local' : 'session');
     if (!saveCustomRpcUrls(entries, persist ? 'local' : 'session')) {
       setFormError(STORAGE_REFUSED);
       return;
@@ -281,7 +283,7 @@ const CustomRpcForm = () => {
   const handleReset = () => {
     setFormError('');
     const cleared = Object.fromEntries(chains.map((chain) => [chain.id, null]));
-    setCustomRpcChunk('');
+    setCustomRpcChunk('', persist ? 'local' : 'session');
     if (!saveCustomRpcUrls(cleared, persist ? 'local' : 'session')) {
       setFormError(STORAGE_REFUSED);
       return;
