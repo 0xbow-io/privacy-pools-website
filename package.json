@@ -1,7 +1,7 @@
 {
   "name": "privacy-pools-website",
   "private": true,
-  "version": "2.16.0",
+  "version": "2.15.1",
   "type": "module",
   "license": "MIT",
   "author": "Wonderland",

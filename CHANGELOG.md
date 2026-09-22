@@ -5,34 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.16.0] - 2026-09-22
-
-### Added
-
-- Custom RPC endpoints, one per network, configurable before sign-in
-- Sign in with a recovery phrase, without a wallet
-- A price freshness countdown on the withdraw review step
-
-### Changed
-
-- With at least one custom endpoint configured, networks left unset are excluded from the account scan rather than served from the defaults. The form lists them before saving; clearing every endpoint restores the previous behaviour
-- The default log range for a custom endpoint is 500,000 blocks, with a smaller range retained for providers documented to cap lower
-- The withdraw form requests the price at review and the fee commitment at confirm
-- The recipient is sent at review only to relayers that require it
-- Wallet balance reads use a single fixed interval
-- Event dates come from the bulk scan, and relay confirmation from block data
-
-### Fixed
-
-- Pool amounts are denominated from the pool asset's configuration rather than the wallet balance query, so formatting, parsing and proof inputs agree while that query is unresolved
-- Dialogs taller than the viewport scroll to their controls
-- The custom RPC form lays its endpoints out side by side
-- Block timestamps are completed for chains scanned through a custom endpoint
-
-### Notes
-
-- Account discovery issues a large number of requests. A rate-limited endpoint can take considerably longer on first load; the form notes this
-
 ## [2.15.1] - 2026-09-11
 
 ### Changed
