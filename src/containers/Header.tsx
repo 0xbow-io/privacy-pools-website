@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { styled } from '@mui/material/styles';
-import { Disclaimer, Logo, Menu, SignInButton } from '~/components';
+import { CustomRpcButton, Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
 import { MaintenanceBanner } from '~/components/MaintenanceBanner';
 import { useAuthContext } from '~/hooks';
@@ -29,6 +29,14 @@ export const Header = () => {
         <Actions>
           <ChainSelect />
 
+          {/*
+            Signed out, the custom RPC form gets its own button. It normally
+            lives in the account menu, which is not rendered here, so the one
+            setting that decides whether signing in works could only be changed
+            after signing in. Signed in, the menu item covers it and this is
+            hidden, so there is never more than one way in on screen.
+          */}
+          {!showMenu && <CustomRpcButton />}
           {!showMenu && <SignInButton />}
           {showMenu && <Menu />}
         </Actions>
