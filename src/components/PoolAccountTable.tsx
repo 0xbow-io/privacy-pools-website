@@ -22,14 +22,14 @@ import { DottedMenu, ExtendedTooltip as Tooltip, StatusChip } from '~/components
 import { getConstants } from '~/config/constants';
 import { usePoolAccountsContext, useModal, useChainContext, useAccountContext } from '~/hooks';
 import { EventType, ModalType, PoolAccount, ReviewStatus } from '~/types';
-import { formatDataNumber, formatTimestamp, getStatus } from '~/utils';
+import { formatDataNumber, formatTimestamp, getStatus, poolDecimals } from '~/utils';
 
 export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
   const { PENDING_STATUS_MESSAGE: statusMessage } = getConstants();
   const { setActionType, setPoolAccount } = usePoolAccountsContext();
   const { balanceBN, selectedPoolInfo } = useChainContext();
   // Pool balances must remain readable without a connected wallet or a resolved balance query.
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
   const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { address } = useAccount();
   const { setModalOpen } = useModal();

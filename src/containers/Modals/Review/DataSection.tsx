@@ -15,7 +15,7 @@ import {
   useNotifications,
 } from '~/hooks';
 import { EventType } from '~/types';
-import { getUsdBalance, truncateAddress } from '~/utils';
+import { getUsdBalance, truncateAddress, poolDecimals } from '~/utils';
 import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
 import { FeeBreakdown, formatFeeDisplay } from './FeeBreakdown';
 
@@ -34,7 +34,7 @@ export const DataSection = () => {
   const { quoteState } = useQuoteContext();
   const publicClient = usePublicClient();
   const { balanceBN, price, refetchPrice, selectedPoolInfo, chainId } = useChainContext();
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
   const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
   const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw, selectedAlternativeToken } =

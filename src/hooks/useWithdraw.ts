@@ -34,6 +34,7 @@ import {
   relayedReceiptClient,
   relayedReceiptLookback,
   waitForRelayedReceipt,
+  poolDecimals,
 } from '~/utils';
 
 const {
@@ -72,7 +73,7 @@ export const useWithdraw = () => {
   const { selectedPoolInfo, chainId, balanceBN, relayersData, selectedRelayer } = useChainContext();
 
   // Proof inputs must use the commitment's units even before a wallet balance resolves.
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
 
   const { accountService, addWithdrawal, isScopeComplete } = useAccountContext();
   const publicClient = usePublicClient({ chainId });

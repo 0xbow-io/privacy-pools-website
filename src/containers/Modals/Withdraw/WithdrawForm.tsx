@@ -33,7 +33,7 @@ import {
   useAuthContext,
 } from '~/hooks';
 import { ModalType, ReviewStatus } from '~/types';
-import { countDepositsAtLeast, getUsdBalance, relayerClient } from '~/utils';
+import { countDepositsAtLeast, getUsdBalance, relayerClient, poolDecimals } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -71,7 +71,7 @@ export const WithdrawForm = () => {
 
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals ?? 18;
+  const decimals = poolDecimals(selectedPoolInfo, { decimals: balanceDecimals });
   const symbol = selectedPoolInfo?.asset ?? balanceSymbol;
 
   // Filter pool accounts by current chain, pool scope, balance > 0, and APPROVED status

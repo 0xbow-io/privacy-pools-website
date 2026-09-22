@@ -15,7 +15,7 @@ import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from 'wa
 import { getConfig } from '~/config';
 import { useChainContext, useAccountContext, useNotifications, usePoolAccountsContext } from '~/hooks';
 import { Hash, ModalType, Secret } from '~/types';
-import { depositEventAbi, decodeEventsFromReceipt, createDepositSecrets, entrypointAbi } from '~/utils';
+import { depositEventAbi, decodeEventsFromReceipt, createDepositSecrets, entrypointAbi, poolDecimals } from '~/utils';
 import {
   createAlternativeTokenDepositBatch,
   checkAlternativeTokenBalance,
@@ -38,7 +38,7 @@ const {
 export const useDeposit = () => {
   const { address } = useAccount();
   const { chainId, selectedPoolInfo, balanceBN } = useChainContext();
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
   const { addNotification, getDefaultErrorMessage } = useNotifications();
   const { switchChainAsync } = useSwitchChain();
   const { setModalOpen, setIsClosable } = useModal();

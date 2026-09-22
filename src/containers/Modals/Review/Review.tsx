@@ -18,6 +18,7 @@ import {
   useNotifications,
 } from '~/hooks';
 import { EventType, ModalType } from '~/types';
+import { poolDecimals } from '~/utils';
 import { ModalContainer, ModalTitle } from '../Deposit';
 import { LinksSection } from '../LinksSection';
 import { DataSection } from './DataSection';
@@ -35,7 +36,7 @@ export const ReviewModal = () => {
 
   // Quote logic for withdrawals
   const { balanceBN, selectedPoolInfo, chainId } = useChainContext();
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
   const { addNotification } = useNotifications();
 

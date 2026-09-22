@@ -4,6 +4,7 @@ import { Box, Stack, styled, Typography } from '@mui/material';
 import { formatUnits } from 'viem';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { useExternalServices, useChainContext } from '~/hooks';
+import { poolDecimals } from '~/utils';
 
 export const GlobalPool = () => {
   const {
@@ -14,7 +15,7 @@ export const GlobalPool = () => {
     aspData: { poolsData },
   } = useExternalServices();
 
-  const decimals = assetDecimals ?? balanceDecimals ?? 18;
+  const decimals = poolDecimals({ assetDecimals }, { decimals: balanceDecimals });
   const symbol = asset ?? balanceSymbol;
 
   const poolBalance = Number(

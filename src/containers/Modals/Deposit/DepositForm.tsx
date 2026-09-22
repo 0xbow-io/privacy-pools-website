@@ -29,7 +29,7 @@ import { getConstants } from '~/config/constants';
 import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { useChainContext, useModal, usePoolAccountsContext, useStakingFeature, useNotifications } from '~/hooks';
 import { ModalType } from '~/types';
-import { formatDataNumber, calculateInitialDeposit, entrypointAbi, aspClient } from '~/utils';
+import { formatDataNumber, calculateInitialDeposit, entrypointAbi, aspClient, poolDecimals } from '~/utils';
 import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
 import type { PoolStats } from '~/utils/aspClient';
 import { getBestYieldOpportunity, formatAPY } from '~/utils/poolUtils';
@@ -59,7 +59,7 @@ export const DepositForm = () => {
     setSelectedAsset,
     setChainId,
   } = useChainContext();
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals;
+  const decimals = poolDecimals(selectedPoolInfo, { decimals: balanceDecimals });
   const symbol = selectedPoolInfo?.asset ?? balanceSymbol;
   const {
     amount,

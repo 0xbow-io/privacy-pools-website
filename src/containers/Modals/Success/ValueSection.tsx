@@ -3,12 +3,13 @@ import { Stack, styled, Typography } from '@mui/material';
 import { formatUnits, parseUnits } from 'viem';
 import { usePoolAccountsContext, useChainContext, useAccountContext } from '~/hooks';
 import { EventType } from '~/types';
+import { poolDecimals } from '~/utils';
 
 export const ValueSection = () => {
   const { amount, poolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const { balanceBN, selectedPoolInfo } = useChainContext();
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
   const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
 
   const paText = actionType === EventType.DEPOSIT ? 'To pool account' : 'From pool account';

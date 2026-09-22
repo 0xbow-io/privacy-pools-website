@@ -13,7 +13,7 @@ import {
 import { chainData, getConfig } from '~/config';
 import { usePoolAccountsContext, useModal, useChainContext, useAccountContext } from '~/hooks';
 import { ActivityRecords, GlobalEvent, HistoryData, ModalType, ReviewStatus } from '~/types';
-import { formatDataNumber, getTimeAgo, getStatus } from '~/utils';
+import { formatDataNumber, getTimeAgo, getStatus, poolDecimals } from '~/utils';
 
 const {
   constants: { ITEMS_PER_PAGE, PENDING_STATUS_MESSAGE },
@@ -36,7 +36,7 @@ export const ActivityTable = ({
 }) => {
   const { setModalOpen } = useModal();
   const { balanceBN, selectedPoolInfo } = useChainContext();
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
   const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { poolAccounts, poolAccountsByChainScope } = useAccountContext();
   const { setSelectedHistoryData } = usePoolAccountsContext();
