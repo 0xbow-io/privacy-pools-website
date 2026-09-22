@@ -307,6 +307,21 @@ const CustomRpcForm = () => {
         One endpoint per network. Leave a field empty to keep using ours.
       </Typography>
 
+      {/*
+        Above the fields, because it changes which endpoint someone picks.
+
+        A free public endpoint ANSWERS, so every field goes green and the form
+        looks entirely healthy, and then the account takes about twenty minutes
+        to appear: discovery is thousands of queries and a public gateway rate
+        limits them (-32005). Nothing is broken and nothing looks broken, which
+        is the worst shape a wait can have. QA sat through it before working
+        out that it was the endpoint (2026-09-22).
+      */}
+      <Typography variant='body2' color='text.secondary' data-testid='custom-rpc-speed-notice'>
+        We recommend using your own RPC. On a free public endpoint, expect your account to take around 20 minutes to
+        load.
+      </Typography>
+
       <ChainGrid>
         {chains.map((chain) => {
           const row = rows[chain.id];
