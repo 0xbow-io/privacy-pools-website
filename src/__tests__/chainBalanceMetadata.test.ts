@@ -37,8 +37,16 @@ jest.mock('../config', () => {
 });
 
 const { ChainContext, ChainProvider } =
+  /*
+   * `require` rather than `import`, and the rule is disabled for exactly these
+   * lines: a static import is HOISTED above the jest.mock calls above, so the
+   * real modules would be captured before the mocks are installed and the test
+   * would exercise the real ones. Load order is the point here.
+   */
+  /* eslint-disable @typescript-eslint/no-require-imports */
   require('../providers/ChainProvider') as typeof import('~/providers/ChainProvider');
 const { useBalance } = require('wagmi') as typeof import('wagmi');
+/* eslint-enable @typescript-eslint/no-require-imports */
 let context: React.ContextType<typeof ChainContext>;
 const Probe = () => {
   context = useContext(ChainContext);
@@ -51,7 +59,7 @@ beforeEach(async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.mocked(useBalance).mockReturnValue({ data: undefined } as ReturnType<typeof useBalance>);
   root = createRoot(document.createElement('div'));
-  await act(async () => root.render(createElement(ChainProvider, { children: createElement(Probe) })));
+  await act(async () => root.render(createElement(ChainProvider, null, createElement(Probe))));
 });
 
 afterEach(async () => {

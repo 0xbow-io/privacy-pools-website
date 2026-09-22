@@ -32,9 +32,17 @@ jest.mock('../utils', () => ({
   verifyWithdrawalProof: async () => true,
 }));
 
+/*
+ * `require` rather than `import`, and the rule is disabled for exactly these
+ * lines: a static import is HOISTED above the jest.mock calls above, so the
+ * real modules would be captured before the mocks are installed and the test
+ * would exercise the real ones. Load order is the point here.
+ */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { useWithdraw } = require('../hooks/useWithdraw') as typeof import('~/hooks/useWithdraw');
 const { useChainContext, usePoolAccountsContext } = require('../hooks') as typeof import('~/hooks');
 const { prepareWithdrawalProofInput } = require('../utils') as typeof import('~/utils');
+/* eslint-enable @typescript-eslint/no-require-imports */
 let withdrawal: ReturnType<typeof useWithdraw>;
 let chainContext: ReturnType<typeof useChainContext>;
 let root: Root;

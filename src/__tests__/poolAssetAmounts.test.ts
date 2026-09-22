@@ -1,7 +1,7 @@
 import { act, createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { createRoot, Root } from 'react-dom/client';
 import { createTheme, ThemeProvider } from '@mui/material';
+import { createRoot, Root } from 'react-dom/client';
 import { parseUnits } from 'viem';
 import { EventType, PoolAccount, ReviewStatus } from '~/types';
 
@@ -24,6 +24,13 @@ jest.mock('../utils', () => ({
 }));
 
 const { PoolAccountTable } =
+  /*
+   * `require` rather than `import`, and the rule is disabled for exactly these
+   * lines: a static import is HOISTED above the jest.mock calls above, so the
+   * real modules would be captured before the mocks are installed and the test
+   * would exercise the real ones. Load order is the point here.
+   */
+  /* eslint-disable @typescript-eslint/no-require-imports */
   require('../components/PoolAccountTable') as typeof import('~/components/PoolAccountTable');
 const { FeeBreakdown } =
   require('../containers/Modals/Review/FeeBreakdown') as typeof import('~/containers/Modals/Review/FeeBreakdown');
@@ -32,6 +39,7 @@ const { PoolAccountSection } =
 const { ValueSection } =
   require('../containers/Modals/Success/ValueSection') as typeof import('~/containers/Modals/Success/ValueSection');
 const { useAccountContext, useChainContext, usePoolAccountsContext } = require('../hooks') as typeof import('~/hooks');
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 let root: Root;
 let container: HTMLDivElement;
