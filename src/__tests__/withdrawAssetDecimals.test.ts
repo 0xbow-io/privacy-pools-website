@@ -3,15 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { createRoot, Root } from 'react-dom/client';
 import { parseUnits } from 'viem';
 
-jest.mock('../config', () => ({ getConfig: () => ({ env: { TEST_MODE: false } }) }));
-jest.mock('../contexts/QuoteContext', () => ({ useQuoteContext: () => ({ resetQuote: jest.fn() }) }));
+jest.mock('~/config', () => ({ getConfig: () => ({ env: { TEST_MODE: false } }) }));
+jest.mock('~/contexts/QuoteContext', () => ({ useQuoteContext: () => ({ resetQuote: jest.fn() }) }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn(), withScope: jest.fn() }));
 jest.mock('wagmi', () => ({
   usePublicClient: () => ({}),
   useSwitchChain: () => ({}),
   useWalletClient: () => ({}),
 }));
-jest.mock('../hooks', () => ({
+jest.mock('~/hooks', () => ({
   useChainContext: jest.fn(),
   usePoolAccountsContext: jest.fn(),
   useAccountContext: () => ({ accountService: {} }),
@@ -21,7 +21,7 @@ jest.mock('../hooks', () => ({
   useNotifications: () => ({ addNotification: jest.fn(), getDefaultErrorMessage: (message: string) => message }),
   useExternalServices: () => ({ aspData: { mtLeavesData: { aspLeaves: ['1'], stateTreeLeaves: ['1'] } } }),
 }));
-jest.mock('../utils', () => ({
+jest.mock('~/utils', () => ({
   prepareWithdrawRequest: () => ({}),
   getScope: async () => 1n,
   getMerkleProof: async () => ({ index: 0 }),
@@ -39,9 +39,9 @@ jest.mock('../utils', () => ({
  * would exercise the real ones. Load order is the point here.
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { useWithdraw } = require('../hooks/useWithdraw') as typeof import('~/hooks/useWithdraw');
-const { useChainContext, usePoolAccountsContext } = require('../hooks') as typeof import('~/hooks');
-const { prepareWithdrawalProofInput } = require('../utils') as typeof import('~/utils');
+const { useWithdraw } = require('~/hooks/useWithdraw') as typeof import('~/hooks/useWithdraw');
+const { useChainContext, usePoolAccountsContext } = require('~/hooks') as typeof import('~/hooks');
+const { prepareWithdrawalProofInput } = require('~/utils') as typeof import('~/utils');
 /* eslint-enable @typescript-eslint/no-require-imports */
 let withdrawal: ReturnType<typeof useWithdraw>;
 let chainContext: ReturnType<typeof useChainContext>;

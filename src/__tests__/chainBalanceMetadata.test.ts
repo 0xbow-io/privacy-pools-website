@@ -11,10 +11,10 @@ jest.mock('@tanstack/react-query', () => ({
   useQuery: () => ({}),
   useQueries: () => [],
 }));
-jest.mock('../hooks', () => ({ useNotifications: () => ({ addNotification: jest.fn() }) }));
-jest.mock('../utils', () => ({ fetchTokenPrice: async () => null }));
-jest.mock('../config/env', () => ({ getAspEndpointForChain: () => '' }));
-jest.mock('../config', () => {
+jest.mock('~/hooks', () => ({ useNotifications: () => ({ addNotification: jest.fn() }) }));
+jest.mock('~/utils', () => ({ fetchTokenPrice: async () => null }));
+jest.mock('~/config/env', () => ({ getAspEndpointForChain: () => '' }));
+jest.mock('~/config', () => {
   const pool = (asset: string, assetDecimals: number) => ({
     asset,
     assetDecimals,
@@ -44,7 +44,7 @@ const { ChainContext, ChainProvider } =
    * would exercise the real ones. Load order is the point here.
    */
   /* eslint-disable @typescript-eslint/no-require-imports */
-  require('../providers/ChainProvider') as typeof import('~/providers/ChainProvider');
+  require('~/providers/ChainProvider') as typeof import('~/providers/ChainProvider');
 const { useBalance } = require('wagmi') as typeof import('wagmi');
 /* eslint-enable @typescript-eslint/no-require-imports */
 let context: React.ContextType<typeof ChainContext>;

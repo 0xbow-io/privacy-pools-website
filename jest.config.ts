@@ -20,6 +20,21 @@ const config: Config = {
     ],
   },
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
+  /*
+   * The `~/` alias, spelled out.
+   *
+   * next/jest reads it from tsconfig for ordinary imports, but `jest.mock`
+   * calls are hoisted and resolved before that applies, so a mocked path had
+   * to be relative. Relative then resolved from a different base under CI's
+   * runner than under the local one, and three suites that passed here failed
+   * there with "Cannot find module '../config' from 'jest.setup.ts'".
+   *
+   * An absolute mapping removes the question of what the path is relative TO,
+   * which is the actual bug.
+   */
+  moduleNameMapper: {
+    '^~/(.*)$': '<rootDir>/src/$1',
+  },
   testPathIgnorePatterns: ['/node_modules/'],
   testMatch: ['<rootDir>/src/__tests__/*.test.ts'],
 };

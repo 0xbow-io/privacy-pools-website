@@ -5,19 +5,19 @@ import { createRoot, Root } from 'react-dom/client';
 import { parseUnits } from 'viem';
 import { EventType, PoolAccount, ReviewStatus } from '~/types';
 
-jest.mock('../hooks', () => ({
+jest.mock('~/hooks', () => ({
   useChainContext: jest.fn(),
   usePoolAccountsContext: jest.fn(),
   useAccountContext: jest.fn(),
   useModal: () => ({ setModalOpen: jest.fn() }),
 }));
 jest.mock('wagmi', () => ({ useAccount: () => ({}) }));
-jest.mock('../components', () => ({
+jest.mock('~/components', () => ({
   ExtendedTooltip: ({ children }: { children: React.ReactNode }) => children,
   DottedMenu: () => null,
   StatusChip: () => null,
 }));
-jest.mock('../utils', () => ({
+jest.mock('~/utils', () => ({
   ...jest.requireActual<typeof import('../utils/misc')>('../utils/misc'),
   formatTimestamp: () => '',
   getStatus: () => 'approved',
@@ -31,14 +31,14 @@ const { PoolAccountTable } =
    * would exercise the real ones. Load order is the point here.
    */
   /* eslint-disable @typescript-eslint/no-require-imports */
-  require('../components/PoolAccountTable') as typeof import('~/components/PoolAccountTable');
+  require('~/components/PoolAccountTable') as typeof import('~/components/PoolAccountTable');
 const { FeeBreakdown } =
-  require('../containers/Modals/Review/FeeBreakdown') as typeof import('~/containers/Modals/Review/FeeBreakdown');
+  require('~/containers/Modals/Review/FeeBreakdown') as typeof import('~/containers/Modals/Review/FeeBreakdown');
 const { PoolAccountSection } =
-  require('../containers/Modals/Review/PoolAccountSection') as typeof import('~/containers/Modals/Review/PoolAccountSection');
+  require('~/containers/Modals/Review/PoolAccountSection') as typeof import('~/containers/Modals/Review/PoolAccountSection');
 const { ValueSection } =
-  require('../containers/Modals/Success/ValueSection') as typeof import('~/containers/Modals/Success/ValueSection');
-const { useAccountContext, useChainContext, usePoolAccountsContext } = require('../hooks') as typeof import('~/hooks');
+  require('~/containers/Modals/Success/ValueSection') as typeof import('~/containers/Modals/Success/ValueSection');
+const { useAccountContext, useChainContext, usePoolAccountsContext } = require('~/hooks') as typeof import('~/hooks');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 let root: Root;
