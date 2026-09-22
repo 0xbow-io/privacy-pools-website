@@ -1,9 +1,8 @@
-import { createPublicClient } from 'viem';
-import { chainData, whitelistedChains } from '~/config/chainData';
-import { transports } from '~/config/wagmiConfig';
+import { chainData } from '~/config/chainData';
 import { AccountService, EventType, Hash, PrivacyPoolAccount, ReviewStatus, SDKPoolAccount } from '~/types';
 import { HistoryData } from '~/types/poolAccount';
-import { getTimestampFromBlockNumber } from '~/utils/misc';
+import { resolveAccountTimestamps } from '~/utils/blockTimestamps';
+import { getChainIdForScope } from '~/utils/sdk';
 
 export const sleep = (ms: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -110,31 +109,11 @@ export const buildLegacyMigrationHistory = (
   return { history, migratedLabels };
 };
 
+/**
+ * Dates the legacy account's events from the bulk timestamp registry. The
+ * legacy account's pools are scanned by the same SDK pass as the current
+ * account's, so the registry already holds their blocks; nothing is fetched.
+ */
 export const resolveLegacyTimestamps = async (account: PrivacyPoolAccount): Promise<void> => {
-  for (const [scope, poolAccounts] of account.poolAccounts.entries()) {
-    const chainIdStr = Object.keys(chainData).find((key) =>
-      chainData[Number(key)].poolInfo.some((pool) => pool.scope === scope),
-    );
-    if (!chainIdStr) continue;
-
-    const publicClient = createPublicClient({
-      chain: whitelistedChains.find((chain) => chain.id === Number(chainIdStr))!,
-      transport: transports[Number(chainIdStr)],
-    });
-
-    for (const pa of poolAccounts) {
-      if (!pa.deposit.timestamp) {
-        pa.deposit.timestamp = await getTimestampFromBlockNumber(pa.deposit.blockNumber, publicClient);
-      }
-      for (const child of pa.children) {
-        if (!child.timestamp) {
-          child.timestamp = await getTimestampFromBlockNumber(child.blockNumber, publicClient);
-        }
-      }
-      const rq = pa.ragequit as { blockNumber?: bigint; timestamp?: bigint } | undefined;
-      if (rq?.blockNumber && !rq.timestamp) {
-        rq.timestamp = await getTimestampFromBlockNumber(rq.blockNumber, publicClient);
-      }
-    }
-  }
+  resolveAccountTimestamps(account, getChainIdForScope);
 };

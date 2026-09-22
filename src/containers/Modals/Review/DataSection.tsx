@@ -15,7 +15,7 @@ import {
   useNotifications,
 } from '~/hooks';
 import { EventType } from '~/types';
-import { getUsdBalance, truncateAddress } from '~/utils';
+import { getUsdBalance, truncateAddress, poolDecimals } from '~/utils';
 import { getStakedTokenPreview } from '~/utils/alternativeTokenDeposit';
 import { FeeBreakdown, formatFeeDisplay } from './FeeBreakdown';
 
@@ -33,25 +33,12 @@ export const DataSection = () => {
   const [isFeeBreakdownOpen, setIsFeeBreakdownOpen] = useState(false);
   const { quoteState } = useQuoteContext();
   const publicClient = usePublicClient();
-  const {
-    balanceBN: { symbol, decimals },
-    price,
-    refetchPrice,
-    selectedPoolInfo,
-    chainId,
-  } = useChainContext();
+  const { balanceBN, price, refetchPrice, selectedPoolInfo, chainId } = useChainContext();
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
-  const {
-    amount,
-    target,
-    actionType,
-    poolAccount,
-    vettingFeeBPS,
-    feeBPSForWithdraw,
-    setFeeCommitment,
-    setFeeBPSForWithdraw,
-    selectedAlternativeToken,
-  } = usePoolAccountsContext();
+  const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw, selectedAlternativeToken } =
+    usePoolAccountsContext();
   const { addNotification } = useNotifications();
   const isDeposit = actionType === EventType.DEPOSIT;
   const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
@@ -76,18 +63,17 @@ export const DataSection = () => {
     fetchPreview();
   }, [isDeposit, selectedAlternativeToken, amount, decimals, publicClient]);
 
-  // Add quote timer for withdrawals
+  // The relayer's price for this withdrawal (phase 1, no commitment yet).
   const amountBN = parseUnits(amount, decimals);
   const { getQuote, isQuoteLoading, quoteError } = relayerData || {};
   const {
+    isPriceCurrent,
+    isPriceStale,
     countdown,
-    isQuoteValid,
-    isExpired,
     feeBPS: quoteFeesBPS,
     baseFeeBPS: quoteBaseFeeBPS,
     extraGasAmountETH: quoteExtraGasAmountETH,
     relayTxCostETH: quoteRelayTxCostETH,
-    quoteCommitment,
   } = useRequestQuote({
     getQuote: getQuote || (() => Promise.reject(new Error('No relayer data'))),
     isQuoteLoading: isQuoteLoading || false,
@@ -103,13 +89,9 @@ export const DataSection = () => {
     addNotification,
   });
 
-  // Set fee commitment when valid quote is available for withdrawals
-  useEffect(() => {
-    if (actionType === EventType.WITHDRAWAL && isQuoteValid && quoteCommitment && quoteFeesBPS) {
-      setFeeCommitment(quoteCommitment);
-      setFeeBPSForWithdraw(BigInt(quoteFeesBPS));
-    }
-  }, [actionType, isQuoteValid, quoteCommitment, quoteFeesBPS, setFeeCommitment, setFeeBPSForWithdraw]);
+  // The fee commitment and feeBPSForWithdraw are set by the Review Confirm
+  // click (phase 2), once the relayer has signed for the shown price.
+  const showsRelayerFee = actionType === EventType.WITHDRAWAL && isPriceCurrent;
   const aspDataFees = (vettingFeeBPS * parseUnits(amount, decimals)) / 100n / 100n;
   const aspOrRelayer = {
     label: isDeposit ? 'ASP' : 'Relayer',
@@ -256,16 +238,6 @@ export const DataSection = () => {
               <Value variant='body2'>{feesCollector}</Value>
             </Tooltip>
           </Row>
-          {actionType === EventType.WITHDRAWAL && (isQuoteValid || isExpired) && (
-            <Row>
-              <Label variant='body2'>Quote expires:</Label>
-              {countdown > 0 ? (
-                <QuoteTimer variant='body2'>in {countdown}s</QuoteTimer>
-              ) : (
-                <FlashingExpiredTimer variant='body2'>Expired</FlashingExpiredTimer>
-              )}
-            </Row>
-          )}
           {actionType !== EventType.WITHDRAWAL && (
             <Row>
               <Label variant='body2'>Value:</Label>
@@ -275,13 +247,23 @@ export const DataSection = () => {
             </Row>
           )}
           {/* Net Fee row with dropdown for withdrawals */}
-          {actionType === EventType.WITHDRAWAL && isQuoteValid && quoteFeesBPS !== null && quoteBaseFeeBPS !== null && (
+          {showsRelayerFee && (
+            <Row>
+              <Label variant='body2'>Price valid for:</Label>
+              {isPriceStale ? (
+                <FlashingExpiredTimer variant='body2'>Out of date</FlashingExpiredTimer>
+              ) : (
+                <QuoteTimer variant='body2'>{countdown}s</QuoteTimer>
+              )}
+            </Row>
+          )}
+          {showsRelayerFee && quoteFeesBPS !== null && quoteBaseFeeBPS !== null && (
             <>
               <Row>
                 <Label variant='body2'>Net Fee:</Label>
                 <FeeRow>
                   <Tooltip title={netFeeTooltip} placement='top'>
-                    <NetFeeValue isExtraGasEnabled={quoteState.extraGas} variant='body2'>
+                    <NetFeeValue isExtraGasEnabled={quoteState.extraGas} isStale={isPriceStale} variant='body2'>
                       {netFeeText}
                     </NetFeeValue>
                   </Tooltip>
@@ -398,6 +380,12 @@ const AddressValue = styled('div')(({ theme }) => ({
   },
 }));
 
+const FeeRow = styled('div')({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+});
+
 const QuoteTimer = styled(Value)(({ theme }) => ({
   fontWeight: 500,
   color: theme.palette.warning.main,
@@ -421,17 +409,13 @@ const FlashingExpiredTimer = styled(Value)(({ theme }) => ({
   },
 }));
 
-const FeeRow = styled('div')({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '4px',
-});
-
 const NetFeeValue = styled(Value, {
-  shouldForwardProp: (prop) => prop !== 'isExtraGasEnabled',
-})<{ isExtraGasEnabled?: boolean }>(({ theme, isExtraGasEnabled }) => ({
+  shouldForwardProp: (prop) => prop !== 'isExtraGasEnabled' && prop !== 'isStale',
+})<{ isExtraGasEnabled?: boolean; isStale?: boolean }>(({ theme, isExtraGasEnabled, isStale }) => ({
   color: isExtraGasEnabled ? theme.palette.success.main : theme.palette.text.primary,
   fontWeight: isExtraGasEnabled ? 600 : 400,
+  opacity: isStale ? 0.5 : 1,
+  fontStyle: isStale ? 'italic' : 'normal',
 }));
 
 const ExpandIconButton = styled(IconButton, {

@@ -25,7 +25,7 @@ export const CreateHistoryFile = () => {
   const { setActionType } = usePoolAccountsContext();
   const { createAccount } = useAccountContext();
   const { maxDeposit } = useChainContext();
-  const { login } = useAuthContext();
+  const { login, hasWallet } = useAuthContext();
   const { setModalOpen } = useModal();
   const [seedPhrase, setSeedPhrase] = useState('');
 
@@ -38,7 +38,8 @@ export const CreateHistoryFile = () => {
   const [notificationSent, setNotificationSent] = useState(false);
   const { addNotification } = useNotifications();
 
-  const isDepositDisabled = !BigInt(maxDeposit);
+  // A deposit is sent from the user's wallet, so the shortcut needs one.
+  const isDepositDisabled = !hasWallet || !BigInt(maxDeposit);
 
   const handleCreateHistoryFile = useCallback(() => {
     if (!isVerified) return;

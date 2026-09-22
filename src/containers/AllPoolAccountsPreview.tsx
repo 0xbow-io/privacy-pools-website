@@ -118,7 +118,7 @@ export const AllPoolAccountsPreview = () => {
   const { push } = useRouter();
   const { poolAccountsByChainScope, hideEmptyPools, toggleHideEmptyPools } = useAccountContext();
   const { setModalOpen } = useModal();
-  const { isLogged, isConnected, isAuthorized } = useAuthContext();
+  const { isLogged, hasWallet, hasSession, isAuthorized } = useAuthContext();
   const goTo = useGoTo();
 
   // Get all unique chain-scope combinations that have pool accounts
@@ -274,7 +274,7 @@ export const AllPoolAccountsPreview = () => {
         </>
       ) : (
         <PAContainer>
-          {!isConnected && (
+          {!hasWallet && !hasSession && (
             <ActionMenuContainer sx={{ minHeight: '13.2rem' }}>
               <Stack
                 padding='1rem'
@@ -292,7 +292,7 @@ export const AllPoolAccountsPreview = () => {
             </ActionMenuContainer>
           )}
 
-          {isConnected && !isLogged && (
+          {hasWallet && !isLogged && (
             <ActionMenuContainer sx={{ minHeight: '13.2rem' }}>
               <Stack
                 padding='1rem'

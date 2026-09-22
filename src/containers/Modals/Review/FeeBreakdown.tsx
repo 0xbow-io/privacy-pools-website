@@ -4,7 +4,7 @@ import { Box, Stack, Typography, styled } from '@mui/material';
 import { formatUnits, parseUnits } from 'viem';
 import { ExtendedTooltip as Tooltip } from '~/components';
 import { useChainContext } from '~/hooks';
-import { getUsdBalance } from '~/utils';
+import { getUsdBalance, poolDecimals } from '~/utils';
 
 interface FeeBreakdownProps {
   feeBPS: number;
@@ -59,13 +59,9 @@ export const formatFeeDisplay = (
 };
 
 export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCostETH, amount }: FeeBreakdownProps) => {
-  const {
-    balanceBN: { symbol, decimals },
-    price,
-    nativeAssetPrice,
-    selectedPoolInfo,
-    chain,
-  } = useChainContext();
+  const { balanceBN, price, nativeAssetPrice, selectedPoolInfo, chain } = useChainContext();
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
 
   const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
 

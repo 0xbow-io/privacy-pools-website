@@ -17,7 +17,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
 import { useSwitchChain } from 'wagmi';
 import { chainData, allPoolsChainData } from '~/config';
@@ -31,10 +30,10 @@ import {
   usePoolAccountsContext,
   useNotifications,
   useExternalServices,
+  useAuthContext,
 } from '~/hooks';
 import { ModalType, ReviewStatus } from '~/types';
-import { aspClient, countDepositsAtLeast, getUsdBalance, relayerClient } from '~/utils';
-import { approvedLabelSet } from '~/utils/accountStatus';
+import { countDepositsAtLeast, getUsdBalance, relayerClient, poolDecimals } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -43,16 +42,15 @@ import { RelayerSelectorSection } from './RelayerSelectorSection';
 const minWithdrawCache = new Map<string, string>();
 
 export const WithdrawForm = () => {
-  const { setModalOpen, modalOpen } = useModal();
+  const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
   const router = useRouter();
   const pathname = usePathname();
 
   const {
-    balanceBN: { symbol, decimals: balanceDecimals },
+    balanceBN: { symbol: balanceSymbol, decimals: balanceDecimals },
     selectedPoolInfo,
     chainId,
-    chain: { aspUrl },
     selectedRelayer,
     setSelectedRelayer,
     relayersData,
@@ -65,14 +63,16 @@ export const WithdrawForm = () => {
     usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
   const {
-    aspData: { mtLeavesData, isLoading: isLoadingAsp },
+    aspData: { depositAmountsData, isLoading: isLoadingAsp },
   } = useExternalServices();
   const { setExtraGas, requestQuote, resetQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
+  const { hasWallet } = useAuthContext();
 
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals ?? 18;
+  const decimals = poolDecimals(selectedPoolInfo, { decimals: balanceDecimals });
+  const symbol = selectedPoolInfo?.asset ?? balanceSymbol;
 
   // Filter pool accounts by current chain, pool scope, balance > 0, and APPROVED status
   const filteredPoolAccounts = useMemo(() => {
@@ -172,41 +172,14 @@ export const WithdrawForm = () => {
     }
   }, [amount, fetchMinWithdrawAmount, minWithdrawAmount, isLoadingMinAmount]);
 
-  // Anonymity set, computed in the browser from two shared feeds: the pool's
-  // deposits and the ASP leaf set. Both are the same for every visitor, are
-  // cached, and the count re-runs locally as the amount changes, so typing
-  // issues no requests.
-  const {
-    data: poolDeposits,
-    isLoading: isLoadingPoolDeposits,
-    isError: depositsError,
-  } = useQuery({
-    queryKey: ['asp_all_pool_deposits', chainId, selectedPoolInfo?.scope?.toString(), aspUrl],
-    queryFn: () => aspClient.fetchAllPoolDeposits(aspUrl, chainId, selectedPoolInfo.scope.toString()),
-    enabled: modalOpen === ModalType.WITHDRAW && !!chainId && !!selectedPoolInfo?.scope,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-
-  const approvedLabels = useMemo(
-    () =>
-      approvedLabelSet(
-        mtLeavesData?.aspLeaves,
-        mtLeavesData?.brevisAspLeaves,
-        selectedPoolInfo.externalAsp?.provider === 'brevis',
-      ),
-    [mtLeavesData, selectedPoolInfo.externalAsp?.provider],
-  );
-
+  // Counted in the browser against the pool's published amount list, which
+  // useASP loads with the other public feeds. Nothing is fetched from here.
   const anonymitySet = useMemo(
-    () => countDepositsAtLeast(depositsError ? undefined : poolDeposits, approvedLabels, amountBN),
-    [amountBN, poolDeposits, approvedLabels, depositsError],
+    () => countDepositsAtLeast(depositAmountsData?.amounts, amountBN),
+    [amountBN, depositAmountsData?.amounts],
   );
 
-  const isLoadingAnonymitySet = amountBN > 0n && (isLoadingPoolDeposits || !!isLoadingAsp);
+  const isLoadingAnonymitySet = amountBN > 0n && !!isLoadingAsp;
 
   const isValidAmount = useMemo(() => {
     return amountBN > 0n && amountBN <= (poolAccount?.balance ?? 0n);
@@ -317,18 +290,23 @@ export const WithdrawForm = () => {
     const selectedPool = targetChainData.poolInfo.find((p) => p.asset.toLowerCase() === selectedAsset.toLowerCase());
 
     if (selectedPool) {
-      // If selecting a pool from a different chain, trigger a wallet chain switch
+      // If selecting a pool from a different chain, move the wallet with it when there is one.
+      // A withdrawal is relayed, so a seed-only session just changes the app's chain.
       if (selectedChainId !== chainId) {
-        try {
-          addNotification('info', `Switching to ${targetChainData.name}...`);
-          await switchChainAsync({ chainId: selectedChainId });
-          // Update the app's chain context to match the wallet's chain
+        if (hasWallet) {
+          try {
+            addNotification('info', `Switching to ${targetChainData.name}...`);
+            await switchChainAsync({ chainId: selectedChainId });
+            // Update the app's chain context to match the wallet's chain
+            setChainId(selectedChainId);
+            addNotification('success', `Switched to ${targetChainData.name}`);
+          } catch (err) {
+            console.error('Failed to switch chain:', err);
+            addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
+            return; // Don't proceed with asset selection if chain switch failed
+          }
+        } else {
           setChainId(selectedChainId);
-          addNotification('success', `Switched to ${targetChainData.name}`);
-        } catch (err) {
-          console.error('Failed to switch chain:', err);
-          addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
-          return; // Don't proceed with asset selection if chain switch failed
         }
       }
 
@@ -356,7 +334,8 @@ export const WithdrawForm = () => {
   const handleWithdraw = useCallback(() => {
     // Set extraGas based on checkbox state
     setExtraGas(receiveGasToken);
-    // Signal that a quote should be requested when Review screen opens
+    // Signal that the price should be requested when Review screen opens.
+    // The recipient goes to the relayer only on Confirm, with the commitment request.
     requestQuote();
     // Go to Review screen
     setModalOpen(ModalType.REVIEW);

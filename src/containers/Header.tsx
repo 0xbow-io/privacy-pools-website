@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { styled } from '@mui/material/styles';
-import { Disclaimer, Logo, Menu, SignInButton } from '~/components';
+import { CustomRpcButton, Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
 import { MaintenanceBanner } from '~/components/MaintenanceBanner';
 import { useAuthContext } from '~/hooks';
@@ -10,7 +10,9 @@ import { MigrationBanner } from '~/migration';
 import { zIndex } from '~/utils';
 
 export const Header = () => {
-  const { isConnected } = useAuthContext();
+  const { hasWallet, hasSession } = useAuthContext();
+  // The menu holds logout and the recovery phrase, so a seed-only session needs it too.
+  const showMenu = hasWallet || hasSession;
 
   return (
     <HeaderWrapper>
@@ -27,8 +29,16 @@ export const Header = () => {
         <Actions>
           <ChainSelect />
 
-          {!isConnected && <SignInButton />}
-          {isConnected && <Menu />}
+          {/*
+            Signed out, the custom RPC form gets its own button. It normally
+            lives in the account menu, which is not rendered here, so the one
+            setting that decides whether signing in works could only be changed
+            after signing in. Signed in, the menu item covers it and this is
+            hidden, so there is never more than one way in on screen.
+          */}
+          {!showMenu && <CustomRpcButton />}
+          {!showMenu && <SignInButton />}
+          {showMenu && <Menu />}
         </Actions>
       </StyledHeader>
     </HeaderWrapper>

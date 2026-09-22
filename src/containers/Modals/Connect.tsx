@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Stack, Button, styled, alpha } from '@mui/material';
 import { Connector, CreateConnectorFn } from 'wagmi';
 import { BaseModal } from '~/components';
-import { useCustomConnect, useGoTo, useModal } from '~/hooks';
+import { useAuthContext, useCustomConnect, useGoTo, useModal } from '~/hooks';
 import { ModalType } from '~/types';
 import { getUniqueConnectors, ROUTER } from '~/utils';
 import { ModalContainer, ModalTitle } from './Deposit';
@@ -12,6 +12,7 @@ import { ModalContainer, ModalTitle } from './Deposit';
 export const ConnectModal = () => {
   const { availableConnectors, customConnect, autoConnectSafe, isSafeApp } = useCustomConnect();
   const { closeModal } = useModal();
+  const { isLogged } = useAuthContext();
   const goTo = useGoTo();
 
   // Reusable connector type with optional RainbowKit display metadata
@@ -31,14 +32,24 @@ export const ConnectModal = () => {
     });
   }, [uniqueConnectors]);
 */
+  // A seed-only session that adds a wallet later already has an account; only
+  // a fresh connect goes on to create or load one.
+  const afterConnect = () => {
+    if (!isLogged) goTo(ROUTER.account.base);
+    closeModal();
+  };
+
   const handleConnect = async (connector: Connector<CreateConnectorFn>) => {
     await customConnect(connector);
-    goTo(ROUTER.account.base);
-    closeModal();
+    afterConnect();
   };
 
   const handleSafeConnect = async () => {
     await autoConnectSafe();
+    afterConnect();
+  };
+
+  const handleRecoveryPhrase = () => {
     goTo(ROUTER.account.base);
     closeModal();
   };
@@ -72,6 +83,16 @@ export const ConnectModal = () => {
               {getConnectorDisplayName(connector as ConnectorWithName)}
             </SButton>
           ))}
+          {!isLogged && (
+            <SButton
+              fullWidth
+              onClick={handleRecoveryPhrase}
+              data-testid='wallet-option-recovery-phrase'
+              variant='text'
+            >
+              Use a recovery phrase
+            </SButton>
+          )}
           {/**remove porto for now
             !isSafeApp && portoConnector && (
             <SButton
