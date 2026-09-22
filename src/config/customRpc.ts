@@ -581,3 +581,37 @@ export const saveCustomRpcUrls = (
     Object.keys(stored).length === Object.keys(next).length
   );
 };
+
+/**
+ * Which chains may be queried, once the user has an endpoint of their own.
+ *
+ * The app discovers notes across EVERY chain it knows about, and the override
+ * is per chain, so filling one field used to leave every other chain's queries
+ * going to our proxy. Someone who sets an endpoint to stop routing through us
+ * was still routing through us for all but one network, and nothing on screen
+ * said so (observed 2026-09-22).
+ *
+ * So: set none and nothing changes, we serve everything as before. Set ONE and
+ * the rule flips, because at that point the user has expressed a preference
+ * and silently ignoring it for the other twenty networks is the wrong way to
+ * be wrong. Chains without an endpoint are not queried at all.
+ *
+ * That has a real cost and it is deliberate: notes on a skipped chain stop
+ * appearing until an endpoint is set for it. The form says which chains those
+ * are and offers to fill them, rather than letting a balance quietly go
+ * missing. A user who wants the old behaviour clears their endpoints.
+ *
+ * PURE, and takes the map rather than reading it, so the query path and the
+ * form cannot disagree about which chains are in play.
+ */
+export const queryableChainIds = (allChainIds: readonly number[], overrides: CustomRpcMap): number[] => {
+  // No preference expressed: everything stays as it was.
+  if (Object.keys(overrides).length === 0) return [...allChainIds];
+  return allChainIds.filter((chainId) => !!overrides[chainId]);
+};
+
+/** The other half of the same split, for telling the user what they lose. */
+export const skippedChainIds = (allChainIds: readonly number[], overrides: CustomRpcMap): number[] => {
+  if (Object.keys(overrides).length === 0) return [];
+  return allChainIds.filter((chainId) => !overrides[chainId]);
+};

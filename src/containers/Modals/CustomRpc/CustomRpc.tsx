@@ -293,6 +293,18 @@ const CustomRpcForm = () => {
 
   const anySaved = chains.some((chain) => rows[chain.id]?.saved);
   const anyFilled = chains.some((chain) => (rows[chain.id]?.value?.trim() ?? '').length > 0);
+
+  /*
+   * The networks this form is about to stop querying.
+   *
+   * Filling one field switches the app to the user's endpoints and stops
+   * falling back to our proxy for the rest, so the rest go unqueried. That is
+   * the point, but it also means a balance disappears, and a balance that
+   * disappears without being mentioned is the worst version of this change.
+   * Named here, from the DRAFT rows rather than what is saved, so the warning
+   * appears while typing rather than after the reload.
+   */
+  const skipped = anyFilled ? chains.filter((chain) => (rows[chain.id]?.value?.trim() ?? '').length === 0) : [];
   const chunkValue = validateCustomRpcChunk(chunk);
   const chunkWarning =
     chunkValue.ok && chunkValue.value > CUSTOM_RPC_CHUNK_WARN_ABOVE
@@ -385,6 +397,23 @@ const CustomRpcForm = () => {
         <Typography variant='body2' color='text.secondary'>
           DAppNode runs a separate node per network, so the others have to be set by hand.
         </Typography>
+      )}
+
+      {/*
+        Below the prefill button on purpose: the button is the one-click way
+        out of this warning, so it should already have been read by the time
+        the warning explains why it matters.
+      */}
+      {skipped.length > 0 && (
+        <SkippedNotice data-testid='custom-rpc-skipped'>
+          <Typography variant='body2'>
+            {`${skipped.length === 1 ? '1 network has' : `${skipped.length} networks have`} no endpoint: ${skipped
+              .map((chain) => chain.name)
+              .join(
+                ', ',
+              )}. Once you save, those are not queried at all and your funds there will not show. Fill them in to see everything.`}
+          </Typography>
+        </SkippedNotice>
       )}
 
       {anyFilled && (
@@ -497,6 +526,21 @@ const ModalTitle = styled(Typography)(() => ({
   fontWeight: 700,
   lineHeight: 'normal',
   width: '100%',
+}));
+
+/**
+ * The warning that some networks will go unqueried.
+ *
+ * Warning colours rather than error: nothing is wrong and saving is allowed.
+ * It is a consequence the user should see before they accept it, which is a
+ * different thing from a mistake.
+ */
+const SkippedNotice = styled(Box)(({ theme }) => ({
+  width: '100%',
+  padding: '1rem 1.2rem',
+  borderRadius: theme.shape.borderRadius,
+  border: `1px solid ${theme.palette.warning.main}`,
+  color: theme.palette.warning.main,
 }));
 
 const RowHeader = styled(Box)(() => ({

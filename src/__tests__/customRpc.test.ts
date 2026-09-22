@@ -15,7 +15,10 @@ import {
   validateCustomRpcChunk,
   getCustomRpcUrl,
   parseChainIdResponse,
+  type CustomRpcMap,
   parseCustomRpcMap,
+  queryableChainIds,
+  skippedChainIds,
   probeRpcUrl,
   setCustomRpcUrl,
   validateCustomRpcUrl,
@@ -474,5 +477,56 @@ describe('the custom RPC toast only speaks to users who set one', () => {
     setCustomRpcUrl(1, 'https://mine.example');
     expect(describeCustomRpcFailure([{ error: new Error('429 Too Many Requests') }])?.kind).toBe('rate-limited');
     clearCustomRpcUrl(1);
+  });
+});
+
+describe('queryableChainIds / skippedChainIds', () => {
+  const ALL = [1, 10, 42161, 56];
+
+  it('changes nothing when the user has set no endpoint of their own', () => {
+    // The default for everyone who never opens the form: we serve every chain,
+    // exactly as before.
+    expect(queryableChainIds(ALL, {})).toEqual(ALL);
+    expect(skippedChainIds(ALL, {})).toEqual([]);
+  });
+
+  it('drops every chain without an endpoint once ONE is set', () => {
+    // The whole point. Before this, filling mainnet left the other three
+    // going to our proxy, which is the opposite of what filling it asks for.
+    const overrides = { 1: 'https://my-node/eth' };
+    expect(queryableChainIds(ALL, overrides)).toEqual([1]);
+    expect(skippedChainIds(ALL, overrides)).toEqual([10, 42161, 56]);
+  });
+
+  it('keeps every chain the user did configure', () => {
+    const overrides = { 1: 'https://a', 56: 'https://b' };
+    expect(queryableChainIds(ALL, overrides)).toEqual([1, 56]);
+    expect(skippedChainIds(ALL, overrides)).toEqual([10, 42161]);
+  });
+
+  it('skips nothing when all of them are configured', () => {
+    const overrides = { 1: 'https://a', 10: 'https://b', 42161: 'https://c', 56: 'https://d' };
+    expect(queryableChainIds(ALL, overrides)).toEqual(ALL);
+    expect(skippedChainIds(ALL, overrides)).toEqual([]);
+  });
+
+  it('treats an empty string as no endpoint, not as an endpoint', () => {
+    // A cleared field must not count as a preference for that chain, or a
+    // chain would be both configured and unusable.
+    const overrides = { 1: 'https://a', 10: '' };
+    expect(queryableChainIds(ALL, overrides)).toEqual([1]);
+    expect(skippedChainIds(ALL, overrides)).toContain(10);
+  });
+
+  it('is the exact complement of itself, for any input', () => {
+    // The form tells the user what is skipped and the query path decides what
+    // runs. If these two ever disagreed, the warning would be a lie.
+    const cases: CustomRpcMap[] = [{}, { 1: 'https://a' }, { 10: 'https://b', 56: 'https://c' }];
+    for (const overrides of cases) {
+      const queryable = queryableChainIds(ALL, overrides);
+      const skipped = skippedChainIds(ALL, overrides);
+      expect([...queryable, ...skipped].sort()).toEqual([...ALL].sort());
+      expect(queryable.filter((id) => skipped.includes(id))).toEqual([]);
+    }
   });
 });

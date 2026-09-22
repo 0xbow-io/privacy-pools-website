@@ -20,7 +20,15 @@ import {
 } from '@0xbow/privacy-pools-core-sdk';
 import { captureException, withScope } from '@sentry/nextjs';
 import { Hex } from 'viem';
-import { ChainData, chainData, getCustomRpcChunk, getCustomRpcUrl, whitelistedChains } from '~/config';
+import {
+  ChainData,
+  chainData,
+  getCustomRpcChunk,
+  getCustomRpcUrl,
+  queryableChainIds,
+  readCustomRpcMap,
+  whitelistedChains,
+} from '~/config';
 import { PoolAccount, ReviewStatus } from '~/types';
 import { anchorChains, anchorTargets } from '~/utils/blockAnchors';
 import { nowSeconds, recordTransactionTimestamp, resolveAccountTimestamps } from '~/utils/blockTimestamps';
@@ -29,9 +37,26 @@ import { createDataService } from '~/utils/dataService';
 // How long anchoring may keep going after the event scan has finished.
 const ANCHOR_GRACE_MS = 10_000;
 
-const chainDataByWhitelistedChains = Object.values(chainData).filter(
+const whitelistedChainData = Object.values(chainData).filter(
   (chain) => chain.poolInfo.length > 0 && whitelistedChains.some((c) => c.id === chain.poolInfo[0].chainId),
 );
+
+/*
+ * Once the user has an endpoint of their own, the chains they did NOT give one
+ * for drop out of discovery entirely rather than falling back to our proxy.
+ * See queryableChainIds for why, and for what it costs.
+ *
+ * Applied here, where the discovery targets are built, so it covers the note
+ * scan itself rather than one caller's idea of it.
+ */
+const queryable = new Set(
+  queryableChainIds(
+    whitelistedChainData.map((chain) => chain.poolInfo[0].chainId),
+    readCustomRpcMap(),
+  ),
+);
+
+const chainDataByWhitelistedChains = whitelistedChainData.filter((chain) => queryable.has(chain.poolInfo[0].chainId));
 
 const poolsByChain = chainDataByWhitelistedChains.flatMap(
   (chain) => chain.poolInfo,
