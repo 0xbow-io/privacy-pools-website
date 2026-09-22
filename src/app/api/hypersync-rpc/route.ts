@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerEnv } from '~/config/env';
+import { completeLogTimestamps } from '~/utils/logTimestampFill';
 
 export const maxDuration = 60; // Vercel Pro max: 60 seconds
 
@@ -7,6 +8,28 @@ const { HYPERSYNC_KEY } = getServerEnv();
 
 const HYPERSYNC_TIMEOUT_MS = 20_000; // 20 seconds per attempt
 const MAX_RETRIES = 2; // Retry up to 2 times on timeout errors (3 attempts total, fits within Vercel Pro 60s limit)
+// Budget for completing `blockTimestamp` on eth_getLogs rows, after the logs
+// themselves are in hand. Whatever is not filled in time the client derives.
+const TIMESTAMP_FILL_MS = 20_000;
+const ROUTE_BUDGET_MS = 55_000;
+
+// Hypersync network names: `https://{name}.rpc.hypersync.xyz/{key}` for JSON-RPC,
+// `https://{name}.hypersync.xyz/query` for the query API.
+// source: https://docs.envio.dev/docs/HyperSync/hypersync-supported-networks
+const HYPERSYNC_NETWORKS: Record<string, string> = {
+  '1': 'eth', // Mainnet
+  '11155111': 'sepolia', // Sepolia
+  '11155420': 'optimism-sepolia', // OP Sepolia
+  '10': 'optimism', // OP
+  '8453': 'base', // Base
+  '84532': 'base-sepolia', // Base Sepolia
+  '42161': 'arbitrum', // arbitrum
+  '421614': 'arbitrum-sepolia', // arbitrum-sepolia
+  '56': 'bsc', // BSC
+};
+
+// The query API takes the bare token; the RPC URL form may carry a `#label(...)` suffix.
+const queryToken = (key: string): string => key.split('#')[0] ?? key;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -56,22 +79,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Map chainId to Hypersync endpoint
-    // source: https://docs.envio.dev/docs/HyperSync/hypersync-supported-networks
-    const hypersyncUrls: Record<string, string> = {
-      '1': `https://eth.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // Mainnet
-      '11155111': `https://sepolia.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // Sepolia
-      '11155420': `https://optimism-sepolia.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // OP Sepolia
-      '10': `https://optimism.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // OP
-      '8453': `https://base.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // Base
-      '84532': `https://base-sepolia.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // Base Sepolia
-      '42161': `https://arbitrum.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // arbitrum
-      '421614': `https://arbitrum-sepolia.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // arbitrum-sepolia
-      '56': `https://bsc.rpc.hypersync.xyz/${HYPERSYNC_KEY}`, // BSC
-    };
-
-    const hypersyncUrl = hypersyncUrls[chainId];
-    if (!hypersyncUrl) {
+    const network = HYPERSYNC_NETWORKS[chainId];
+    if (!network) {
       return NextResponse.json(
         {
           jsonrpc: '2.0',
@@ -82,7 +91,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const hypersyncUrl = `https://${network}.rpc.hypersync.xyz/${HYPERSYNC_KEY}`;
     const body = JSON.stringify(rpcRequest);
+    const startedAt = Date.now();
 
     // Retry on timeout errors from Hypersync (returns 200 with JSON-RPC error)
     let lastData: Record<string, unknown> | null = null;
@@ -105,6 +116,25 @@ export async function POST(request: NextRequest) {
 
       lastData = data;
       break;
+    }
+
+    // eth_getLogs rows come back only partly dated; complete them from the
+    // query API over the same range and filter (see utils/logTimestampFill.ts).
+    if (rpcRequest.method === 'eth_getLogs' && Array.isArray(lastData?.result)) {
+      const filter = Array.isArray(rpcRequest.params) ? rpcRequest.params[0] : undefined;
+      if (filter && typeof filter === 'object') {
+        const deadline = Math.min(Date.now() + TIMESTAMP_FILL_MS, startedAt + ROUTE_BUDGET_MS);
+        const { undated, filled } = await completeLogTimestamps(filter, lastData.result, {
+          queryUrl: `https://${network}.hypersync.xyz/query`,
+          token: queryToken(HYPERSYNC_KEY),
+          deadline,
+        });
+        if (undated > filled) {
+          console.warn(
+            `Hypersync chain ${chainId}: ${undated - filled} of ${lastData.result.length} log rows left undated`,
+          );
+        }
+      }
     }
 
     return NextResponse.json(lastData, { headers: CORS_HEADERS });

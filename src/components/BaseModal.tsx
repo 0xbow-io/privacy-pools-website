@@ -47,7 +47,7 @@ export const BaseModal = ({
           </ModalHeader>
         )}
 
-        {children}
+        <ModalScroll>{children}</ModalScroll>
       </ModalContainer>
     </SModal>
   );
@@ -88,6 +88,31 @@ export const ModalContainer = styled(Box, {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '2rem',
+    /*
+     * No modal may be taller than the window.
+     *
+     * SModal is `position: fixed` and centred, so a box that outgrows the
+     * viewport hangs off both edges with nothing able to scroll it: not the
+     * box, which had no overflow, and not the page behind, which a fixed
+     * overlay does not move. Whatever sat at the bottom, which in a form is
+     * the button you came to press, simply could not be reached. QA got out
+     * of it by making the browser window smaller (Mike, 2026-09-22: "so can't
+     * click confirm on custom rpc").
+     *
+     * The cap is here rather than on the one form because every modal has the
+     * same shape and none of them benefits from running off the screen. The
+     * custom RPC dialog is only the tallest, so it got there first.
+     *
+     * The SHELL keeps the cap and hides the overflow; ModalScroll below does
+     * the scrolling. Keeping those apart is what lets the close button, which
+     * is absolutely positioned against this box, stay put instead of sliding
+     * away with the content.
+     *
+     * `dvh` rather than `vh` so a mobile browser's collapsing toolbar is
+     * counted.
+     */
+    maxHeight: 'calc(100dvh - 2.4rem)',
+    overflow: 'hidden',
     backgroundColor: theme.palette.background.paper,
     backgroundImage: hasBackground ? `url(${backgroundImage.src})` : 'none',
     backgroundPosition: '50% 41%',
@@ -96,6 +121,42 @@ export const ModalContainer = styled(Box, {
     boxShadow: theme.shadows[5],
     maxWidth: modalSizes[size],
     width: '100%',
+  };
+});
+
+/**
+ * The part that scrolls when a modal is taller than the window.
+ *
+ * Separate from the shell so the close button, which is positioned against
+ * the shell, stays where it is. On a modal that fits, this is inert: the box
+ * is shorter than the cap, nothing overflows, and nothing scrolls.
+ *
+ * `justifyContent: flex-start` rather than centre is the flexbox trap this
+ * avoids. Once content is taller than its box, centring pushes the first rows
+ * off the TOP, where no scroll can reach them. It makes no visible difference
+ * when it fits, because the box is sized by its content.
+ *
+ * The scrollbar is not drawn. Wheel, trackpad, touch drag, keyboard and
+ * find-on-page all still move it, and `overscrollBehavior` keeps a flick at
+ * the end of the list from scrolling the page underneath on a phone.
+ */
+export const ModalScroll = styled(Box)(() => {
+  return {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    width: '100%',
+    // Without this a flex child refuses to shrink below its content, so the
+    // cap on the shell would be ignored and the overflow would come back.
+    minHeight: 0,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    '&::-webkit-scrollbar': {
+      display: 'none',
+    },
   };
 });
 

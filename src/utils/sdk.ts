@@ -12,22 +12,51 @@ import {
   Hash,
   WithdrawalProof,
   AccountService,
-  DataService,
   PrivacyPoolAccount,
   AccountCommitment,
   ChainConfig,
   PoolInfo,
   PoolEventsError,
 } from '@0xbow/privacy-pools-core-sdk';
-import { createPublicClient, Hex } from 'viem';
-import { ChainData, chainData, whitelistedChains } from '~/config';
-import { transports } from '~/config/wagmiConfig';
+import { captureException, withScope } from '@sentry/nextjs';
+import { Hex } from 'viem';
+import {
+  ChainData,
+  chainData,
+  getCustomRpcChunk,
+  getCustomRpcUrl,
+  queryableChainIds,
+  readCustomRpcMap,
+  whitelistedChains,
+} from '~/config';
 import { PoolAccount, ReviewStatus } from '~/types';
-import { getTimestampFromBlockNumber } from '~/utils';
+import { anchorChains, anchorTargets } from '~/utils/blockAnchors';
+import { nowSeconds, recordTransactionTimestamp, resolveAccountTimestamps } from '~/utils/blockTimestamps';
+import { createDataService } from '~/utils/dataService';
 
-const chainDataByWhitelistedChains = Object.values(chainData).filter(
+// How long anchoring may keep going after the event scan has finished.
+const ANCHOR_GRACE_MS = 10_000;
+
+const whitelistedChainData = Object.values(chainData).filter(
   (chain) => chain.poolInfo.length > 0 && whitelistedChains.some((c) => c.id === chain.poolInfo[0].chainId),
 );
+
+/*
+ * Once the user has an endpoint of their own, the chains they did NOT give one
+ * for drop out of discovery entirely rather than falling back to our proxy.
+ * See queryableChainIds for why, and for what it costs.
+ *
+ * Applied here, where the discovery targets are built, so it covers the note
+ * scan itself rather than one caller's idea of it.
+ */
+const queryable = new Set(
+  queryableChainIds(
+    whitelistedChainData.map((chain) => chain.poolInfo[0].chainId),
+    readCustomRpcMap(),
+  ),
+);
+
+const chainDataByWhitelistedChains = whitelistedChainData.filter((chain) => queryable.has(chain.poolInfo[0].chainId));
 
 const poolsByChain = chainDataByWhitelistedChains.flatMap(
   (chain) => chain.poolInfo,
@@ -141,7 +170,59 @@ const logFetchConfig = new Map<
   ],
 ]);
 
-const dataService = new DataService(dataServiceConfig, logFetchConfig);
+/**
+ * What a NORMAL node will serve.
+ *
+ * Every entry above is tuned for the hypersync proxy: 1.5M blocks per
+ * `eth_getLogs` on mainnet, 48M on Arbitrum. Hosted providers cap a log range
+ * in the thousands, so against a custom endpoint the event scan fails, every
+ * pool errors, and `loadAccount` returns an account with no pools and no
+ * balances. Nothing is lost and resetting the endpoint recovers it, but the
+ * user is looking at a screen that says their money is gone.
+ *
+ * The save-time `eth_chainId` probe cannot predict this: a fast, correct,
+ * right-chain endpoint passes the probe and then fails the scan. "Probe
+ * passed" must not read as "endpoint works".
+ *
+ * 10k blocks is the common floor across hosted providers and the SDK's own
+ * default.
+ */
+const customRpcLogFetch = () => ({
+  // User-settable, defaulting to the SDK's own 10k. Someone running their own
+  // node, or pointing at another hypersync, can raise it; they are warned once
+  // in the form and then believed.
+  blockChunkSize: getCustomRpcChunk(),
+  // One request at a time. The per-chain entries above run 2 concurrent for
+  // every chain except mainnet, which is fine against a proxy we own and is
+  // the first thing a rate-limited endpoint punishes.
+  concurrency: 1,
+  // A pause between chunks. The SDK retries a 429 with exponential backoff
+  // but never slows the STEADY rate, so without this a scan hits the limit,
+  // waits, and hits it again (Artem, 2026-09-11).
+  chunkDelayMs: 100,
+  retryOnFailure: true,
+  maxRetries: 3,
+  // The SDK's own default. 500 was ours, chosen against an endpoint that does
+  // not rate limit us.
+  retryBaseDelayMs: 1_000,
+});
+
+// Must run before the data service is built: it reads this map once.
+for (const chainId of logFetchConfig.keys()) {
+  if (getCustomRpcUrl(chainId)) logFetchConfig.set(chainId, customRpcLogFetch());
+}
+
+// Full-range scans plus block-timestamp capture; see utils/dataService.ts for
+// the two request patterns this removes.
+const dataService = createDataService(dataServiceConfig, logFetchConfig);
+
+/** The chain a pool scope is configured on, or undefined for an unknown scope. */
+export const getChainIdForScope = (scope: bigint): number | undefined => {
+  const key = Object.keys(chainData).find((chainId) =>
+    chainData[Number(chainId)].poolInfo.some((pool) => pool.scope === scope),
+  );
+  return key === undefined ? undefined : Number(key);
+};
 
 /**
  * Generates a zero-knowledge proof for a commitment using Poseidon hash.
@@ -225,21 +306,59 @@ export const loadAccount = async (
   accountService: AccountService;
   legacyAccountService: AccountService | null;
   errors: PoolEventsError[];
+  incompleteScopes: string[];
 }> => {
-  const result = await AccountService.initializeWithEvents(dataService, { mnemonic: seed }, pools);
+  // A user endpoint returns eth_getLogs rows without blockTimestamp (only our
+  // proxy completes them), so those chains are anchored alongside the scan:
+  // head, the earliest deployment block and bisection midpoints, the same
+  // blocks for every user of the chain. See utils/blockAnchors.ts. Runs
+  // during the scan and gets a short grace once the scan is done.
+  const anchoring = new AbortController();
+  const anchors = anchorChains(anchorTargets(chainData, getCustomRpcUrl), { signal: anchoring.signal });
 
-  // Log any errors that occurred during event fetching
+  let result: Awaited<ReturnType<typeof AccountService.initializeWithEvents>>;
+  try {
+    result = await AccountService.initializeWithEvents(dataService, { mnemonic: seed }, pools);
+  } finally {
+    setTimeout(() => anchoring.abort(), ANCHOR_GRACE_MS);
+  }
+  await anchors;
+
+  // Scopes whose event history failed to load. Reconstructed state for these is
+  // ABSENT, not empty: the account may hold notes we cannot see, and any deposit
+  // index inferred from the visible count would collide with one already in use
+  // on-chain. Callers must block account actions for these scopes rather than
+  // treating them as scopes with no accounts.
+  const incompleteScopes = [...new Set(result.errors.map((error) => error.scope.toString()))];
+
   if (result.errors.length > 0) {
     console.warn('Some pools failed to load:', result.errors);
+
+    // Previously console-only, so we had no telemetry on how often this fires.
+    withScope((scope) => {
+      scope.setLevel('error');
+      scope.setContext('poolLoad', {
+        incompleteScopes,
+        reasons: result.errors.map((error) => error.reason),
+      });
+      captureException(new Error(`Pool event history failed to load for ${result.errors.length} scope(s)`));
+    });
   }
 
   return {
     accountService: result.account,
     legacyAccountService: result.legacyAccount ?? null,
     errors: result.errors,
+    incompleteScopes,
   };
 };
 
+// TODO(sdk@1.5.0): drop the `index` argument and let the SDK derive it. On 1.4.0
+// the SDK infers the next index from `poolAccounts.length`, which is the same
+// unsafe derivation as computing it here; the incomplete-scope guard in
+// useDeposit is what actually prevents the collision today. Once 1.5.0 lands the
+// SDK records `depositIndex` per account, derives the next index from it, and
+// throws for an incomplete scope on its own.
 export const createDepositSecrets = (accountService: AccountService, scope: Hash, index: bigint) => {
   return accountService.createDepositSecrets(scope, index);
 };
@@ -258,6 +377,9 @@ export const addPoolAccount = (
     label: Hash;
     blockNumber: bigint;
     txHash: Hex;
+    /** block.timestamp when the caller knows it; defaults to "now", since the
+     *  caller has just seen the transaction confirm. Never looked up. */
+    timestamp?: bigint;
   },
 ) => {
   const accountInfo = accountService.addPoolAccount(
@@ -269,6 +391,7 @@ export const addPoolAccount = (
     newPoolAccount.blockNumber,
     newPoolAccount.txHash,
   );
+  recordTransactionTimestamp(newPoolAccount.txHash, newPoolAccount.timestamp ?? nowSeconds());
 
   return accountInfo;
 };
@@ -282,8 +405,11 @@ export const addWithdrawal = async (
     secret: Secret;
     blockNumber: bigint;
     txHash: Hex;
+    /** See addPoolAccount. */
+    timestamp?: bigint;
   },
 ) => {
+  recordTransactionTimestamp(withdrawalParams.txHash, withdrawalParams.timestamp ?? nowSeconds());
   return accountService.addWithdrawalCommitment(
     withdrawalParams.parentCommitment,
     withdrawalParams.value,
@@ -306,8 +432,11 @@ export const addRagequit = async (
       blockNumber: bigint;
       transactionHash: Hex;
     };
+    /** See addPoolAccount. */
+    timestamp?: bigint;
   },
 ) => {
+  recordTransactionTimestamp(ragequitParams.ragequit.transactionHash, ragequitParams.timestamp ?? nowSeconds());
   return accountService.addRagequitToAccount(ragequitParams.label, ragequitParams.ragequit);
 };
 
@@ -326,24 +455,18 @@ export const buildDeclinedLegacyPoolAccounts = async (
     return result;
   }
 
-  const timestamps: Promise<void>[] = [];
+  // Dates come from the bulk registry (utils/blockTimestamps.ts), never from a
+  // per-account block lookup.
+  resolveAccountTimestamps({ poolAccounts: legacyPoolAccounts }, getChainIdForScope);
 
   for (const [_scope, accounts] of legacyPoolAccounts.entries()) {
     if (!Array.isArray(accounts) || accounts.length === 0) continue;
 
-    const resolvedChainId = Object.keys(chainData).find((key) =>
-      chainData[Number(key)].poolInfo.some((pool) => pool.scope === _scope),
-    );
-    if (!resolvedChainId) continue;
+    const chainIdNum = getChainIdForScope(_scope);
+    if (chainIdNum === undefined) continue;
 
-    const chainIdNum = Number(resolvedChainId);
     const key = `${chainIdNum}-${_scope}`;
     let idx = 1;
-
-    const publicClient = createPublicClient({
-      chain: whitelistedChains.find((chain) => chain.id === chainIdNum)!,
-      transport: transports[chainIdNum],
-    });
 
     for (const pa of accounts) {
       const label = pa.deposit?.label ?? pa.label;
@@ -374,38 +497,27 @@ export const buildDeclinedLegacyPoolAccounts = async (
       if (enriched.ragequit) {
         enriched.balance = 0n;
         enriched.reviewStatus = ReviewStatus.EXITED;
-        timestamps.push(
-          getTimestampFromBlockNumber(enriched.ragequit.blockNumber, publicClient)
-            .then((ts) => {
-              enriched.ragequit!.timestamp = ts;
-            })
-            .catch(() => {
-              enriched.ragequit!.timestamp = 0n;
-            }),
-        );
       }
-
-      timestamps.push(
-        getTimestampFromBlockNumber(pa.deposit.blockNumber, publicClient)
-          .then((ts) => {
-            enriched.deposit.timestamp = ts;
-          })
-          .catch(() => {
-            enriched.deposit.timestamp = 0n;
-          }),
-      );
 
       result[key] = [...(result[key] || []), enriched];
       idx++;
     }
   }
 
-  await Promise.all(timestamps);
-
   return result;
 };
 
+/**
+ * Enriches the SDK account into the UI's PoolAccount shape.
+ *
+ * Dates are filled from the bulk timestamp registry only. This function used
+ * to issue `getBlock(blockNumber)` for every deposit, child and ragequit here,
+ * at login and after every transaction, which handed the RPC provider the
+ * exact set of blocks this user's notes live in. See utils/blockTimestamps.ts.
+ */
 export const getPoolAccountsFromAccount = async (account: PrivacyPoolAccount, chainId: number) => {
+  resolveAccountTimestamps(account, getChainIdForScope);
+
   const paMap = account.poolAccounts.entries();
   const poolAccounts = [];
 
@@ -416,10 +528,6 @@ export const getPoolAccountsFromAccount = async (account: PrivacyPoolAccount, ch
       const lastCommitment =
         poolAccount.children.length > 0 ? poolAccount.children[poolAccount.children.length - 1] : poolAccount.deposit;
 
-      const _chainId = Object.keys(chainData).find((key) =>
-        chainData[Number(key)].poolInfo.some((pool) => pool.scope === _scope),
-      );
-
       const updatedPoolAccount = {
         ...(poolAccount as PoolAccount),
         balance: lastCommitment!.value,
@@ -428,35 +536,12 @@ export const getPoolAccountsFromAccount = async (account: PrivacyPoolAccount, ch
         isValid: false,
         name: idx,
         scope: _scope,
-        chainId: Number(_chainId),
+        chainId: Number(getChainIdForScope(_scope)),
       };
-
-      const publicClient = createPublicClient({
-        chain: whitelistedChains.find((chain) => chain.id === Number(_chainId))!,
-        transport: transports[Number(_chainId)],
-      });
-
-      updatedPoolAccount.deposit.timestamp = await getTimestampFromBlockNumber(
-        poolAccount.deposit.blockNumber,
-        publicClient,
-      );
-
-      if (updatedPoolAccount.children.length > 0) {
-        updatedPoolAccount.children.forEach(async (child) => {
-          child.timestamp = await getTimestampFromBlockNumber(child.blockNumber, publicClient);
-        });
-      }
 
       if (updatedPoolAccount.ragequit) {
         updatedPoolAccount.balance = 0n;
         updatedPoolAccount.reviewStatus = ReviewStatus.EXITED;
-      }
-
-      if (updatedPoolAccount.ragequit) {
-        updatedPoolAccount.ragequit.timestamp = await getTimestampFromBlockNumber(
-          updatedPoolAccount.ragequit.blockNumber,
-          publicClient!,
-        );
       }
 
       poolAccounts.push(updatedPoolAccount);

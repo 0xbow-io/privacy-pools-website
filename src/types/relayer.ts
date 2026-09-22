@@ -72,8 +72,11 @@ export type QuoteRequestBody = {
   amount: string;
   /** The address of the asset being withdrawn. */
   asset: string;
-  /** The recipient address for the withdrawal. */
-  recipient: string;
+  /**
+   * The recipient address for the withdrawal. Optional: without it the
+   * relayer returns the price only and signs no fee commitment.
+   */
+  recipient?: string;
   /** Whether to include native token drop for gas fees (optional, defaults to false). */
   extraGas?: boolean;
 };
@@ -125,8 +128,8 @@ export type QuoteResponse = {
   feeBPS: string;
   /** Current gas price used for calculations (in wei). */
   gasPrice: string;
-  /** The signed fee commitment from the relayer. */
-  feeCommitment: FeeCommitment;
+  /** The signed fee commitment from the relayer. Present only when the request carried a recipient. */
+  feeCommitment?: FeeCommitment;
   /** Detailed breakdown of costs and gas amounts. */
   detail: QuoteDetailBreakdown;
 };

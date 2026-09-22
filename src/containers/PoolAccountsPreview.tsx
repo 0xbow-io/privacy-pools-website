@@ -15,8 +15,9 @@ import { UserPoolsStats } from './UserPoolsStats';
 export const PoolAccountsPreview = () => {
   const { allPools, poolAccountsByChainScope } = useAccountContext();
   const { setModalOpen } = useModal();
-  const { isLogged, isConnected } = useAuthContext();
+  const { isLogged, hasWallet, hasSession } = useAuthContext();
   const goTo = useGoTo();
+  const isSignedIn = hasWallet || hasSession;
   const [selectedChainIds, setSelectedChainIds] = useState<number[]>([]);
 
   // Get unique chain IDs from user's pool accounts
@@ -47,7 +48,7 @@ export const PoolAccountsPreview = () => {
           <Stack direction='row' alignItems='center' justifyContent='space-between' width='100%'>
             <Stack direction='row' alignItems='center' gap={1}>
               <Typography variant='subtitle1' fontWeight='bold' lineHeight='1' whiteSpace='nowrap'>
-                {isConnected ? 'My Pools' : 'Pool Accounts'}
+                {isSignedIn ? 'My Pools' : 'Pool Accounts'}
               </Typography>
               {isLogged && allPools > 0 && (
                 <Typography variant='caption' fontWeight='bold' mt='0.2rem'>
@@ -76,7 +77,7 @@ export const PoolAccountsPreview = () => {
           </>
         )}
 
-        {!isConnected && (
+        {!isSignedIn && (
           <ActionMenuContainer sx={{ minHeight: '13.2rem' }}>
             <Stack
               padding='1rem'
@@ -94,7 +95,7 @@ export const PoolAccountsPreview = () => {
           </ActionMenuContainer>
         )}
 
-        {isConnected && !isLogged && (
+        {hasWallet && !isLogged && (
           <ActionMenuContainer sx={{ minHeight: '13.2rem' }}>
             <Stack
               padding='1rem'

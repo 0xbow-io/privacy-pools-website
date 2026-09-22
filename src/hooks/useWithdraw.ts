@@ -13,6 +13,7 @@ import {
   usePoolAccountsContext,
   useChainContext,
   useSafeApp,
+  useAuthContext,
 } from '~/hooks';
 import { Hash, ModalType, Secret, ProofRelayerPayload, WithdrawalRelayerPayload } from '~/types';
 import {
@@ -27,6 +28,13 @@ import {
   getScope,
   createWithdrawalSecrets,
   mergeAndSortAspLeaves,
+  decodeRelayedWithdrawalFee,
+  nowSeconds,
+  recordWithdrawalFee,
+  relayedReceiptClient,
+  relayedReceiptLookback,
+  waitForRelayedReceipt,
+  poolDecimals,
 } from '~/utils';
 
 const {
@@ -59,17 +67,15 @@ export const useWithdraw = () => {
   const { aspData, relayerData } = useExternalServices();
   const { switchChainAsync } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
+  const { hasWallet } = useAuthContext();
   const { resetQuote } = useQuoteContext();
   const { isSafeApp } = useSafeApp();
-  const {
-    selectedPoolInfo,
-    chainId,
-    balanceBN: { decimals },
-    relayersData,
-    selectedRelayer,
-  } = useChainContext();
+  const { selectedPoolInfo, chainId, balanceBN, relayersData, selectedRelayer } = useChainContext();
 
-  const { accountService, addWithdrawal } = useAccountContext();
+  // Proof inputs must use the commitment's units even before a wallet balance resolves.
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
+
+  const { accountService, addWithdrawal, isScopeComplete } = useAccountContext();
   const publicClient = usePublicClient({ chainId });
 
   const {
@@ -182,9 +188,9 @@ export const useWithdraw = () => {
       }) => void,
       onComplete?: (proof: unknown, withdrawal: unknown, newSecretKeys: unknown) => void,
     ) => {
-      // Check for valid quote data immediately
+      // The signed fee commitment and its feeBPS are set by the Review Confirm click.
       if (!feeBPSForWithdraw || feeBPSForWithdraw === 0n || !feeCommitment) {
-        throw new Error('No valid quote available. Please ensure you have a valid quote before withdrawing.');
+        throw new Error('No fee commitment for this withdrawal. Please confirm the review step again.');
       }
 
       if (TEST_MODE) return;
@@ -200,6 +206,7 @@ export const useWithdraw = () => {
       if (!relayerDetails) missingFields.push('relayerDetails');
       if (!relayerDetails?.relayerAddress) missingFields.push('relayerAddress');
       if (!feeBPSForWithdraw) missingFields.push('feeBPS');
+      if (!feeCommitment) missingFields.push('feeCommitment');
       if (!accountService) missingFields.push('accountService');
 
       if (missingFields.length > 0) {
@@ -356,6 +363,19 @@ export const useWithdraw = () => {
       const currentProof = proofData || proof;
       const currentWithdrawal = withdrawalData || withdrawal;
       const currentNewSecretKeys = secretKeysData || newSecretKeys;
+
+      // Defense in depth: a scope whose history failed to load has no
+      // reconstructed accounts today, so there is normally nothing to select
+      // and withdraw. Guard anyway — withdrawal secrets are derived from the
+      // account's child count, so acting on partially reconstructed state
+      // would risk reusing a withdrawal index.
+      if (selectedPoolInfo?.scope && !isScopeComplete(selectedPoolInfo.scope)) {
+        throw new Error(
+          "This pool's history could not be loaded, so your balance may be incomplete. " +
+            'Reload your account before withdrawing.',
+        );
+      }
+
       if (!TEST_MODE) {
         const relayerDetails = relayersData.find((r) => r.url === selectedRelayer?.url);
 
@@ -372,8 +392,10 @@ export const useWithdraw = () => {
         )
           throw new Error('Missing required data to withdraw');
 
-        // Only switch chain if not already on the correct chain and not using Safe
-        if (!isSafeApp && walletClient?.chain?.id !== chainId) {
+        // Only switch chain if not already on the correct chain and not using Safe.
+        // The withdrawal is relayed and reads through `publicClient`, so a
+        // seed-only session (no wallet) needs no switch.
+        if (!isSafeApp && hasWallet && walletClient?.chain?.id !== chainId) {
           await switchChainAsync({ chainId });
         }
 
@@ -411,12 +433,26 @@ export const useWithdraw = () => {
           setTransactionHash(res.txHash as Hex);
           setModalOpen(ModalType.PROCESSING);
 
-          const receipt = await publicClient?.waitForTransactionReceipt({
-            hash: res.txHash as Hex,
-            timeout: 300_000, // 5 minutes timeout for withdrawal transactions
+          if (!publicClient) throw new Error('Public client not found');
+
+          // PRIVACY: never poll the relayed hash. `waitForTransactionReceipt`
+          // would send eth_getTransactionReceipt(hash) to the RPC provider every
+          // few seconds and tie this client to the relayer's transaction. The
+          // wait below reads new blocks' transaction lists and the pool's and
+          // entrypoint's logs by address and range, and matches locally.
+          // See utils/relayedReceipt.ts.
+          const receipt = await waitForRelayedReceipt(res.txHash as Hex, relayedReceiptClient(publicClient), {
+            addresses: [getAddress(selectedPoolInfo.address), getAddress(selectedPoolInfo.entryPointAddress)],
+            lookbackBlocks: relayedReceiptLookback(chainId),
+            budgetMs: 300_000, // 5 minutes, as before
           });
 
-          if (!receipt) throw new Error('Receipt not found');
+          if (receipt.status === 'reverted') {
+            throw new Error('The relayed withdrawal was mined but reverted. Your funds have not moved.');
+          }
+
+          const relayedFee = decodeRelayedWithdrawalFee(receipt.logs, getAddress(selectedPoolInfo.entryPointAddress));
+          if (relayedFee) recordWithdrawalFee(res.txHash, relayedFee);
 
           const events = decodeEventsFromReceipt(receipt, withdrawEventAbi);
           const withdrawnEvents = events.filter((event) => event.eventName === 'Withdrawn');
@@ -454,6 +490,9 @@ export const useWithdraw = () => {
             secret: (currentNewSecretKeys as { secret?: unknown })?.secret as Secret,
             blockNumber: receipt.blockNumber,
             txHash: res.txHash as Hex,
+            // The block header's timestamp when the walk read it, else "now":
+            // the transaction was observed seconds ago. Never looked up by hash.
+            timestamp: receipt.timestamp ?? nowSeconds(),
           });
 
           setModalOpen(ModalType.SUCCESS);
@@ -495,6 +534,7 @@ export const useWithdraw = () => {
       feeCommitment,
       newSecretKeys,
       accountService,
+      isScopeComplete,
       switchChainAsync,
       chainId,
       publicClient,
@@ -512,6 +552,7 @@ export const useWithdraw = () => {
       relayerData,
       resetQuote,
       isSafeApp,
+      hasWallet,
       walletClient?.chain?.id,
     ],
   );

@@ -122,13 +122,27 @@ export const ChainProvider = ({ children }: Props) => {
   console.log(
     `fetching data for chainId: ${chainId}, selectedAsset: ${selectedAsset}, token: ${selectedAsset === DEFAULT_ASSET ? undefined : selectedPoolInfo.assetAddress}`,
   );
-  // User balance based on the selected asset
+  // Wallet balance for the selected asset, read on a FIXED cadence.
+  //
+  // The interval is the only trigger. React Query's defaults would also
+  // refetch when the window regains focus and pause the interval while the
+  // tab is hidden, which times requests to what the user is doing; both are
+  // off, as is the reconnect refetch, so the cadence is a build constant.
+  // 30 s matches the v2 app. `noTargetedReads.test.ts` holds these options.
+  //
+  // Consumers of the VALUE are `Menu` (display) and `DepositForm` (the
+  // "Insufficient balance" check and Max). A user who spends their whole
+  // balance sees the pre-spend figure for at most one interval; the wallet
+  // rejects an over-spend at signing, so that window costs a retry, not funds.
   const { data: userBalance } = useBalance({
     address,
     chainId,
     token: selectedPoolInfo.isNativeToken ? undefined : selectedPoolInfo.assetAddress, //selectedAsset === DEFAULT_ASSET ? undefined : selectedPoolInfo.assetAddress,
     query: {
-      refetchInterval: 10_000, // Refetch every 10 seconds
+      refetchInterval: 30_000,
+      refetchIntervalInBackground: true,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   });
 
@@ -138,13 +152,15 @@ export const ChainProvider = ({ children }: Props) => {
     if (userBalance) {
       return userBalance;
     }
+    // Keep unresolved balances in the queried asset's units, including when
+    // an unavailable selection falls back to the chain's first pool.
     return {
-      decimals: 18,
+      decimals: selectedPoolInfo?.assetDecimals ?? 18,
       formatted: '0',
-      symbol: selectedAsset,
+      symbol: selectedPoolInfo?.asset ?? selectedAsset,
       value: 0n,
     };
-  }, [userBalance, selectedAsset]);
+  }, [userBalance, selectedAsset, selectedPoolInfo]);
 
   const priceRetryRef = useRef(false);
   const priceFetchIdRef = useRef(0);

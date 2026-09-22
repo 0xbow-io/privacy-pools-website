@@ -16,7 +16,7 @@ import { formatUnits } from 'viem';
 import { StatusChip } from '~/components';
 import { usePoolAccountsContext, useChainContext, useAccountContext } from '~/hooks';
 import { EventType, ReviewStatus } from '~/types';
-import { getTimeAgo, truncateAddress } from '~/utils';
+import { getTimeAgo, truncateAddress, poolDecimals } from '~/utils';
 
 const eventTypeLabel: Record<EventType, string> = {
   [EventType.MIGRATION]: 'Migration',
@@ -26,10 +26,8 @@ const eventTypeLabel: Record<EventType, string> = {
 };
 
 export const WithdrawalsTable = () => {
-  const {
-    chain,
-    balanceBN: { decimals },
-  } = useChainContext();
+  const { chain, balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
   const explorerUrl = chain.explorerUrl;
   const { poolAccount } = usePoolAccountsContext();
   const { historyData } = useAccountContext();

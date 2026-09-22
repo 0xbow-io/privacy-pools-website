@@ -34,6 +34,15 @@ type ContextType = {
   hasApprovedDeposit: boolean;
   hasProcessedInitialDeposits: boolean; // True after initial deposit status fetch completes
 
+  /**
+   * Scopes (as decimal strings) whose event history failed to load on the last
+   * account load. Reconstructed state for these is absent, not empty — the
+   * account may hold notes that are not visible, so deposits and withdrawals
+   * must be blocked until a reload succeeds.
+   */
+  incompleteScopes: string[];
+  isScopeComplete: (scope: bigint | string) => boolean;
+
   createAccount: (seed: string) => void;
   loadAccount: (seed: string) => Promise<void>;
   addPoolAccount: (...params: Parameters<typeof addPoolAccount>) => void;
@@ -70,6 +79,7 @@ export const AccountProvider = ({ children }: Props) => {
   const [hasProcessedInitialDeposits, setHasProcessedInitialDeposits] = useState(false);
   const declinedLabelsRef = useRef<Set<string>>(new Set());
   const [precomputedDeclinedLabels, setPrecomputedDeclinedLabels] = useState<Set<string> | null>(null);
+  const [incompleteScopes, setIncompleteScopes] = useState<ContextType['incompleteScopes']>([]);
   const { selectedPoolInfo } = useChainContext();
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();
@@ -85,6 +95,13 @@ export const AccountProvider = ({ children }: Props) => {
     accountServiceRef,
     legacyAccountServiceRef,
     selectedPoolInfo.chainId,
+    setIncompleteScopes,
+    addNotification,
+  );
+
+  const isScopeComplete = useCallback(
+    (scope: bigint | string) => !incompleteScopes.includes(scope.toString()),
+    [incompleteScopes],
   );
 
   const allPools = poolAccounts.length;
@@ -387,6 +404,7 @@ export const AccountProvider = ({ children }: Props) => {
     setHasProcessedInitialDeposits(false);
     declinedLabelsRef.current = new Set();
     setPrecomputedDeclinedLabels(null);
+    setIncompleteScopes([]);
   };
 
   const toggleHideEmptyPools = useCallback(() => {
@@ -420,7 +438,8 @@ export const AccountProvider = ({ children }: Props) => {
             txHash: pa.deposit.txHash,
             reviewStatus: pa.reviewStatus,
             amount: pa.deposit.value,
-            timestamp: Number(pa.deposit.timestamp),
+            // 0 = unknown date (renders "-", sorts last); never NaN, which breaks the sort.
+            timestamp: Number(pa.deposit.timestamp ?? 0),
             label: pa.label,
             scope: pa.scope,
             chainId: pa.chainId,
@@ -435,7 +454,7 @@ export const AccountProvider = ({ children }: Props) => {
             txHash: child.txHash,
             reviewStatus: ReviewStatus.APPROVED,
             amount: (idx === 0 ? pa.deposit.value : pa.children[idx - 1].value) - child.value,
-            timestamp: Number(child.timestamp),
+            timestamp: Number(child.timestamp ?? 0),
             label: child.label,
             scope: pa.scope,
             chainId: pa.chainId,
@@ -451,7 +470,7 @@ export const AccountProvider = ({ children }: Props) => {
           txHash: pa.ragequit.transactionHash,
           reviewStatus: ReviewStatus.APPROVED,
           amount: pa.ragequit.value,
-          timestamp: Number(pa.ragequit.timestamp),
+          timestamp: Number(pa.ragequit.timestamp ?? 0),
           label: pa.ragequit.label,
           scope: pa.scope,
           chainId: pa.chainId,
@@ -484,6 +503,8 @@ export const AccountProvider = ({ children }: Props) => {
         addWithdrawal: handleAddWithdrawal,
         addRagequit: handleAddRagequit,
         resetGlobalState,
+        incompleteScopes,
+        isScopeComplete,
         loadLegacyReviewStatuses,
         historyData,
         precomputedDeclinedLabels,

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { MOCK_RELAYER } from '~/__tests__/__mocks__';
 import { chainData, whitelistedChains } from '~/config/chainData';
 import { FeesResponse, RelayerResponse } from '~/types';
-import { relayerClient } from '~/utils/relayerClient';
+import { relayerClient, RelayerRequestError } from '~/utils/relayerClient';
 
 const chainId = whitelistedChains[0].id;
 const relayerUrl = chainData[chainId].relayers[0].url;
@@ -101,6 +101,62 @@ describe('relayerClient', () => {
       });
 
       expect(result).toEqual(MOCK_RELAYER.relayResponse);
+    });
+  });
+
+  describe('fetchQuote', () => {
+    const quoteFields = { chainId, amount: '100000000000000000', asset: assetAddress, extraGas: false };
+    const recipient = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+    const sentBody = () => JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+
+    it('phase 1: the body on the wire has no recipient key', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ baseFeeBPS: '100', feeBPS: '250', gasPrice: '1', detail: {} }),
+      } as Response);
+
+      const result = await relayerClient.fetchQuote(relayerUrl, quoteFields);
+
+      expect(mockFetch.mock.calls[0][0]).toBe(`${relayerUrl}/relayer/quote`);
+      expect(sentBody()).toEqual(quoteFields);
+      expect(Object.keys(sentBody())).not.toContain('recipient');
+      expect(result.feeCommitment).toBeUndefined();
+    });
+
+    it('phase 2: the body on the wire carries the recipient', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            baseFeeBPS: '100',
+            feeBPS: '250',
+            gasPrice: '1',
+            detail: {},
+            feeCommitment: MOCK_RELAYER.feeCommitment,
+          }),
+      } as Response);
+
+      const result = await relayerClient.fetchQuote(relayerUrl, { ...quoteFields, recipient });
+
+      expect(sentBody()).toEqual({ ...quoteFields, recipient });
+      expect(result.feeCommitment).toEqual(MOCK_RELAYER.feeCommitment);
+    });
+
+    it('a non-2xx answer throws with the status and body kept', async () => {
+      const body = '{"message":"body must have required property \'recipient\'"}';
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: () => Promise.resolve(body),
+      } as Response);
+
+      const err = await relayerClient.fetchQuote(relayerUrl, quoteFields).catch((e) => e);
+
+      expect(err).toBeInstanceOf(RelayerRequestError);
+      expect(err.status).toBe(400);
+      expect(err.body).toBe(body);
+      expect(err.message).toBe(`Failed to fetch quote: 400 Bad Request - ${body}`);
     });
   });
 });

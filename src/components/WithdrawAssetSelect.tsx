@@ -3,19 +3,20 @@
 import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button, styled } from '@mui/material';
-import { useAccount, useSwitchChain } from 'wagmi';
+import { useSwitchChain } from 'wagmi';
 import { allPoolsChainData } from '~/config';
-import { useModal, usePoolAccountsContext, useAccountContext, useNotifications } from '~/hooks';
+import { useModal, usePoolAccountsContext, useAccountContext, useNotifications, useAuthContext } from '~/hooks';
 import { useChainContext } from '~/hooks/context/useChainContext';
 import { EventType, ModalType, ReviewStatus } from '~/types';
 
 export const WithdrawAssetSelect: React.FC = () => {
   const pathname = usePathname();
-  const { hasSomeRelayerAvailable, chainId, setSelectedAsset, selectedPoolInfo } = useChainContext();
+  const { hasSomeRelayerAvailable, chainId, setSelectedAsset, setChainId, selectedPoolInfo } = useChainContext();
   const { setModalOpen } = useModal();
   const { setActionType } = usePoolAccountsContext();
   const { poolAccountsByChainScope, seed } = useAccountContext();
-  const { address } = useAccount();
+  // A withdrawal is relayed: it needs the seed, not a wallet.
+  const { hasWallet } = useAuthContext();
   const { switchChain } = useSwitchChain();
   const { addNotification } = useNotifications();
 
@@ -56,23 +57,23 @@ export const WithdrawAssetSelect: React.FC = () => {
 
   const hasAnyApprovedDeposit = !!firstPoolWithFunds;
   const isWithdrawDisabled =
-    !address ||
-    !hasAnyApprovedDeposit ||
-    !seed ||
-    !hasSomeRelayerAvailable ||
-    (isOnPoolPage && !currentPoolHasApprovedDeposit);
+    !hasAnyApprovedDeposit || !seed || !hasSomeRelayerAvailable || (isOnPoolPage && !currentPoolHasApprovedDeposit);
 
   const handleClick = () => {
     // Only auto-switch to firstPoolWithFunds when NOT on a pool page.
     // On pool pages, the PoolPage component already sets the correct asset.
     if (!isOnPoolPage && firstPoolWithFunds) {
-      // Switch chain if needed
+      // Switch chain if needed; with no wallet, the app's chain is set directly
       if (firstPoolWithFunds.chainId !== chainId) {
-        try {
-          switchChain({ chainId: firstPoolWithFunds.chainId });
-          addNotification('info', `Switching to ${firstPoolWithFunds.chainName}...`);
-        } catch (err) {
-          console.error('Failed to switch chain:', err);
+        if (hasWallet) {
+          try {
+            switchChain({ chainId: firstPoolWithFunds.chainId });
+            addNotification('info', `Switching to ${firstPoolWithFunds.chainName}...`);
+          } catch (err) {
+            console.error('Failed to switch chain:', err);
+          }
+        } else {
+          setChainId(firstPoolWithFunds.chainId);
         }
       }
       // Set the selected asset to the pool with funds

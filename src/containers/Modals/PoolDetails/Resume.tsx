@@ -1,12 +1,12 @@
 import { Stack, styled, Typography } from '@mui/material';
 import { formatUnits } from 'viem';
 import { usePoolAccountsContext, useChainContext } from '~/hooks';
-import { formatTimestamp } from '~/utils';
+import { formatTimestamp, poolDecimals } from '~/utils';
 
 export const Resume = () => {
-  const {
-    balanceBN: { symbol, decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { poolAccount } = usePoolAccountsContext();
 
   return (
