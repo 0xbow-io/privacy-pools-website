@@ -340,14 +340,19 @@ const CustomRpcForm = () => {
         Above the fields, because it changes which endpoint someone picks.
 
         A free public endpoint ANSWERS, so every field goes green and the form
-        looks entirely healthy, and then the account takes about twenty minutes
-        to appear: discovery is thousands of queries and a public gateway rate
-        limits them (-32005). Nothing is broken and nothing looks broken, which
-        is the worst shape a wait can have. QA sat through it before working
-        out that it was the endpoint (2026-09-22).
+        looks entirely healthy, and then the account is still not there:
+        discovery is thousands of queries and a public gateway rate limits them
+        (-32005). Nothing is broken and nothing looks broken, which is the
+        worst shape a wait can have. QA sat through it before working out that
+        it was the endpoint (2026-09-22).
+
+        The figure is two minutes, not the twenty this first said. Twenty was
+        measured at the old 10,000-block chunk; the default is now 500,000 and
+        QA reloaded in about two (Tenderly, 2026-09-22). Keep this number and
+        DEFAULT_CUSTOM_RPC_CHUNK in step: raising the chunk is what moved it.
       */}
       <Typography variant='body2' color='text.secondary' data-testid='custom-rpc-speed-notice'>
-        We recommend using your own RPC. On a free public endpoint, expect your account to take around 20 minutes to
+        We recommend using your own RPC. On a free public endpoint, expect your account to take around 2 minutes to
         load.
       </Typography>
 
