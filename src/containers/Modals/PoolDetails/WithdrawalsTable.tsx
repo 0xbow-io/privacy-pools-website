@@ -26,10 +26,8 @@ const eventTypeLabel: Record<EventType, string> = {
 };
 
 export const WithdrawalsTable = () => {
-  const {
-    chain,
-    balanceBN: { decimals },
-  } = useChainContext();
+  const { chain, balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
   const explorerUrl = chain.explorerUrl;
   const { poolAccount } = usePoolAccountsContext();
   const { historyData } = useAccountContext();

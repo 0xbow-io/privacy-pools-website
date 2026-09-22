@@ -20,9 +20,8 @@ const ExitConfirmForm = () => {
   const { address } = useAccount();
   const { setModalOpen } = useModal();
   const { poolAccount, setTarget, setAmount, setActionType } = usePoolAccountsContext();
-  const {
-    balanceBN: { decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
 
   const handleConfirmExit = () => {
     if (!poolAccount || !address) return;

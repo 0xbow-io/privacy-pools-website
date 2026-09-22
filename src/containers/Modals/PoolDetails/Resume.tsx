@@ -4,9 +4,9 @@ import { usePoolAccountsContext, useChainContext } from '~/hooks';
 import { formatTimestamp } from '~/utils';
 
 export const Resume = () => {
-  const {
-    balanceBN: { symbol, decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { poolAccount } = usePoolAccountsContext();
 
   return (

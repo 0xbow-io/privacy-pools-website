@@ -34,11 +34,8 @@ export const ReviewModal = () => {
   const { quoteState, clearPendingQuoteRequest, clearCommitment } = useQuoteContext();
 
   // Quote logic for withdrawals
-  const {
-    balanceBN: { decimals },
-    selectedPoolInfo,
-    chainId,
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo, chainId } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
   const { addNotification } = useNotifications();
 

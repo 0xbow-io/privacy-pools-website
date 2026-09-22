@@ -33,13 +33,9 @@ export const DataSection = () => {
   const [isFeeBreakdownOpen, setIsFeeBreakdownOpen] = useState(false);
   const { quoteState } = useQuoteContext();
   const publicClient = usePublicClient();
-  const {
-    balanceBN: { symbol, decimals },
-    price,
-    refetchPrice,
-    selectedPoolInfo,
-    chainId,
-  } = useChainContext();
+  const { balanceBN, price, refetchPrice, selectedPoolInfo, chainId } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { currentSelectedRelayerData, relayerData } = useExternalServices();
   const { amount, target, actionType, poolAccount, vettingFeeBPS, feeBPSForWithdraw, selectedAlternativeToken } =
     usePoolAccountsContext();

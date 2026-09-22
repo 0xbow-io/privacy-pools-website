@@ -48,7 +48,7 @@ export const WithdrawForm = () => {
   const pathname = usePathname();
 
   const {
-    balanceBN: { symbol, decimals: balanceDecimals },
+    balanceBN: { symbol: balanceSymbol, decimals: balanceDecimals },
     selectedPoolInfo,
     chainId,
     selectedRelayer,
@@ -72,6 +72,7 @@ export const WithdrawForm = () => {
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
   const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals ?? 18;
+  const symbol = selectedPoolInfo?.asset ?? balanceSymbol;
 
   // Filter pool accounts by current chain, pool scope, balance > 0, and APPROVED status
   const filteredPoolAccounts = useMemo(() => {

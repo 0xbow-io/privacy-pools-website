@@ -50,7 +50,7 @@ export const DepositForm = () => {
   const { switchChainAsync } = useSwitchChain();
   const isStakingEnabled = useStakingFeature();
   const {
-    balanceBN: { symbol, formatted: balanceFormatted, decimals },
+    balanceBN: { formatted: balanceFormatted, decimals: balanceDecimals, symbol: balanceSymbol },
     price: currentPrice,
     maxDeposit,
     selectedPoolInfo,
@@ -59,6 +59,8 @@ export const DepositForm = () => {
     setSelectedAsset,
     setChainId,
   } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceSymbol;
   const {
     amount,
     setAmount,

@@ -37,11 +37,8 @@ const {
 
 export const useDeposit = () => {
   const { address } = useAccount();
-  const {
-    chainId,
-    selectedPoolInfo,
-    balanceBN: { decimals },
-  } = useChainContext();
+  const { chainId, selectedPoolInfo, balanceBN } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
   const { addNotification, getDefaultErrorMessage } = useNotifications();
   const { switchChainAsync } = useSwitchChain();
   const { setModalOpen, setIsClosable } = useModal();

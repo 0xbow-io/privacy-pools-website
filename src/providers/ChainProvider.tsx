@@ -152,13 +152,15 @@ export const ChainProvider = ({ children }: Props) => {
     if (userBalance) {
       return userBalance;
     }
+    // Keep unresolved balances in the queried asset's units, including when
+    // an unavailable selection falls back to the chain's first pool.
     return {
-      decimals: 18,
+      decimals: selectedPoolInfo?.assetDecimals ?? 18,
       formatted: '0',
-      symbol: selectedAsset,
+      symbol: selectedPoolInfo?.asset ?? selectedAsset,
       value: 0n,
     };
-  }, [userBalance, selectedAsset]);
+  }, [userBalance, selectedAsset, selectedPoolInfo]);
 
   const priceRetryRef = useRef(false);
   const priceFetchIdRef = useRef(0);

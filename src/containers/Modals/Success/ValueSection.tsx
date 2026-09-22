@@ -7,9 +7,9 @@ import { EventType } from '~/types';
 export const ValueSection = () => {
   const { amount, poolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
-  const {
-    balanceBN: { symbol, decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
 
   const paText = actionType === EventType.DEPOSIT ? 'To pool account' : 'From pool account';
   const paName =

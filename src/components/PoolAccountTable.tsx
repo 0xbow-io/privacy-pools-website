@@ -27,9 +27,10 @@ import { formatDataNumber, formatTimestamp, getStatus } from '~/utils';
 export const PoolAccountTable = ({ records }: { records: PoolAccount[] }) => {
   const { PENDING_STATUS_MESSAGE: statusMessage } = getConstants();
   const { setActionType, setPoolAccount } = usePoolAccountsContext();
-  const {
-    balanceBN: { symbol, decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  // Pool balances must remain readable without a connected wallet or a resolved balance query.
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { address } = useAccount();
   const { setModalOpen } = useModal();
   const { poolAccounts, isLoading } = useAccountContext();

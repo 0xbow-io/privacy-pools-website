@@ -8,9 +8,9 @@ import { PoolAccount } from '~/types';
 import { ViewAllText, ViewAllButton } from './PoolAccountsPreview';
 
 export const PoolAccountsFull = () => {
-  const {
-    balanceBN: { symbol, decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { poolAccounts, allPools, amountPoolAsset, pendingAmountPoolAsset, hideEmptyPools, toggleHideEmptyPools } =
     useAccountContext();
   const { ITEMS_PER_PAGE, fullPoolAccounts } = useAdvancedView();

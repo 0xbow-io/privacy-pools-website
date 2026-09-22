@@ -59,13 +59,9 @@ export const formatFeeDisplay = (
 };
 
 export const FeeBreakdown = ({ feeBPS, baseFeeBPS, extraGasAmountETH, relayTxCostETH, amount }: FeeBreakdownProps) => {
-  const {
-    balanceBN: { symbol, decimals },
-    price,
-    nativeAssetPrice,
-    selectedPoolInfo,
-    chain,
-  } = useChainContext();
+  const { balanceBN, price, nativeAssetPrice, selectedPoolInfo, chain } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
 
   const isStableAsset = selectedPoolInfo?.isStableAsset ?? false;
 

@@ -69,13 +69,10 @@ export const useWithdraw = () => {
   const { hasWallet } = useAuthContext();
   const { resetQuote } = useQuoteContext();
   const { isSafeApp } = useSafeApp();
-  const {
-    selectedPoolInfo,
-    chainId,
-    balanceBN: { decimals },
-    relayersData,
-    selectedRelayer,
-  } = useChainContext();
+  const { selectedPoolInfo, chainId, balanceBN, relayersData, selectedRelayer } = useChainContext();
+
+  // Proof inputs must use the commitment's units even before a wallet balance resolves.
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
 
   const { accountService, addWithdrawal, isScopeComplete } = useAccountContext();
   const publicClient = usePublicClient({ chainId });

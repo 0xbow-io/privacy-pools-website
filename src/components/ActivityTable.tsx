@@ -35,10 +35,9 @@ export const ActivityTable = ({
   size?: 'small' | 'large';
 }) => {
   const { setModalOpen } = useModal();
-  const {
-    balanceBN: { decimals, symbol },
-    selectedPoolInfo: { assetDecimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { poolAccounts, poolAccountsByChainScope } = useAccountContext();
   const { setSelectedHistoryData } = usePoolAccountsContext();
   const noRecordsMessage =
@@ -73,7 +72,7 @@ export const ActivityTable = ({
       }
     }
     // Fallback to current pool's symbol
-    return `${formatDataNumber(BigInt(getAmount(row) || 0), assetDecimals || decimals, 3, false, true, false)} ${symbol}`;
+    return `${formatDataNumber(BigInt(getAmount(row) || 0), decimals, 3, false, true, false)} ${symbol}`;
   };
 
   const formatTime = (row: ActivityRecords[number]) => {
@@ -154,10 +153,7 @@ export const ActivityTable = ({
                           }
                         }
                         // Fallback to current pool's decimals
-                        return formatUnits(
-                          getAmount(row as ActivityRecords[number]) as bigint,
-                          assetDecimals || decimals,
-                        );
+                        return formatUnits(getAmount(row as ActivityRecords[number]) as bigint, decimals);
                       })()}
                       placement='top'
                       disableInteractive

@@ -4,10 +4,10 @@ import { useAccountContext, usePoolAccountsContext, useChainContext } from '~/ho
 import { EventType } from '~/types';
 
 export const PoolAccountSection = () => {
-  const {
-    selectedPoolInfo: { asset },
-    balanceBN: { decimals },
-  } = useChainContext();
+  const { selectedPoolInfo, balanceBN } = useChainContext();
+  const { asset } = selectedPoolInfo;
+  // Parse the withdrawal in the same units as the stored pool balance before subtracting.
+  const decimals = selectedPoolInfo?.assetDecimals ?? balanceBN.decimals;
 
   const { amount, poolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
