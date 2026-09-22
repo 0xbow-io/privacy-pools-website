@@ -34,7 +34,10 @@ import { ModalType } from '~/types';
 
 export const CustomRpcModal = () => {
   return (
-    <BaseModal type={ModalType.CUSTOM_RPC} size='small' hasBackground>
+    // 'large', because 'small' stacked one full-width field per network into a
+    // column far taller than the viewport. The fields sit in a grid below; the
+    // width is what lets that grid have more than one column.
+    <BaseModal type={ModalType.CUSTOM_RPC} size='large' hasBackground>
       <CustomRpcForm />
     </BaseModal>
   );
@@ -302,57 +305,59 @@ const CustomRpcForm = () => {
         One endpoint per network. Leave a field empty to keep using ours.
       </Typography>
 
-      {chains.map((chain) => {
-        const row = rows[chain.id];
-        return (
-          <Box key={chain.id} sx={{ width: '100%' }}>
-            <RowHeader>
-              <Typography variant='body2' color='text.secondary'>
-                {chain.name}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                {row?.saved && (
-                  <Typography variant='body2' color='text.secondary'>
-                    in use
-                  </Typography>
-                )}
-                {row?.status === 'checking' && <CircularProgress size={14} color='inherit' />}
-                {row?.status === 'ok' && (
-                  <CheckCircleIcon
-                    fontSize='small'
-                    sx={{ color: 'success.main' }}
-                    data-testid={`custom-rpc-ok-${chain.id}`}
-                  />
-                )}
-                {row?.status === 'fail' && (
-                  <CancelIcon
-                    fontSize='small'
-                    sx={{ color: 'error.main' }}
-                    data-testid={`custom-rpc-fail-${chain.id}`}
-                  />
-                )}
-              </Box>
-            </RowHeader>
-            <STextField
-              fullWidth
-              autoComplete='off'
-              spellCheck={false}
-              placeholder='https://'
-              value={row?.value ?? ''}
-              disabled={busy}
-              error={row?.status === 'fail'}
-              helperText={row?.message || ' '}
-              onChange={(event) => editRow(chain.id, event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') handleSave();
-              }}
-              slotProps={{
-                htmlInput: { 'data-testid': `custom-rpc-input-${chain.id}`, spellCheck: false },
-              }}
-            />
-          </Box>
-        );
-      })}
+      <ChainGrid>
+        {chains.map((chain) => {
+          const row = rows[chain.id];
+          return (
+            <Box key={chain.id} sx={{ width: '100%' }}>
+              <RowHeader>
+                <Typography variant='body2' color='text.secondary'>
+                  {chain.name}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  {row?.saved && (
+                    <Typography variant='body2' color='text.secondary'>
+                      in use
+                    </Typography>
+                  )}
+                  {row?.status === 'checking' && <CircularProgress size={14} color='inherit' />}
+                  {row?.status === 'ok' && (
+                    <CheckCircleIcon
+                      fontSize='small'
+                      sx={{ color: 'success.main' }}
+                      data-testid={`custom-rpc-ok-${chain.id}`}
+                    />
+                  )}
+                  {row?.status === 'fail' && (
+                    <CancelIcon
+                      fontSize='small'
+                      sx={{ color: 'error.main' }}
+                      data-testid={`custom-rpc-fail-${chain.id}`}
+                    />
+                  )}
+                </Box>
+              </RowHeader>
+              <STextField
+                fullWidth
+                autoComplete='off'
+                spellCheck={false}
+                placeholder='https://'
+                value={row?.value ?? ''}
+                disabled={busy}
+                error={row?.status === 'fail'}
+                helperText={row?.message || ' '}
+                onChange={(event) => editRow(chain.id, event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleSave();
+                }}
+                slotProps={{
+                  htmlInput: { 'data-testid': `custom-rpc-input-${chain.id}`, spellCheck: false },
+                }}
+              />
+            </Box>
+          );
+        })}
+      </ChainGrid>
 
       {!!prefill?.empty.length && (
         <Button variant='outlined' onClick={applyPrefill} data-testid='custom-rpc-prefill' sx={{ width: '100%' }}>
@@ -385,7 +390,8 @@ const CustomRpcForm = () => {
         Blocks per request
       </Typography>
       <STextField
-        fullWidth
+        // A five-digit number does not need the width of a URL.
+        sx={{ width: '100%', maxWidth: '26rem' }}
         autoComplete='off'
         value={chunk}
         disabled={busy}
@@ -441,7 +447,7 @@ const CustomRpcForm = () => {
 
 const ModalContainer = styled(Box)(() => ({
   display: 'flex',
-  padding: '3.6rem 2.4rem',
+  padding: '2.8rem 2.4rem',
   flexDirection: 'column',
   alignItems: 'flex-start',
   gap: '1.2rem',
@@ -450,6 +456,23 @@ const ModalContainer = styled(Box)(() => ({
   '& > *': {
     zIndex: 1,
   },
+}));
+
+/**
+ * The per-network endpoints, side by side rather than in one long column.
+ *
+ * Every network needs the same control, and stacking them full width made the
+ * form taller than the viewport with five of them: the save button sat below
+ * the fold and the whole dialog read as a narrow ribbon. `auto-fit` with a
+ * 26rem floor keeps one column on a phone and gives two or three on a laptop,
+ * so adding a sixth network costs half a row instead of a whole one.
+ */
+const ChainGrid = styled(Box)(() => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(26rem, 1fr))',
+  columnGap: '2.4rem',
+  rowGap: '0.4rem',
+  width: '100%',
 }));
 
 const ModalTitle = styled(Typography)(() => ({
@@ -477,12 +500,18 @@ const STextField = styled(TextField)(() => ({
   },
 }));
 
+// Side by side now that there is width for it, and `wrap` puts them back in a
+// column on a narrow screen without a breakpoint to keep in sync.
 const ButtonsContainer = styled(Box)(() => ({
   display: 'flex',
-  flexDirection: 'column',
+  flexDirection: 'row',
+  flexWrap: 'wrap',
   width: '100%',
   gap: '1.2rem',
   marginTop: '0.8rem',
+  '& > *': {
+    flex: '1 1 18rem',
+  },
 }));
 
 const SaveButton = styled(Button)(({ theme }) => ({
