@@ -25,3 +25,34 @@ export const privateErrorEvent = (event: ErrorEvent): ErrorEvent => {
     contexts: { withdrawal_context: flags },
   };
 };
+
+// A route name is worth keeping: without it every server error collapses into
+// one issue and the reports stop being actionable. But Next does not always
+// hand back a parameterised template, so the value is checked rather than
+// trusted. Letters, digits and the punctuation a route is made of, no long
+// hex or decimal run, bounded length. `/api/hypersync-rpc` and `/pool/[id]`
+// pass; anything carrying an address, hash or amount does not.
+const safeRoute = (value: unknown): string | undefined => {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 80) return undefined;
+  if (!/^[A-Za-z0-9/_\-[\].]+$/.test(value)) return undefined;
+  if (/[0-9a-fA-F]{16,}/.test(value) || /\d{8,}/.test(value)) return undefined;
+  return value;
+};
+
+// The server half of the same rule.
+//
+// A Next server error can quote anything the request carried, and the server
+// is what proxies RPC traffic, so `captureRequestError` and any thrown route
+// handler would otherwise export the message, the stack and the request. There
+// is no withdrawal_context here (that is set in the browser), so a server
+// event says only that the server failed and which route it failed on.
+export const privateServerErrorEvent = (event: ErrorEvent): ErrorEvent => {
+  const route = safeRoute(event.transaction);
+  return {
+    type: undefined,
+    level: 'error',
+    message: 'Server operation failed',
+    ...(route ? { transaction: route } : {}),
+    contexts: {},
+  };
+};
