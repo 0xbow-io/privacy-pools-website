@@ -3,7 +3,7 @@ import { captureException, withScope } from '@sentry/nextjs';
 import { getAddress, Hex, parseUnits, TransactionExecutionError } from 'viem';
 import { generatePrivateKey } from 'viem/accounts';
 import { usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
-import { getConfig } from '~/config';
+import { getBrevisAspLeavesConfig, getConfig } from '~/config';
 import { useQuoteContext } from '~/contexts/QuoteContext';
 import {
   useExternalServices,
@@ -94,10 +94,10 @@ export const useWithdraw = () => {
   } = usePoolAccountsContext();
 
   const commitment = poolAccount?.lastCommitment;
-  // When pool has Brevis external ASP, merge ASP leaves from both 0xBow and Brevis sources, sorted ASC
+  // When the pool's entrypoint is shared with Brevis, merge ASP leaves from both 0xBow and Brevis sources, sorted ASC
   // For other pools, use standard ASP leaves
   const aspLeaves =
-    selectedPoolInfo?.externalAsp?.provider === 'brevis'
+    selectedPoolInfo && getBrevisAspLeavesConfig(selectedPoolInfo)
       ? mergeAndSortAspLeaves(aspData.mtLeavesData?.aspLeaves, aspData.mtLeavesData?.brevisAspLeaves)
       : aspData.mtLeavesData?.aspLeaves;
   const stateLeaves = aspData.mtLeavesData?.stateTreeLeaves;

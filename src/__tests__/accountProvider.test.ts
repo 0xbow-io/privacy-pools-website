@@ -21,6 +21,7 @@ jest.unstable_mockModule(`${process.cwd()}/src/config/chainData.ts`, () => ({
       poolInfo: [{ scope: 56n, externalAsp: { provider: 'brevis', baseUrl: 'https://brevis.test' } }],
     },
   },
+  getBrevisAspLeavesConfig: (pool: { externalAsp?: unknown }) => pool.externalAsp,
 }));
 jest.unstable_mockModule(`${process.cwd()}/src/hooks/index.ts`, () => ({
   useChainContext: () => ({ selectedPoolInfo: { ...selected } }),
