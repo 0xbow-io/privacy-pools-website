@@ -688,6 +688,17 @@ const applyCustomRpcOverrides = (data: ChainData): ChainData => {
 // For wallet operations: only show appropriate chains based on IS_TESTNET
 export const chainData = applyCustomRpcOverrides(IS_TESTNET ? testnetChainData : mainnetChainData);
 
+// The ASP root is per entrypoint, so every pool behind an entrypoint that has a
+// Brevis pool must prove against the merged 0xbow + Brevis leaves.
+export const getBrevisAspLeavesConfig = (pool: PoolInfo): ExternalAspConfig | undefined => {
+  if (pool.externalAsp?.provider === 'brevis') return pool.externalAsp;
+  return chainData[pool.chainId]?.poolInfo.find(
+    (p) =>
+      p.externalAsp?.provider === 'brevis' &&
+      p.entryPointAddress.toLowerCase() === pool.entryPointAddress.toLowerCase(),
+  )?.externalAsp;
+};
+
 // Chain data for All Pools table (includes test chains if SHOW_TEST_CHAINS is enabled)
 export const allPoolsChainData: ChainData = applyCustomRpcOverrides(
   (() => {

@@ -6,7 +6,7 @@ import { Stack, Typography, Box, styled } from '@mui/material';
 import { formatUnits } from 'viem';
 import { PoolAccountTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
-import { chainData, PoolInfo } from '~/config';
+import { chainData, getBrevisAspLeavesConfig, PoolInfo } from '~/config';
 import { Section, PAContainer, EthText, Subtitle } from '~/containers';
 import { useAuthContext, useGoTo, useModal, useAccountContext } from '~/hooks';
 import { useASP } from '~/hooks/useASP';
@@ -33,7 +33,7 @@ const PoolPreviewSection = ({
   onNavigateToViewAll,
 }: PoolPreviewSectionProps) => {
   const chain = chainData[chainId];
-  const { isLoading, isError } = useASP(chainId, poolInfo.scope.toString(), aspUrl, poolInfo.externalAsp);
+  const { isLoading, isError } = useASP(chainId, poolInfo.scope.toString(), aspUrl, getBrevisAspLeavesConfig(poolInfo));
 
   // Calculate totals for this pool (poolAccounts are already filtered)
   const amountPoolAsset = useMemo(() => {
