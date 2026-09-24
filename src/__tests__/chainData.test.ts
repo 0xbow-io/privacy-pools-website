@@ -1,7 +1,30 @@
 import { describe, expect, it } from '@jest/globals';
-import { chainData, type ChainAssets } from '~/config/chainData';
+import { chainData, getBrevisAspLeavesConfig, type ChainAssets } from '~/config/chainData';
 
 describe('Chain Data Configuration', () => {
+  describe('getBrevisAspLeavesConfig', () => {
+    const pools = Object.values(chainData).flatMap((chain) => chain.poolInfo);
+    const brevisEntrypoints = new Set(
+      pools
+        .filter((p) => p.externalAsp?.provider === 'brevis')
+        .map((p) => `${p.chainId}:${p.entryPointAddress.toLowerCase()}`),
+    );
+
+    it('merges Brevis leaves for every pool sharing an entrypoint with a Brevis pool', () => {
+      pools.forEach((pool) => {
+        const shared = brevisEntrypoints.has(`${pool.chainId}:${pool.entryPointAddress.toLowerCase()}`);
+        expect(getBrevisAspLeavesConfig(pool)?.provider).toBe(shared ? 'brevis' : undefined);
+      });
+    });
+
+    it('covers the BSC BNB pool, which has no externalAsp of its own', () => {
+      const bnb = chainData[56]?.poolInfo.find((p) => p.asset === 'BNB');
+      if (!bnb) return;
+      expect(bnb.externalAsp).toBeUndefined();
+      expect(getBrevisAspLeavesConfig(bnb)?.provider).toBe('brevis');
+    });
+  });
+
   describe('isStableAsset Property', () => {
     // Define which assets should be marked as stable assets
     const expectedStableAssets: ChainAssets[] = ['USDT', 'USDC', 'USDS', 'sUSDS', 'DAI'];

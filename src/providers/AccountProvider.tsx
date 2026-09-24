@@ -2,7 +2,7 @@
 
 import { createContext, SetStateAction, Dispatch, useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { chainData } from '~/config/chainData';
+import { chainData, getBrevisAspLeavesConfig } from '~/config/chainData';
 import { getEnv } from '~/config/env';
 import { useChainContext, useNotifications, usePoolAccountsContext } from '~/hooks';
 import { useAccountManager } from '~/hooks/useAccountManager';
@@ -183,7 +183,7 @@ export const AccountProvider = ({ children }: Props) => {
             let canDetermineAbsence = false;
             try {
               if (!chain || !pool) throw new Error('Pool configuration unavailable');
-              const brevisUrl = pool.externalAsp?.provider === 'brevis' ? pool.externalAsp.baseUrl : undefined;
+              const brevisUrl = getBrevisAspLeavesConfig(pool)?.baseUrl;
               const [leaves, brevis] = await Promise.all([
                 queryClient.fetchQuery({
                   queryKey: ['asp_mt_leaves', chainId, scope, chain.aspUrl],

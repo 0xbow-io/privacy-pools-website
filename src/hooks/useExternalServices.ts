@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { getBrevisAspLeavesConfig } from '~/config/chainData';
 import { useASP, useRelayer, useChainContext } from '~/hooks';
 
 export const useExternalServices = () => {
@@ -18,7 +19,12 @@ export const useExternalServices = () => {
 
   const relayerData = useRelayer();
 
-  const aspData = useASP(chainId, selectedPoolInfo.scope.toString(), aspUrl, selectedPoolInfo.externalAsp);
+  const aspData = useASP(
+    chainId,
+    selectedPoolInfo.scope.toString(),
+    aspUrl,
+    getBrevisAspLeavesConfig(selectedPoolInfo),
+  );
 
   const isLoading = aspData.isLoading || relayerData.isQuoteLoading;
 
