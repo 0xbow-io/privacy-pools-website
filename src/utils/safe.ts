@@ -1,7 +1,8 @@
 'use client';
 
 import SafeAppsSDK, { SafeInfo, TransactionStatus } from '@safe-global/safe-apps-sdk';
-import { type Address, encodeFunctionData, parseAbi } from 'viem';
+import { type Address } from 'viem';
+import { buildApprovalCalls } from './allowance';
 
 export type SafeAccountType = 'Not Safe' | 'Safe App' | 'Safe WalletConnect' | 'Unknown';
 
@@ -92,25 +93,19 @@ export const createSafeBatchTransaction = (
   _vettingFeeBPS: bigint,
   depositTarget: Address,
   depositData: `0x${string}`,
+  currentAllowance = 0n,
 ) => {
   // Calculate the approval amount (just the deposit amount, not including fee)
   const approvalAmount = amount;
 
-  // Encode approve call
-  const approveData = encodeFunctionData({
-    abi: parseAbi(['function approve(address spender, uint256 amount) external returns (bool)']),
-    functionName: 'approve',
-    args: [spenderAddress, approvalAmount],
-  });
-
   // Create Safe transaction format
   const transactions = [
-    {
+    ...buildApprovalCalls(spenderAddress, approvalAmount, currentAllowance).map((data) => ({
       to: tokenAddress,
       value: '0',
-      data: approveData,
+      data,
       operation: 0, // 0 = Call, 1 = DelegateCall
-    },
+    })),
     {
       to: depositTarget,
       value: '0',
