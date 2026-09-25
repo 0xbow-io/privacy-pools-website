@@ -298,7 +298,6 @@ export const useDeposit = () => {
                 BigInt(vettingFeeBPS),
                 getAddress(selectedPoolInfo.entryPointAddress),
                 depositCallData,
-                assetAllowance,
               );
 
               // Send through Safe Apps SDK
