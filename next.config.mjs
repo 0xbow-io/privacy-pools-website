@@ -93,6 +93,25 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // WebAuthn Related Origins (WebAuthn L3 §5.11): lets the V2 app served
+        // from the listed Vercel origins use passkeys scoped to the
+        // privacypools.com RP ID, so a preview and v2.privacypools.com share one
+        // passkey and one account. *.privacypools.com hosts need no entry (the
+        // apex is their registrable-domain suffix). The file has no extension,
+        // so the JSON content type must be set here; clients require it.
+        source: '/.well-known/webauthn',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/json',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=300',
+          },
+        ],
+      },
     ];
   },
 };
