@@ -1,6 +1,7 @@
 'use client';
 
-import { type Address, encodeFunctionData, parseAbi } from 'viem';
+import { type Address } from 'viem';
+import { buildApprovalCalls } from './allowance';
 
 export type AccountType = 'Standard EOA' | 'MetaMask Smart Account' | 'Unknown Smart Account' | 'Unknown';
 
@@ -228,25 +229,19 @@ export const createApprovalDepositBatch = (
   _vettingFeeBPS: bigint,
   depositTarget: Address,
   depositData: `0x${string}`,
+  currentAllowance = 0n,
 ): BatchCall[] => {
   // IMPORTANT: Based on the standard flow in useDeposit.ts line 177,
   // the approval should only be for the deposit amount, not amount + fee
   // The deposit contract handles the fee internally
   const approvalAmount = amount;
 
-  // Encode approve call
-  const approveData = encodeFunctionData({
-    abi: parseAbi(['function approve(address spender, uint256 amount) external returns (bool)']),
-    functionName: 'approve',
-    args: [spenderAddress, approvalAmount],
-  });
-
   return [
-    {
+    ...buildApprovalCalls(spenderAddress, approvalAmount, currentAllowance).map((data) => ({
       to: tokenAddress,
-      data: approveData,
+      data,
       value: '0x0',
-    },
+    })),
     {
       to: depositTarget,
       data: depositData,

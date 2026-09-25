@@ -16,6 +16,7 @@ import { getConfig } from '~/config';
 import { useChainContext, useAccountContext, useNotifications, usePoolAccountsContext } from '~/hooks';
 import { Hash, ModalType, Secret } from '~/types';
 import { depositEventAbi, decodeEventsFromReceipt, createDepositSecrets, entrypointAbi, poolDecimals } from '~/utils';
+import { needsAllowanceReset } from '~/utils/allowance';
 import {
   createAlternativeTokenDepositBatch,
   checkAlternativeTokenBalance,
@@ -436,6 +437,7 @@ export const useDeposit = () => {
                 BigInt(vettingFeeBPS),
                 getAddress(selectedPoolInfo.entryPointAddress),
                 depositCallData,
+                assetAllowance,
               );
 
               // Send batch transaction using MetaMask Smart Account API
@@ -469,17 +471,13 @@ export const useDeposit = () => {
                 throw new Error(`No receipts found. Status: ${batchStatus.status}`);
               }
 
-              // Check if we have 1 or 2 receipts and handle accordingly
-              let depositReceipt;
-              if (batchStatus.receipts.length === 1) {
-                // Single receipt might contain both transactions
-                depositReceipt = batchStatus.receipts[0];
-              } else if (batchStatus.receipts.length === 2) {
-                // Two receipts - deposit is the second one
-                depositReceipt = batchStatus.receipts[1];
-              } else {
+              // One receipt when the batch is atomic, otherwise one per call
+              // (an allowance reset adds a call). The deposit is always last.
+              const expectedCalls = batchCalls.length;
+              if (batchStatus.receipts.length !== 1 && batchStatus.receipts.length !== expectedCalls) {
                 throw new Error(`Unexpected number of receipts: ${batchStatus.receipts.length}`);
               }
+              const depositReceipt = batchStatus.receipts[batchStatus.receipts.length - 1];
 
               hash = depositReceipt.transactionHash as ViemHash;
 
@@ -488,20 +486,31 @@ export const useDeposit = () => {
           } else {
             // Standard flow - check allowance and approve if needed
             if (assetAllowance < value) {
-              addNotification('info', 'Allowance insufficient. Requesting approval...');
-              const approveHash = await wc!.writeContract({
-                address: selectedPoolInfo.assetAddress,
-                abi: erc20Abi,
-                functionName: 'approve',
-                args: [selectedPoolInfo.entryPointAddress, value],
-                account: address,
-              });
+              // Tokens like USDT refuse to move a non-zero allowance to another
+              // non-zero value, so a leftover partial allowance is zeroed first.
+              const approvals = needsAllowanceReset(assetAllowance, value) ? [0n, value] : [value];
+              addNotification(
+                'info',
+                approvals.length > 1
+                  ? 'Resetting the old allowance, then requesting approval...'
+                  : 'Allowance insufficient. Requesting approval...',
+              );
+              for (const approvalAmount of approvals) {
+                const approveHash = await wc!.writeContract({
+                  address: selectedPoolInfo.assetAddress,
+                  abi: erc20Abi,
+                  functionName: 'approve',
+                  args: [selectedPoolInfo.entryPointAddress, approvalAmount],
+                  account: address,
+                });
 
-              const approvalReceipt = await publicClient.waitForTransactionReceipt({
-                hash: approveHash,
-                timeout: 180_000, // 3 minutes timeout for approval transactions
-              });
-              if (!approvalReceipt) throw new Error('Approval receipt not found');
+                const approvalReceipt = await publicClient.waitForTransactionReceipt({
+                  hash: approveHash,
+                  timeout: 180_000, // 3 minutes timeout for approval transactions
+                });
+                if (!approvalReceipt) throw new Error('Approval receipt not found');
+                if (approvalReceipt.status !== 'success') throw new Error('Approval transaction reverted');
+              }
             }
 
             const { request } = await publicClient
