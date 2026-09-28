@@ -3,10 +3,11 @@ import { Stack, styled, Typography } from '@mui/material';
 import { formatUnits, parseUnits } from 'viem';
 import { usePoolAccountsContext, useChainContext, useAccountContext } from '~/hooks';
 import { EventType } from '~/types';
-import { poolDecimals } from '~/utils';
+import { poolDecimals, successPoolAccount } from '~/utils';
 
 export const ValueSection = () => {
-  const { amount, poolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
+  const { amount, poolAccount, completedPoolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
+  const spentAccount = successPoolAccount(actionType, completedPoolAccount, poolAccount);
   const { poolAccounts } = useAccountContext();
   const { balanceBN, selectedPoolInfo } = useChainContext();
   const decimals = poolDecimals(selectedPoolInfo, balanceBN);
@@ -14,7 +15,7 @@ export const ValueSection = () => {
 
   const paText = actionType === EventType.DEPOSIT ? 'To pool account' : 'From pool account';
   const paName =
-    actionType === EventType.DEPOSIT ? `PA-${poolAccounts[poolAccounts.length - 1]?.name}` : `PA-${poolAccount?.name}`;
+    actionType === EventType.DEPOSIT ? `PA-${poolAccounts[poolAccounts.length - 1]?.name}` : `PA-${spentAccount?.name}`;
 
   const isDeposit = actionType === EventType.DEPOSIT;
 
@@ -24,9 +25,9 @@ export const ValueSection = () => {
   const formattedTotalAmount = formatUnits(totalAmountBN, decimals);
 
   const remainingBalance = useMemo(() => {
-    const pa = poolAccounts.find((pa) => pa.label === poolAccount?.label);
+    const pa = poolAccounts.find((pa) => pa.label === spentAccount?.label);
     return formatUnits(pa?.balance ?? BigInt(0), decimals);
-  }, [poolAccount, poolAccounts, decimals]);
+  }, [spentAccount, poolAccounts, decimals]);
 
   return (
     <Container>
