@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.3] - 2026-09-29
+
+### Changed
+
+- "Continue with Wallet" key generation is available for EOA signers (including EIP-7702 accounts). Other account types use manual seedphrase setup, and the wallet type check runs on the wallet's own network (#253)
+
 ## [2.15.1] - 2026-09-11
 
 ### Changed
