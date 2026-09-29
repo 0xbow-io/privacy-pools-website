@@ -1,7 +1,8 @@
 'use client';
 
 import SafeAppsSDK, { SafeInfo, TransactionStatus } from '@safe-global/safe-apps-sdk';
-import { type Address, encodeFunctionData, parseAbi } from 'viem';
+import { type Address } from 'viem';
+import { buildApprovalCalls } from './allowance';
 
 export type SafeAccountType = 'Not Safe' | 'Safe App' | 'Safe WalletConnect' | 'Unknown';
 
@@ -76,6 +77,32 @@ export const detectSafeEnvironment = async (): Promise<{
 };
 
 /**
+ * The approval + deposit calls of a Safe token deposit. The single source for
+ * both the Safe Apps hook (useSafeTransactions) and createSafeBatchTransaction.
+ *
+ * A multi-sig Safe transaction can execute long after it is proposed, so the
+ * allowance read at proposal time says nothing about the allowance at
+ * execution. The allowance is always zeroed first: `approve(0)` never reverts,
+ * and it keeps USDT's non-zero to non-zero revert out of the batch whatever
+ * happened in between.
+ */
+export const buildSafeApprovalDepositTxs = (
+  tokenAddress: Address,
+  spenderAddress: Address,
+  amount: bigint,
+  depositTarget: Address,
+  depositData: `0x${string}`,
+): { to: Address; value: string; data: `0x${string}` }[] => [
+  // Approve just the deposit amount, not including fee
+  ...buildApprovalCalls(spenderAddress, amount, 0n, { alwaysReset: true }).map((data) => ({
+    to: tokenAddress,
+    value: '0',
+    data,
+  })),
+  { to: depositTarget, value: '0', data: depositData },
+];
+
+/**
  * Creates a batch transaction for Safe wallets
  * @param tokenAddress The ERC20 token address
  * @param spenderAddress The address to approve (entry point)
@@ -92,35 +119,11 @@ export const createSafeBatchTransaction = (
   _vettingFeeBPS: bigint,
   depositTarget: Address,
   depositData: `0x${string}`,
-) => {
-  // Calculate the approval amount (just the deposit amount, not including fee)
-  const approvalAmount = amount;
-
-  // Encode approve call
-  const approveData = encodeFunctionData({
-    abi: parseAbi(['function approve(address spender, uint256 amount) external returns (bool)']),
-    functionName: 'approve',
-    args: [spenderAddress, approvalAmount],
-  });
-
-  // Create Safe transaction format
-  const transactions = [
-    {
-      to: tokenAddress,
-      value: '0',
-      data: approveData,
-      operation: 0, // 0 = Call, 1 = DelegateCall
-    },
-    {
-      to: depositTarget,
-      value: '0',
-      data: depositData,
-      operation: 0,
-    },
-  ];
-
-  return transactions;
-};
+) =>
+  buildSafeApprovalDepositTxs(tokenAddress, spenderAddress, amount, depositTarget, depositData).map((tx) => ({
+    ...tx,
+    operation: 0, // 0 = Call, 1 = DelegateCall
+  }));
 
 /**
  * Sends a batch transaction using Safe Apps SDK

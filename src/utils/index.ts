@@ -21,3 +21,4 @@ export * from './blockTimestamps';
 export * from './relayedReceipt';
 export * from './quotePhases';
 export * from './priceFreshness';
+export * from './successPoolAccount';

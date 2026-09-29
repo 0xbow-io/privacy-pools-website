@@ -91,6 +91,7 @@ export const useWithdraw = () => {
     setTransactionHash,
     feeCommitment,
     feeBPSForWithdraw,
+    setCompletedPoolAccount,
   } = usePoolAccountsContext();
 
   const commitment = poolAccount?.lastCommitment;
@@ -495,6 +496,8 @@ export const useWithdraw = () => {
             timestamp: receipt.timestamp ?? nowSeconds(),
           });
 
+          // The live selection moves off this account once its balance changes.
+          setCompletedPoolAccount(poolAccount);
           setModalOpen(ModalType.SUCCESS);
         } catch (err) {
           const error = err as TransactionExecutionError;
@@ -519,6 +522,7 @@ export const useWithdraw = () => {
         setModalOpen(ModalType.PROCESSING);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
+        setCompletedPoolAccount(poolAccount);
         setModalOpen(ModalType.SUCCESS);
       }
       setIsLoading(false);
@@ -545,6 +549,7 @@ export const useWithdraw = () => {
       setModalOpen,
       addWithdrawal,
       poolAccount,
+      setCompletedPoolAccount,
       getPrivacyPoolErrorMessage,
       logErrorToSentry,
       addNotification,

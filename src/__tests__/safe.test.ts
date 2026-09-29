@@ -150,7 +150,7 @@ describe('Safe Wallet Detection', () => {
         depositData,
       );
 
-      expect(transactions).toHaveLength(2);
+      expect(transactions).toHaveLength(3); // approve(0), approve(amount), deposit
 
       // Check approve transaction
       expect(transactions[0].to).toBe(tokenAddress);
@@ -159,10 +159,10 @@ describe('Safe Wallet Detection', () => {
       expect(transactions[0].operation).toBe(0); // CALL operation
 
       // Check deposit transaction
-      expect(transactions[1].to).toBe(depositTarget);
-      expect(transactions[1].value).toBe('0');
-      expect(transactions[1].data).toBe(depositData);
-      expect(transactions[1].operation).toBe(0);
+      expect(transactions[2].to).toBe(depositTarget);
+      expect(transactions[2].value).toBe('0');
+      expect(transactions[2].data).toBe(depositData);
+      expect(transactions[2].operation).toBe(0);
     });
 
     it('should encode approve function correctly', () => {
