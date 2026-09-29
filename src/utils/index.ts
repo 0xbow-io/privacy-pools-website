@@ -15,6 +15,7 @@ export * from './sdk';
 export * from './withdraw';
 export * from './seedPhrase';
 export * from './walletSeed';
+export * from './seedSignature';
 export * from './clipboard';
 export * from './eip7702';
 export * from './blockTimestamps';

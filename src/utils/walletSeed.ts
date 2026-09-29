@@ -9,8 +9,8 @@
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { hexToBytes } from '@noble/hashes/utils.js';
-import { keccak256, toBytes } from 'viem';
 import { english } from 'viem/accounts';
+import { assertSeedSignatureLength, assertSignedByAddress, buildSeedDerivationTypedData } from './seedSignature';
 
 const textEncoder = new TextEncoder();
 
@@ -44,8 +44,14 @@ export async function deriveMnemonicFromWalletSignature(
 ): Promise<string> {
   // Decode signature and extract r (first 32 bytes)
   const cleanHex = signatureHex.startsWith('0x') ? signatureHex.slice(2) : signatureHex;
+  // Only a signature the connected EOA itself made may become the seed (seedSignature.ts).
+  await assertSignedByAddress(
+    buildSeedDerivationTypedData(address, version),
+    `0x${cleanHex}`,
+    address as `0x${string}`,
+  );
   const sig = hexToBytes(cleanHex);
-  if (sig.length < 65) throw new Error('Invalid signature length');
+  assertSeedSignatureLength(sig);
   const r = sig.slice(0, 32); // IKM for HKDF-Extract
 
   // Salt is the raw address bytes (A_secret)
@@ -71,24 +77,4 @@ export async function deriveMnemonicFromWalletSignature(
   entropy.fill(0);
 
   return mnemonic;
-}
-
-// Build the EIP-712 typed data for seed derivation, committing to keccak256(address).
-export function buildSeedDerivationTypedData(address: string, version: 'v1' | 'v2' = 'v2') {
-  const addrBytes = toBytes(address as `0x${string}`);
-  const addressHash = keccak256(addrBytes);
-  const domain = { name: 'Privacy Pools', version: '1' } as const;
-  const types = {
-    DeriveSeed: [
-      { name: 'action', type: 'string' },
-      { name: 'context', type: 'string' },
-      { name: 'addressHash', type: 'bytes32' },
-    ],
-  } as const;
-  const message = {
-    action: 'Derive Account Seed',
-    context: `privacy-pools/wallet-seed:${version}`,
-    addressHash: addressHash as `0x${string}`,
-  } as const;
-  return { domain, types, message, primaryType: 'DeriveSeed' as const };
 }
