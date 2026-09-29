@@ -14,13 +14,20 @@ interface BytecodeProvider {
   getBytecode: (args: { address: Address }) => Promise<string | undefined>;
 }
 
+// EIP-7702 delegation designator: exactly 0xef0100 || 20-byte address (23 bytes). The account
+// is still an EOA that signs with its own key, so it is not a contract wallet for key generation.
+const EIP7702_DELEGATION = /^0xef0100[0-9a-f]{40}$/i;
+
+export const isContractCode = (code: string | undefined): boolean =>
+  code !== undefined && code !== '0x' && code.length > 2 && !EIP7702_DELEGATION.test(code);
+
 /**
  * Detects if an address is a smart contract by checking bytecode
  */
 export const isSmartContract = async (address: Address, provider: BytecodeProvider): Promise<boolean> => {
   try {
     const code = await provider.getBytecode({ address });
-    return code !== undefined && code !== '0x' && code.length > 2;
+    return isContractCode(code);
   } catch (error) {
     console.error('Error checking bytecode:', error);
     return false;
@@ -28,13 +35,13 @@ export const isSmartContract = async (address: Address, provider: BytecodeProvid
 };
 
 /**
- * Comprehensive smart wallet detection
+ * Comprehensive smart wallet detection.
+ * Returns 'Unknown' when the bytecode read fails, so callers can fail closed.
  */
 export const detectSmartWalletType = async (address: Address, provider: BytecodeProvider): Promise<SmartWalletType> => {
   try {
-    // First check if it's a smart contract
-    const isContract = await isSmartContract(address, provider);
-    if (!isContract) {
+    const code = await provider.getBytecode({ address });
+    if (!isContractCode(code)) {
       return 'Standard EOA';
     }
 
