@@ -22,3 +22,4 @@ export * from './WithdrawAssetSelect';
 export * from './NewsletterSubscriptionModal';
 export * from './SafeApp';
 export * from './FeatureFlagInitializer';
+export * from './V2InviteBanner';
