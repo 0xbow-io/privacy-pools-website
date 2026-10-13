@@ -3,7 +3,8 @@
 import { useCallback } from 'react';
 import { useSafeAppsSDK } from '@safe-global/safe-apps-react-sdk';
 import { BaseTransaction } from '@safe-global/safe-apps-sdk';
-import { type Address, encodeFunctionData, parseAbi } from 'viem';
+import { type Address } from 'viem';
+import { buildSafeApprovalDepositTxs } from '~/utils/safe';
 
 export interface SafeBatchTransaction {
   to: Address;
@@ -22,29 +23,8 @@ export const useSafeTransactions = () => {
       _vettingFeeBPS: bigint,
       depositTarget: Address,
       depositData: `0x${string}`,
-    ): BaseTransaction[] => {
-      // Create approval transaction
-      const approveData = encodeFunctionData({
-        abi: parseAbi(['function approve(address spender, uint256 amount) external returns (bool)']),
-        functionName: 'approve',
-        args: [spenderAddress, amount],
-      });
-
-      const transactions: BaseTransaction[] = [
-        {
-          to: tokenAddress,
-          value: '0',
-          data: approveData,
-        },
-        {
-          to: depositTarget,
-          value: '0',
-          data: depositData,
-        },
-      ];
-
-      return transactions;
-    },
+    ): BaseTransaction[] =>
+      buildSafeApprovalDepositTxs(tokenAddress, spenderAddress, amount, depositTarget, depositData),
     [],
   );
 

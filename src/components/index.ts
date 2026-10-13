@@ -3,6 +3,7 @@ export * from './BackButton';
 export * from './ChainFilterSelect';
 export * from './DottedMenu';
 export * from './SignInButton';
+export * from './CustomRpcButton';
 export * from './LayoutComponents';
 export * from './Menu';
 export * from './NotificationToast';

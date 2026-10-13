@@ -2,35 +2,41 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { FeeCommitment } from '~/types';
+import { PRICE_FRESHNESS_WINDOW_S, priceSecondsLeft } from '~/utils/priceFreshness';
+import { PriceQuote } from '~/utils/quotePhases';
 
 interface QuoteState {
+  // Phase 2 only: the signed commitment obtained on Confirm.
   quoteCommitment: FeeCommitment | null;
+  // Seconds left on whichever is current: the price freshness window while
+  // reviewing, the commitment's window once Confirm has been clicked.
+  countdown: number;
+  isExpired: boolean;
+  // Phase 1: the price shown on the review step and when it was stored.
   feeBPS: number | null;
   baseFeeBPS: number | null;
   extraGasAmountETH: string | null;
   relayTxCostETH: string | null;
-  countdown: number;
-  isExpired: boolean;
+  priceStoredAt: number | null;
   extraGas: boolean;
-  quotedAmount: string | null; // The amount used when the quote was requested
-  quotedRelayerUrl: string | null; // The relayer that produced the quote
-  pendingQuoteRequest: boolean; // Flag to trigger quote request when Review screen opens
+  quotedAmount: string | null; // The amount used when the price was requested
+  quotedRelayerUrl: string | null; // The relayer that produced the price
+  pendingQuoteRequest: boolean; // Flag to trigger the price request when Review screen opens
 }
 
 interface QuoteContextType {
   quoteState: QuoteState;
+  setPriceData: (price: PriceQuote, quotedAmount: string, quotedRelayerUrl: string) => void;
   setQuoteData: (
     commitment: FeeCommitment,
-    feeBPS: number,
-    baseFeeBPS: number,
-    extraGasAmountETH: string | null,
-    relayTxCostETH: string | null,
+    price: PriceQuote,
     countdown: number,
     quotedAmount: string,
     quotedRelayerUrl: string,
   ) => void;
   updateCountdown: (countdown: number) => void;
   resetQuote: () => void;
+  clearCommitment: () => void;
   markAsExpired: () => void;
   setExtraGas: (extraGas: boolean) => void;
   requestQuote: () => void;
@@ -46,6 +52,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     baseFeeBPS: null,
     extraGasAmountETH: null,
     relayTxCostETH: null,
+    priceStoredAt: null,
     countdown: 0,
     isExpired: false,
     extraGas: false,
@@ -54,29 +61,47 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     pendingQuoteRequest: false,
   });
 
+  // Phase 1: store the price and start its freshness window; any earlier
+  // commitment no longer matches it.
+  const setPriceData = useCallback((price: PriceQuote, quotedAmount: string, quotedRelayerUrl: string) => {
+    setQuoteState((prev) => ({
+      quoteCommitment: null,
+      feeBPS: price.feeBPS,
+      baseFeeBPS: price.baseFeeBPS,
+      extraGasAmountETH: price.extraGasAmountETH,
+      relayTxCostETH: price.relayTxCostETH,
+      priceStoredAt: Date.now(),
+      countdown: PRICE_FRESHNESS_WINDOW_S,
+      isExpired: false,
+      extraGas: prev.extraGas, // Preserve current extraGas setting
+      quotedAmount,
+      quotedRelayerUrl,
+      pendingQuoteRequest: false, // Clear pending request when the price is set
+    }));
+  }, []);
+
+  // Phase 2: store the commitment together with the price it was signed for.
   const setQuoteData = useCallback(
     (
       commitment: FeeCommitment,
-      feeBPS: number,
-      baseFeeBPS: number,
-      extraGasAmountETH: string | null,
-      relayTxCostETH: string | null,
+      price: PriceQuote,
       countdown: number,
       quotedAmount: string,
       quotedRelayerUrl: string,
     ) => {
       setQuoteState((prev) => ({
         quoteCommitment: commitment,
-        feeBPS,
-        baseFeeBPS,
-        extraGasAmountETH,
-        relayTxCostETH,
+        feeBPS: price.feeBPS,
+        baseFeeBPS: price.baseFeeBPS,
+        extraGasAmountETH: price.extraGasAmountETH,
+        relayTxCostETH: price.relayTxCostETH,
+        priceStoredAt: Date.now(),
         countdown,
         isExpired: countdown <= 0, // Mark as expired immediately if countdown is already 0 (e.g., clock skew)
         extraGas: prev.extraGas, // Preserve current extraGas setting
         quotedAmount,
         quotedRelayerUrl,
-        pendingQuoteRequest: false, // Clear pending request when quote is set
+        pendingQuoteRequest: false,
       }));
     },
     [],
@@ -86,7 +111,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     setQuoteState((prev) => ({
       ...prev,
       countdown,
-      isExpired: countdown <= 0 && prev.quoteCommitment !== null,
+      isExpired: countdown <= 0 && (prev.quoteCommitment !== null || prev.priceStoredAt !== null),
     }));
   }, []);
 
@@ -97,6 +122,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       baseFeeBPS: null,
       extraGasAmountETH: null,
       relayTxCostETH: null,
+      priceStoredAt: null,
       countdown: 0,
       isExpired: false,
       extraGas: prev.extraGas, // Preserve extraGas setting when resetting quote
@@ -104,6 +130,16 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       quotedRelayerUrl: null,
       pendingQuoteRequest: prev.pendingQuoteRequest, // Preserve pending request state
     }));
+  }, []);
+
+  // Drop a commitment while keeping the price on screen; the countdown goes
+  // back to what is left of the price's freshness window.
+  const clearCommitment = useCallback(() => {
+    setQuoteState((prev) => {
+      if (prev.quoteCommitment === null) return prev;
+      const countdown = priceSecondsLeft(prev.priceStoredAt);
+      return { ...prev, quoteCommitment: null, countdown, isExpired: countdown <= 0 && prev.priceStoredAt !== null };
+    });
   }, []);
 
   const markAsExpired = useCallback(() => {
@@ -139,9 +175,11 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
     <QuoteContext.Provider
       value={{
         quoteState,
+        setPriceData,
         setQuoteData,
         updateCountdown,
         resetQuote,
+        clearCommitment,
         markAsExpired,
         setExtraGas,
         requestQuote,

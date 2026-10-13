@@ -5,17 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useAuthContext } from '~/hooks';
 import { ROUTER } from '~/utils';
 
+// Create/load an account needs no wallet: the seed is the account. Only a
+// user who already has a session is sent home.
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLogged, isConnected } = useAuthContext();
+  const { isLogged } = useAuthContext();
 
   useEffect(() => {
-    if (isLogged || !isConnected) {
+    if (isLogged) {
       router.replace(ROUTER.home.base);
     }
-  }, [isLogged, isConnected, router]);
+  }, [isLogged, router]);
 
-  if (isLogged || !isConnected) return null;
+  if (isLogged) return null;
 
   return children;
 }

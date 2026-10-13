@@ -6,6 +6,7 @@ import { useAccount } from 'wagmi';
 import { BaseModal } from '~/components';
 import { useModal, usePoolAccountsContext, useChainContext } from '~/hooks';
 import { EventType, ModalType } from '~/types';
+import { poolDecimals } from '~/utils';
 import { LinksSection } from '../LinksSection';
 
 export const ExitConfirmModal = () => {
@@ -20,9 +21,8 @@ const ExitConfirmForm = () => {
   const { address } = useAccount();
   const { setModalOpen } = useModal();
   const { poolAccount, setTarget, setAmount, setActionType } = usePoolAccountsContext();
-  const {
-    balanceBN: { decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
 
   const handleConfirmExit = () => {
     if (!poolAccount || !address) return;

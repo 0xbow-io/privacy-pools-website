@@ -1,9 +1,8 @@
 'use client';
 
-import { ChangeEvent, FocusEventHandler, useCallback, useMemo, useState, useEffect } from 'react';
+import { ChangeEvent, useCallback, useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Copy, Checkmark } from '@carbon/icons-react';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import {
   Box,
@@ -16,21 +15,25 @@ import {
   Stack,
   styled,
   TextField,
-  Avatar,
-  Tooltip,
   Typography,
-  useTheme,
 } from '@mui/material';
 import { Address, formatUnits, isAddress, parseUnits } from 'viem';
-import { useEnsAddress, useEnsAvatar, useEnsName, useSwitchChain } from 'wagmi';
+import { useSwitchChain } from 'wagmi';
 import { chainData, allPoolsChainData } from '~/config';
-import { getAspEndpointForChain } from '~/config/env';
 import { ChainTokenSelectorDropdown } from '~/containers/ChainTokenSelector';
 import { ModalContainer, ModalTitle } from '~/containers/Modals/Deposit';
 import { useQuoteContext } from '~/contexts/QuoteContext';
-import { useChainContext, useAccountContext, useModal, usePoolAccountsContext, useNotifications } from '~/hooks';
+import {
+  useChainContext,
+  useAccountContext,
+  useModal,
+  usePoolAccountsContext,
+  useNotifications,
+  useExternalServices,
+  useAuthContext,
+} from '~/hooks';
 import { ModalType, ReviewStatus } from '~/types';
-import { aspClient, getUsdBalance, relayerClient, truncateAddress, useClipboard } from '~/utils';
+import { countDepositsAtLeast, getUsdBalance, relayerClient, poolDecimals } from '~/utils';
 import { LinksSection } from '../LinksSection';
 import { AmountInputSection } from './AmountInputSection';
 import { PoolAccountSelectorSection } from './PoolAccountSelectorSection';
@@ -41,12 +44,11 @@ const minWithdrawCache = new Map<string, string>();
 export const WithdrawForm = () => {
   const { setModalOpen } = useModal();
   const { addNotification } = useNotifications();
-  const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
 
   const {
-    balanceBN: { symbol, decimals: balanceDecimals },
+    balanceBN: { symbol: balanceSymbol, decimals: balanceDecimals },
     selectedPoolInfo,
     chainId,
     selectedRelayer,
@@ -60,12 +62,17 @@ export const WithdrawForm = () => {
   const { amount, setAmount, target, setTarget, poolAccount, setPoolAccount, setFeeCommitment, setFeeBPSForWithdraw } =
     usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();
+  const {
+    aspData: { depositAmountsData, isLoading: isLoadingAsp },
+  } = useExternalServices();
   const { setExtraGas, requestQuote, resetQuote } = useQuoteContext();
   const { switchChainAsync } = useSwitchChain();
+  const { hasWallet } = useAuthContext();
 
   const [tokenSelectorAnchor, setTokenSelectorAnchor] = useState<HTMLElement | null>(null);
 
-  const decimals = selectedPoolInfo?.assetDecimals ?? balanceDecimals ?? 18;
+  const decimals = poolDecimals(selectedPoolInfo, { decimals: balanceDecimals });
+  const symbol = selectedPoolInfo?.asset ?? balanceSymbol;
 
   // Filter pool accounts by current chain, pool scope, balance > 0, and APPROVED status
   const filteredPoolAccounts = useMemo(() => {
@@ -78,132 +85,21 @@ export const WithdrawForm = () => {
     );
   }, [poolAccounts, chainId, selectedPoolInfo?.scope]);
 
-  // Auto-select the first pool account when filtered list changes and no account is selected
-  // All filtered accounts are already approved, so just pick the first one
-  useEffect(() => {
-    const currentAccountStillValid = poolAccount && filteredPoolAccounts.some((pa) => pa.name === poolAccount.name);
-    if (!currentAccountStillValid && filteredPoolAccounts.length > 0) {
-      setPoolAccount(filteredPoolAccounts[0]);
-    }
-  }, [filteredPoolAccounts, poolAccount, setPoolAccount]);
-
   // New state for minimum withdrawal amount and warning
   const [minWithdrawAmount, setMinWithdrawAmount] = useState<bigint | null>(null);
   const [isLoadingMinAmount, setIsLoadingMinAmount] = useState(false);
   const [targetAddressHasError, setTargetAddressHasError] = useState(false);
   const [receiveGasToken, setReceiveGasToken] = useState(false);
 
-  // Anonymity set state
-  const [anonymitySet, setAnonymitySet] = useState<number | null>(null);
-  const [isLoadingAnonymitySet, setIsLoadingAnonymitySet] = useState(false);
-
-  // Reset state when pool changes
+  // Reset state when pool changes. The anonymity set needs no reset: it is
+  // derived from the entered amount and this pool's own feeds, both of which
+  // are already keyed by scope.
   useEffect(() => {
     setMinWithdrawAmount(null);
-    setAnonymitySet(null);
   }, [selectedPoolInfo?.scope]);
-
-  // ENS-related state
-  const [inputValue, setInputValue] = useState<string>(target);
-  const [ensName, setEnsName] = useState<string | null>(null);
-
-  // Restore target when cleared externally (e.g. by PoolAccountsProvider on asset change)
-  // but the user's inputValue still holds a valid address
-  useEffect(() => {
-    if (target === '' && inputValue && isAddress(inputValue)) {
-      setTarget(inputValue as Address);
-    }
-  }, [target, inputValue, setTarget]);
-
-  // Clipboard for copying resolved address
-  const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
-
-  // Handle copying resolved address
-  const handleCopyResolvedAddress = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    copyToClipboard(target);
-  };
-
-  // Resolved address display component
-  const ResolvedAddressDisplay = () => (
-    <Box component='span' sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-      <span>Resolved to: {truncateAddress(target)}</span>
-      <Tooltip title={`${target} (Click to copy)`}>
-        <Box
-          component='span'
-          onClick={handleCopyResolvedAddress}
-          sx={{
-            ml: 0.5,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-          }}
-        >
-          {copied ? (
-            <Checkmark size={12} color={theme.palette.text.disabled} />
-          ) : (
-            <Copy size={12} color={theme.palette.text.disabled} />
-          )}
-        </Box>
-      </Tooltip>
-    </Box>
-  );
 
   const balanceFormatted = formatUnits(poolAccount?.balance ?? BigInt(0), decimals);
   const balanceUSD = getUsdBalance(currentPrice, balanceFormatted, decimals);
-
-  // ENS hooks
-  const isEnsName = useMemo(() => {
-    // Must have at least one dot followed by 3+ characters
-    const dotIndex = inputValue.lastIndexOf('.');
-    if (dotIndex === -1) return false; // No dot found
-
-    const tld = inputValue.slice(dotIndex + 1);
-    return tld.length >= 3; // At least 3 characters after the dot
-  }, [inputValue]);
-
-  const normalizedName = useMemo(() => {
-    if (!isEnsName) return undefined;
-    // Simple normalization - just lowercase and trim
-    return inputValue.toLowerCase().trim();
-  }, [isEnsName, inputValue]);
-
-  const {
-    data: ensAddress,
-    isLoading: isLoadingEnsAddress,
-    error: ensError,
-  } = useEnsAddress({
-    name: normalizedName,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  const { data: ensAvatar } = useEnsAvatar({
-    name: normalizedName,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  const { data: reverseEnsName } = useEnsName({
-    address: isAddress(target) ? target : undefined,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  // Effect to handle ENS resolution
-  useEffect(() => {
-    if (isEnsName && ensAddress) {
-      setTarget(ensAddress as Address);
-      setTargetAddressHasError(false);
-      setEnsName(inputValue);
-      addNotification('success', `ENS name resolved to ${truncateAddress(ensAddress)}`);
-    } else if (isEnsName && !isLoadingEnsAddress && !ensAddress && normalizedName) {
-      if (ensError) {
-        console.error('ENS Resolution Error:', ensError);
-        addNotification('error', `ENS resolution failed: ${ensError.message || 'Unknown error'}`);
-      } else {
-        addNotification('error', `Could not resolve ENS name: ${inputValue}`);
-      }
-      setTargetAddressHasError(true);
-    }
-  }, [ensAddress, isEnsName, isLoadingEnsAddress, inputValue, normalizedName, ensError, setTarget, addNotification]);
 
   const amountBN = useMemo(() => {
     try {
@@ -276,36 +172,14 @@ export const WithdrawForm = () => {
     }
   }, [amount, fetchMinWithdrawAmount, minWithdrawAmount, isLoadingMinAmount]);
 
-  // Fetch anonymity set when amount changes
-  useEffect(() => {
-    const fetchAnonymitySet = async () => {
-      if (!amountBN || amountBN <= 0n || !selectedPoolInfo?.scope || !chainId) {
-        setAnonymitySet(null);
-        return;
-      }
+  // Counted in the browser against the pool's published amount list, which
+  // useASP loads with the other public feeds. Nothing is fetched from here.
+  const anonymitySet = useMemo(
+    () => countDepositsAtLeast(depositAmountsData?.amounts, amountBN),
+    [amountBN, depositAmountsData?.amounts],
+  );
 
-      setIsLoadingAnonymitySet(true);
-      try {
-        const aspUrl = getAspEndpointForChain(chainId);
-        const response = await aspClient.fetchDepositsLargerThan(
-          aspUrl,
-          chainId,
-          selectedPoolInfo.scope.toString(),
-          amountBN.toString(),
-        );
-        setAnonymitySet(response.eligibleDeposits);
-      } catch (error) {
-        console.error('Failed to fetch anonymity set:', error);
-        setAnonymitySet(null);
-      } finally {
-        setIsLoadingAnonymitySet(false);
-      }
-    };
-
-    // Debounce the fetch to avoid too many requests while typing
-    const timeoutId = setTimeout(fetchAnonymitySet, 500);
-    return () => clearTimeout(timeoutId);
-  }, [amountBN, selectedPoolInfo?.scope, chainId]);
+  const isLoadingAnonymitySet = amountBN > 0n && !!isLoadingAsp;
 
   const isValidAmount = useMemo(() => {
     return amountBN > 0n && amountBN <= (poolAccount?.balance ?? 0n);
@@ -392,58 +266,8 @@ export const WithdrawForm = () => {
 
   const handleTargetAddressChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setInputValue(value);
-
-    // Clear any previous errors when user is typing
-    setTargetAddressHasError(false);
-
-    // If it's a valid address, set it directly
-    if (isAddress(value)) {
-      setTarget(value as Address);
-      setEnsName(null);
-    } else {
-      // Check if it looks like a complete ENS name (dot + 3+ chars)
-      const dotIndex = value.lastIndexOf('.');
-      const isCompleteEns = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
-
-      if (!isCompleteEns) {
-        // If it's not a complete ENS name and not a valid address, clear the target
-        setTarget('' as Address);
-        setEnsName(null);
-      }
-    }
-    // ENS resolution will be handled by the useEffect
-  };
-
-  const handleTargetAddressBlur: FocusEventHandler<HTMLInputElement> = (e) => {
-    const value = e.target.value;
-    if (!value) {
-      setTargetAddressHasError(false);
-      return;
-    }
-
-    // Check if it's a valid address
-    if (isAddress(value)) {
-      setTargetAddressHasError(false);
-      return;
-    }
-
-    // Check if it's a valid ENS name format
-    const dotIndex = value.lastIndexOf('.');
-    const isValidEnsFormat = dotIndex !== -1 && value.slice(dotIndex + 1).length >= 3;
-
-    if (isValidEnsFormat) {
-      // If ENS is resolved or still loading, don't show error
-      if (ensAddress || isLoadingEnsAddress || ensName === value) {
-        setTargetAddressHasError(false);
-      } else {
-        // Only show error if ENS resolution failed
-        setTargetAddressHasError(!ensAddress && !isLoadingEnsAddress);
-      }
-    } else {
-      // Not a valid address or ENS format
-      setTargetAddressHasError(true);
-    }
+    setTarget(value as Address);
+    setTargetAddressHasError(value !== '' && !isAddress(value));
   };
 
   const handleRelayerChange = (e: SelectChangeEvent<unknown>) => {
@@ -466,18 +290,23 @@ export const WithdrawForm = () => {
     const selectedPool = targetChainData.poolInfo.find((p) => p.asset.toLowerCase() === selectedAsset.toLowerCase());
 
     if (selectedPool) {
-      // If selecting a pool from a different chain, trigger a wallet chain switch
+      // If selecting a pool from a different chain, move the wallet with it when there is one.
+      // A withdrawal is relayed, so a seed-only session just changes the app's chain.
       if (selectedChainId !== chainId) {
-        try {
-          addNotification('info', `Switching to ${targetChainData.name}...`);
-          await switchChainAsync({ chainId: selectedChainId });
-          // Update the app's chain context to match the wallet's chain
+        if (hasWallet) {
+          try {
+            addNotification('info', `Switching to ${targetChainData.name}...`);
+            await switchChainAsync({ chainId: selectedChainId });
+            // Update the app's chain context to match the wallet's chain
+            setChainId(selectedChainId);
+            addNotification('success', `Switched to ${targetChainData.name}`);
+          } catch (err) {
+            console.error('Failed to switch chain:', err);
+            addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
+            return; // Don't proceed with asset selection if chain switch failed
+          }
+        } else {
           setChainId(selectedChainId);
-          addNotification('success', `Switched to ${targetChainData.name}`);
-        } catch (err) {
-          console.error('Failed to switch chain:', err);
-          addNotification('error', `Please switch to ${targetChainData.name} to withdraw from this pool`);
-          return; // Don't proceed with asset selection if chain switch failed
         }
       }
 
@@ -505,7 +334,8 @@ export const WithdrawForm = () => {
   const handleWithdraw = useCallback(() => {
     // Set extraGas based on checkbox state
     setExtraGas(receiveGasToken);
-    // Signal that a quote should be requested when Review screen opens
+    // Signal that the price should be requested when Review screen opens.
+    // The recipient goes to the relayer only on Confirm, with the commitment request.
     requestQuote();
     // Go to Review screen
     setModalOpen(ModalType.REVIEW);
@@ -571,7 +401,14 @@ export const WithdrawForm = () => {
           />
         ) : (
           <Typography variant='body2' color='error' sx={{ textAlign: 'center', py: 1 }}>
-            No approved deposits available for withdrawal in this pool. Please wait for your deposits to be approved.
+            {poolAccounts.some(
+              (pa) =>
+                pa.chainId === chainId &&
+                pa.scope === selectedPoolInfo.scope &&
+                pa.reviewStatus === ReviewStatus.UNAVAILABLE,
+            )
+              ? 'Approval status unavailable. Please try again later.'
+              : 'No approved deposits available for withdrawal in this pool. Please wait for your deposits to be approved.'}
           </Typography>
         )}
 
@@ -579,29 +416,14 @@ export const WithdrawForm = () => {
           <Box sx={{ position: 'relative' }}>
             <TextField
               id='target-address'
-              placeholder='Target Address or ENS name'
-              value={inputValue}
+              placeholder='Target Address'
+              value={target}
               error={targetAddressHasError}
               onChange={handleTargetAddressChange}
-              onBlur={handleTargetAddressBlur}
               spellCheck={false}
-              helperText={
-                targetAddressHasError ? (
-                  'Invalid address or ENS name'
-                ) : ensName ? (
-                  <ResolvedAddressDisplay />
-                ) : reverseEnsName ? (
-                  `ENS: ${reverseEnsName}`
-                ) : (
-                  ''
-                )
-              }
+              helperText={targetAddressHasError ? 'Invalid address' : ''}
               data-testid='target-address-input'
               fullWidth
-              InputProps={{
-                startAdornment: ensAvatar ? <Avatar src={ensAvatar} sx={{ width: 24, height: 24, mr: 1 }} /> : null,
-                endAdornment: isLoadingEnsAddress ? <CircularProgress size={20} /> : null,
-              }}
             />
           </Box>
         </FormControl>

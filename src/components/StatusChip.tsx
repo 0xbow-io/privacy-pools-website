@@ -47,6 +47,7 @@ export const SStatusChip = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'status',
 })<{ status: ReviewStatus }>(({ theme, status }) => {
   const statusColorMap = {
+    unavailable: { main: theme.palette.grey[500], light: theme.palette.grey[100] },
     approved: theme.palette.success,
     pending: theme.palette.warning,
     declined: theme.palette.error,

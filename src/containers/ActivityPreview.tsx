@@ -10,12 +10,14 @@ import { ActivityTable } from '~/components';
 import { InfoTooltip } from '~/components/InfoTooltip';
 import { allPoolsChainData, getConfig } from '~/config';
 import { ViewAllButton, ViewAllText } from '~/containers';
-import { useAccountContext, useAdvancedView } from '~/hooks';
+import { useAccountContext, useAdvancedView, useAuthContext } from '~/hooks';
 import { aspClient, ROUTER } from '~/utils';
 
 export const ActivityPreview = () => {
   const { push } = useRouter();
   const { address } = useAccount();
+  // Personal activity comes from the loaded account, so a session is enough.
+  const { hasSession } = useAuthContext();
   const { previewGlobalEvents, isLoading } = useAdvancedView();
   const { historyData: allHistoryData } = useAccountContext();
 
@@ -150,7 +152,7 @@ export const ActivityPreview = () => {
               variant='text'
               onClick={() => setView('personal')}
               active={String(view === 'personal')}
-              disabled={!address}
+              disabled={!address && !hasSession}
             >
               Personal
             </SButton>

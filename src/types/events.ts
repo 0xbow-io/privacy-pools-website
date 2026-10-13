@@ -7,6 +7,7 @@ export enum EventType {
 
 export enum ReviewStatus {
   PENDING = 'pending',
+  UNAVAILABLE = 'unavailable',
   APPROVED = 'approved',
   DECLINED = 'declined',
   EXITED = 'exited',

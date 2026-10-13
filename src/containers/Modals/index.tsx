@@ -2,6 +2,7 @@ import { NewsletterSubscriptionModal } from '~/components';
 import { MigrationModal } from '~/migration';
 import { ActivityDetails } from './ActivityDetails';
 import { ConnectModal } from './Connect';
+import { CustomRpcModal } from './CustomRpc';
 import { DepositModal } from './Deposit';
 import { ExitConfirmModal } from './ExitConfirm';
 import { GeneratingModal } from './GeneratingZkProof';
@@ -28,6 +29,7 @@ export const Modals = () => {
       <NewsletterSubscriptionModal />
       <ExitConfirmModal />
       <SelfReportModal />
+      <CustomRpcModal />
     </>
   );
 };

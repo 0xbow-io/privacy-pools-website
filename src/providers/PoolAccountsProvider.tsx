@@ -28,6 +28,14 @@ type ContextType = {
   setTarget: (val: Address | '') => void;
   poolAccount: PoolAccount | undefined;
   setPoolAccount: (val?: PoolAccount) => void;
+  /**
+   * The pool account a withdrawal or exit actually spent, saved when it
+   * succeeded. The live `poolAccount` is reconciled to the first account with a
+   * balance as soon as the spend lands, so after a full withdrawal it pointed
+   * at another account (or none: "PA-undefined") on the success screen.
+   */
+  completedPoolAccount: PoolAccount | undefined;
+  setCompletedPoolAccount: (val?: PoolAccount) => void;
   resetInputs: () => void;
 
   // Alternative token selection
@@ -76,6 +84,7 @@ export const PoolAccountsProvider = ({ children }: Props) => {
   const [amount, setAmount] = useState<string>('');
   const [target, setTarget] = useState<Address | ''>('');
   const [poolAccount, setPoolAccount] = useState<PoolAccount>();
+  const [completedPoolAccount, setCompletedPoolAccount] = useState<PoolAccount>();
   const [selectedAlternativeToken, setSelectedAlternativeToken] = useState<AlternativeTokenConfig | null>(null);
 
   const [proof, setProof] = useState<ContextType['proof']>(null);
@@ -94,6 +103,7 @@ export const PoolAccountsProvider = ({ children }: Props) => {
   };
 
   const resetTransactionState = () => {
+    setCompletedPoolAccount(undefined);
     setProof(null);
     setWithdrawal(null);
     setTransactionHash(undefined);
@@ -146,6 +156,8 @@ export const PoolAccountsProvider = ({ children }: Props) => {
         setTarget,
         poolAccount,
         setPoolAccount,
+        completedPoolAccount,
+        setCompletedPoolAccount,
         resetInputs,
         selectedAlternativeToken,
         setSelectedAlternativeToken,

@@ -30,7 +30,7 @@ export const useExit = () => {
   const { switchChainAsync } = useSwitchChain();
   const { setModalOpen, setIsClosable } = useModal();
   const { chainId, selectedPoolInfo } = useChainContext();
-  const { poolAccount, setTransactionHash, proof, setProof } = usePoolAccountsContext();
+  const { poolAccount, setTransactionHash, proof, setProof, setCompletedPoolAccount } = usePoolAccountsContext();
   const { seed, accountService, legacyAccountService, addRagequit } = useAccountContext();
   const { data: walletClient, refetch: refetchWalletClient } = useWalletClient({ chainId });
   const publicClient = usePublicClient({ chainId });
@@ -287,6 +287,8 @@ export const useExit = () => {
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
 
+        // The live selection moves off this account once it is emptied.
+        setCompletedPoolAccount(poolAccount);
         setModalOpen(ModalType.SUCCESS);
       } catch (err) {
         const error = err as TransactionExecutionError;
@@ -315,6 +317,7 @@ export const useExit = () => {
     [
       proof,
       poolAccount,
+      setCompletedPoolAccount,
       accountService,
       legacyAccountService,
       seed,

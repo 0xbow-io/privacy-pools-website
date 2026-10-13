@@ -1,7 +1,7 @@
 'use client';
 
 import { MouseEvent, useRef, useState } from 'react';
-import { Checkmark, Copy, Download, Logout, Menu as MenuIcon, Wallet, Warning } from '@carbon/icons-react';
+import { Checkmark, Copy, Download, Globe, Logout, Menu as MenuIcon, Wallet, Warning } from '@carbon/icons-react';
 import {
   ListItemIcon,
   Menu as MuiMenu,
@@ -11,14 +11,24 @@ import {
   Typography,
   IconButton,
   useTheme,
-  Avatar,
 } from '@mui/material';
 import { captureException } from '@sentry/nextjs';
 import { formatUnits } from 'viem';
-import { useSignTypedData, useAccount, useEnsName, useEnsAvatar } from 'wagmi';
-import { useGoTo, useChainContext, useAuthContext, useAccountContext, useModal } from '~/hooks';
+import { useSignTypedData, useAccount } from 'wagmi';
+import { getCustomRpcUrl } from '~/config';
+import {
+  useGoTo,
+  useChainContext,
+  useAuthContext,
+  useAccountContext,
+  useModal,
+  useAccountType,
+  useNotifications,
+  canUseWalletSeedSigning,
+} from '~/hooks';
 import { ModalType } from '~/types';
 import {
+  SeedSignatureError,
   deriveMnemonicFromWalletSignature,
   buildSeedDerivationTypedData,
   formatDataNumber,
@@ -32,33 +42,34 @@ import {
 export const Menu = () => {
   const { address } = useAccount();
 
-  // ENS hooks for the connected user
-  const { data: ensName } = useEnsName({
-    address: address,
-    chainId: 1, // Always use mainnet for ENS
-  });
-
-  const { data: ensAvatar } = useEnsAvatar({
-    name: ensName || undefined,
-    chainId: 1, // Always use mainnet for ENS
-  });
   const {
     price,
+    chainId,
     balanceBN: { value, symbol, decimals },
   } = useChainContext();
-  const { logout } = useAuthContext();
+  const { logout, hasWallet } = useAuthContext();
   const { seed } = useAccountContext();
   const { setModalOpen } = useModal();
   const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
   const [isDownloading, setIsDownloading] = useState(false);
   const { signTypedDataAsync } = useSignTypedData();
+  const { accountType } = useAccountType();
+  const { addNotification } = useNotifications();
   const theme = useTheme();
 
   // Get signup method and version from localStorage
   const signupMethod = typeof window !== 'undefined' ? localStorage.getItem('signupMethod') : null;
   const walletSeedVersion =
     typeof window !== 'undefined' ? (localStorage.getItem('walletSeedVersion') as 'v1' | 'v2' | null) : null;
-  const canDownloadSeedphrase = signupMethod === 'wallet';
+  // A wallet sign-up re-derives the phrase behind a fresh signature. A seed-only
+  // session has no wallet to ask, so it downloads the seed it already holds.
+  const canReDeriveFromWallet = signupMethod === 'wallet' && hasWallet;
+  // Holding the seed is the whole condition. Requiring `!hasWallet` as well
+  // lost the pair: a seed-only sign-up that later connects a wallet matched
+  // neither branch, so the menu item vanished while the phrase sat in memory
+  // and the user had to disconnect to get their own recovery phrase back.
+  const canDownloadFromMemory = signupMethod !== 'wallet' && !!seed;
+  const canDownloadSeedphrase = canReDeriveFromWallet || canDownloadFromMemory;
 
   const ethBalanceBN = value.toString() ?? '0';
   const balance = formatDataNumber(ethBalanceBN, decimals, 2, false, false, false);
@@ -70,9 +81,14 @@ export const Menu = () => {
   const open = Boolean(anchorEl);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  // Read when the menu is opened rather than during render, so the label is
+  // correct after a reset and nothing touches localStorage on the server.
+  const [hasCustomRpc, setHasCustomRpc] = useState(false);
+
   const handleToggle = (event: MouseEvent<HTMLElement>) => {
     if (event) {
       setAnchorEl(event.currentTarget);
+      setHasCustomRpc(!!getCustomRpcUrl(chainId));
     }
     if (open) {
       handleClose();
@@ -97,14 +113,30 @@ export const Menu = () => {
     }
   };
 
+  const handleConnectWallet = () => {
+    handleClose();
+    setModalOpen(ModalType.CONNECT);
+  };
+
   const handleDownloadSeedPhrase = async () => {
-    if (!seed || !address) return;
+    if (!seed || (canReDeriveFromWallet && !address)) return;
 
     try {
       setIsDownloading(true);
-      let mnemonic = '';
+      let mnemonic = canReDeriveFromWallet ? '' : seed;
 
-      if (signupMethod === 'wallet') {
+      if (canReDeriveFromWallet && address) {
+        // Same rule as sign-in: only a plain or EIP-7702 EOA may turn a signature into the seed.
+        if (!canUseWalletSeedSigning(accountType)) {
+          addNotification(
+            accountType === null ? 'info' : 'error',
+            accountType === null
+              ? 'Still checking your wallet type. Please try again in a moment.'
+              : 'The connected wallet cannot be used to re-create your seedphrase. Use your downloaded backup seedphrase.',
+          );
+          handleClose();
+          return;
+        }
         // Use stored version, or default to v1 for backward compatibility with users who signed in before version tracking
         const version: 'v1' | 'v2' = walletSeedVersion || 'v1';
 
@@ -123,17 +155,24 @@ export const Menu = () => {
       }
 
       // Download the seedphrase
-      const content = `Privacy Pools Recovery Phrase\n\nWallet Address: ${address}\n\nRecovery Phrase:\n${mnemonic}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
+      const addressLine = address ? `Wallet Address: ${address}\n\n` : '';
+      const content = `Privacy Pools Recovery Phrase\n\n${addressLine}Recovery Phrase:\n${mnemonic}\n\nIMPORTANT: Keep this file secure and never share it with anyone.\nThis phrase is the ONLY way to recover your account if you lose access.`;
       const blob = new Blob([content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `privacy-pools-recovery-${address}.txt`;
+      a.download = `privacy-pools-recovery-${address ?? 'account'}.txt`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
       captureException(err, { tags: { stage: 'download_seedphrase' } });
+      if (err instanceof SeedSignatureError) {
+        addNotification(
+          'error',
+          'The connected wallet cannot be used to re-create your seedphrase. Use your downloaded backup seedphrase.',
+        );
+      }
     } finally {
       setIsDownloading(false);
     }
@@ -155,26 +194,37 @@ export const Menu = () => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         elevation={0}
       >
-        <Stack direction='column' alignItems='start'>
-          <EthText variant='h6'>
-            {balance}
-            <span>{symbol}</span>
-          </EthText>
-          {usdBalance && <BalanceUsd variant='body2'>{`~ ${usdBalance}`}</BalanceUsd>}
-        </Stack>
+        {hasWallet && (
+          <Stack direction='column' alignItems='start'>
+            <EthText variant='h6'>
+              {balance}
+              <span>{symbol}</span>
+            </EthText>
+            {usdBalance && <BalanceUsd variant='body2'>{`~ ${usdBalance}`}</BalanceUsd>}
+          </Stack>
+        )}
 
-        <SMenuItem onClick={handleCopyAddress}>
-          <ListItemIcon>
-            {ensAvatar ? <Avatar src={ensAvatar} sx={{ width: 16, height: 16 }} /> : <Wallet size={16} />}
-          </ListItemIcon>
-          {ensName || truncateAddress(address!)}
+        {address ? (
+          <SMenuItem onClick={handleCopyAddress}>
+            <ListItemIcon>
+              <Wallet size={16} />
+            </ListItemIcon>
+            {truncateAddress(address)}
 
-          {copied ? (
-            <Checkmark size={16} color={theme.palette.text.disabled} />
-          ) : (
-            <Copy size={16} color={theme.palette.text.disabled} />
-          )}
-        </SMenuItem>
+            {copied ? (
+              <Checkmark size={16} color={theme.palette.text.disabled} />
+            ) : (
+              <Copy size={16} color={theme.palette.text.disabled} />
+            )}
+          </SMenuItem>
+        ) : (
+          <SMenuItem onClick={handleConnectWallet} data-testid='menu-connect-wallet'>
+            <ListItemIcon>
+              <Wallet size={16} />
+            </ListItemIcon>
+            Connect Wallet
+          </SMenuItem>
+        )}
 
         {seed && canDownloadSeedphrase && (
           <SMenuItem onClick={handleDownloadSeedPhrase} disabled={isDownloading}>
@@ -185,23 +235,38 @@ export const Menu = () => {
           </SMenuItem>
         )}
 
-        <SMenuItem
-          onClick={() => {
-            handleClose();
-            setModalOpen(ModalType.SELF_REPORT);
-          }}
-        >
-          <ListItemIcon>
-            <Warning size={16} />
-          </ListItemIcon>
-          Report Compromised Address
-        </SMenuItem>
+        {hasWallet && (
+          <SMenuItem
+            onClick={() => {
+              handleClose();
+              setModalOpen(ModalType.SELF_REPORT);
+            }}
+          >
+            <ListItemIcon>
+              <Warning size={16} />
+            </ListItemIcon>
+            Report Compromised Address
+          </SMenuItem>
+        )}
 
         <SMenuItem onClick={handleLogout}>
           <ListItemIcon>
             <Logout size={16} />
           </ListItemIcon>
           Logout
+        </SMenuItem>
+
+        <SMenuItem
+          data-testid='custom-rpc-menu-item'
+          onClick={() => {
+            handleClose();
+            setModalOpen(ModalType.CUSTOM_RPC);
+          }}
+        >
+          <ListItemIcon>
+            <Globe size={16} />
+          </ListItemIcon>
+          {hasCustomRpc ? 'Using custom RPC' : 'Use custom RPC'}
         </SMenuItem>
       </SMenu>
     </>

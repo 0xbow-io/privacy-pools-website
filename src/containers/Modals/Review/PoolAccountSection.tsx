@@ -2,12 +2,13 @@ import { styled, Stack, Typography } from '@mui/material';
 import { formatUnits, parseUnits } from 'viem';
 import { useAccountContext, usePoolAccountsContext, useChainContext } from '~/hooks';
 import { EventType } from '~/types';
+import { poolDecimals } from '~/utils';
 
 export const PoolAccountSection = () => {
-  const {
-    selectedPoolInfo: { asset },
-    balanceBN: { decimals },
-  } = useChainContext();
+  const { selectedPoolInfo, balanceBN } = useChainContext();
+  const { asset } = selectedPoolInfo;
+  // Parse the withdrawal in the same units as the stored pool balance before subtracting.
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
 
   const { amount, poolAccount, actionType, vettingFeeBPS } = usePoolAccountsContext();
   const { poolAccounts } = useAccountContext();

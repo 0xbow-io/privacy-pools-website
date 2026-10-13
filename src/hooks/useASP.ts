@@ -1,19 +1,18 @@
 'use client';
 
-import { useMemo } from 'react';
-import { QueryObserverResult, useMutation, useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ExternalAspConfig } from '~/config/chainData';
 import {
   PoolResponse,
-  DepositsByLabelResponse,
   AllEventsResponse,
-  MtLeavesResponse,
   BrevisAspLeavesResponse,
   BrevisAspRootResponse,
   ExtendedMtLeavesResponse,
   ExtendedMtRootResponse,
 } from '~/types';
-import { aspClient, PoolStatsResponse } from '~/utils';
+import { aspClient, DepositAmountsResponse, PoolStatsResponse } from '~/utils';
+import { approvedLabelSet } from '~/utils/accountStatus';
 
 export const useASP = (
   chainId: number,
@@ -26,12 +25,12 @@ export const useASP = (
   poolsData: PoolResponse | undefined;
   rootsData: ExtendedMtRootResponse | undefined;
   mtLeavesData: ExtendedMtLeavesResponse | undefined;
+  depositAmountsData: DepositAmountsResponse | undefined;
   allEventsData: AllEventsResponse | undefined;
   poolStatsData: PoolStatsResponse | undefined;
   brevisAspLeavesData: BrevisAspLeavesResponse | undefined;
   brevisAspRootData: BrevisAspRootResponse | undefined;
-  fetchDepositsByLabel: (labels: string[]) => Promise<DepositsByLabelResponse>;
-  refetchMtLeaves: () => Promise<QueryObserverResult<MtLeavesResponse, Error>>;
+  refetchMtLeaves: () => Promise<void>;
 } => {
   // Enable Brevis queries only if externalAsp is configured with brevis provider
   const hasBrevisAsp = externalAsp?.provider === 'brevis';
@@ -59,6 +58,20 @@ export const useASP = (
     staleTime: 60000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+  });
+
+  // Loaded here with the other public pool feeds, at boot. The response is
+  // the same bytes for every caller, so it belongs with mt-leaves and
+  // pool-info rather than on any screen's own path.
+  const depositAmountsQuery = useQuery({
+    queryKey: ['asp_deposit_amounts', chainId, scope, aspUrl],
+    queryFn: () => aspClient.fetchDepositAmounts(aspUrl, chainId, scope),
+    staleTime: 60000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    // The endpoint is newer than some deployed ASPs. Where it is absent the
+    // figure is simply unavailable; there is no second route to try.
+    retry: false,
   });
 
   // Brevis ASP leaves query - only enabled if externalAsp is configured with brevis provider
@@ -103,11 +116,8 @@ export const useASP = (
     refetchOnReconnect: false,
   });
 
-  const depositsByLabelQuery = useMutation({
-    mutationFn: (labels: string[]) => aspClient.fetchDepositsByLabel(aspUrl, chainId, scope, labels),
-  });
-
-  const isError = poolInfoQuery.isError || mtRootQuery.isError;
+  const leavesError = mtLeavesQuery.isError || (hasBrevisAsp && brevisAspLeavesQuery.isError);
+  const isError = poolInfoQuery.isError || mtRootQuery.isError || leavesError;
   const isLoading =
     poolInfoQuery.isLoading ||
     mtRootQuery.isLoading ||
@@ -116,12 +126,17 @@ export const useASP = (
 
   // Merge Brevis data with standard data when externalAsp is configured with brevis provider
   const mergedMtLeavesData: ExtendedMtLeavesResponse | undefined = useMemo(() => {
-    if (!mtLeavesQuery.data) return undefined;
+    if (
+      !mtLeavesQuery.data ||
+      leavesError ||
+      !approvedLabelSet(mtLeavesQuery.data.aspLeaves, brevisAspLeavesQuery.data?.aspLeaves, hasBrevisAsp)
+    )
+      return undefined;
     return {
       ...mtLeavesQuery.data,
       brevisAspLeaves: hasBrevisAsp ? brevisAspLeavesQuery.data?.aspLeaves : undefined,
     };
-  }, [mtLeavesQuery.data, brevisAspLeavesQuery.data, hasBrevisAsp]);
+  }, [mtLeavesQuery.data, brevisAspLeavesQuery.data, hasBrevisAsp, leavesError]);
 
   const mergedRootsData: ExtendedMtRootResponse | undefined = useMemo(() => {
     if (!mtRootQuery.data) return undefined;
@@ -131,6 +146,12 @@ export const useASP = (
     };
   }, [mtRootQuery.data, brevisAspRootQuery.data, hasBrevisAsp]);
 
+  const { refetch: refetchPrimary } = mtLeavesQuery;
+  const { refetch: refetchBrevis } = brevisAspLeavesQuery;
+  const refetchMtLeaves = useCallback(async () => {
+    await Promise.all([refetchPrimary(), hasBrevisAsp ? refetchBrevis() : undefined]);
+  }, [refetchPrimary, refetchBrevis, hasBrevisAsp]);
+
   return useMemo(
     () => ({
       isError,
@@ -138,12 +159,12 @@ export const useASP = (
       poolsData: poolInfoQuery.data,
       rootsData: mergedRootsData,
       mtLeavesData: mergedMtLeavesData,
+      depositAmountsData: depositAmountsQuery.data,
       allEventsData: allEventsQuery.data,
       poolStatsData: poolStatsQuery.data,
       brevisAspLeavesData: brevisAspLeavesQuery.data,
       brevisAspRootData: brevisAspRootQuery.data,
-      refetchMtLeaves: mtLeavesQuery.refetch,
-      fetchDepositsByLabel: depositsByLabelQuery.mutateAsync,
+      refetchMtLeaves,
     }),
     [
       isError,
@@ -151,12 +172,12 @@ export const useASP = (
       poolInfoQuery.data,
       mergedRootsData,
       mergedMtLeavesData,
+      depositAmountsQuery.data,
       allEventsQuery.data,
       poolStatsQuery.data,
       brevisAspLeavesQuery.data,
       brevisAspRootQuery.data,
-      depositsByLabelQuery.mutateAsync,
-      mtLeavesQuery.refetch,
+      refetchMtLeaves,
     ],
   );
 };

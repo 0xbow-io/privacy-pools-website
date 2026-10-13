@@ -38,15 +38,13 @@ interface PoolStatsResponse {
   [scope: string]: PoolStats | PoolStats[] | undefined;
 }
 
-// Define type for deposits-larger-than response
-interface DepositsLargerThanResponse {
-  eligibleDeposits: number;
-  totalDeposits: number;
-  percentage: number;
-  amount: string;
+// One deposit as the client needs it for local, caller-independent maths:
+// Shape of GET /:chainId/public/deposit-amounts.
+interface DepositAmountsResponse {
   scope: string;
-  rank: number;
-  uniqueAmountsAbove: number;
+  amounts: string[];
+  totalDeposits: number;
+  cacheTimestamp: string;
 }
 
 // Define type for pool incentives stats response
@@ -128,6 +126,13 @@ const postWithBody = async <T>(url: string, body: unknown): Promise<T> => {
   return response.json();
 };
 
+const validateLeaves = (leaves: unknown): string[] => {
+  if (!Array.isArray(leaves) || leaves.some((leaf) => typeof leaf !== 'string' || !/^[0-9]+$/.test(leaf))) {
+    throw new Error('Invalid ASP leaf snapshot');
+  }
+  return leaves.map((leaf) => BigInt(leaf).toString());
+};
+
 const aspClient = {
   fetchPoolInfo: (aspUrl: string, chainId: number, scope: string) =>
     fetchWithHeaders<PoolResponse>(`${aspUrl}/${chainId}/public/pool-info`, {
@@ -139,6 +144,9 @@ const aspClient = {
       'X-Pool-Scope': scope,
     }),
 
+  // Legacy migration only. Normal paths derive approval from the ASP leaf set
+  // (see AccountProvider); migration additionally needs DECLINED distinguished
+  // from PENDING to decide what can be migrated, which no bulk feed exposes.
   fetchDepositsByLabel: (aspUrl: string, chainId: number, scope: string, labels: string[]) =>
     fetchWithHeaders<DepositsByLabelResponse>(`${aspUrl}/${chainId}/public/deposits-by-label`, {
       'X-Pool-Scope': scope,
@@ -150,21 +158,18 @@ const aspClient = {
       'X-Pool-Scope': scope,
     }),
 
-  fetchMtLeaves: (aspUrl: string, chainId: number, scope: string) =>
-    fetchWithHeaders<MtLeavesResponse>(`${aspUrl}/${chainId}/public/mt-leaves`, {
+  fetchMtLeaves: async (aspUrl: string, chainId: number, scope: string): Promise<MtLeavesResponse> => {
+    const data = await fetchWithHeaders<MtLeavesResponse>(`${aspUrl}/${chainId}/public/mt-leaves`, {
       'X-Pool-Scope': scope,
-    }),
+    });
+    return { aspLeaves: validateLeaves(data?.aspLeaves), stateTreeLeaves: validateLeaves(data?.stateTreeLeaves) };
+  },
 
   fetchPoolStats: (aspUrl: string, chainId: number | 'all') =>
     fetchWithHeaders<PoolStatsResponse>(`${aspUrl}/${chainId}/public/pools-stats`),
 
   fetchGlobalEvents: (aspUrl: string, page = 1, perPage = ITEMS_PER_PAGE) =>
     fetchWithHeaders<GlobalEventsResponse>(`${aspUrl}/global/public/events?page=${page}&perPage=${perPage}`),
-
-  fetchDepositsLargerThan: (aspUrl: string, chainId: number, scope: string, amount: string) =>
-    fetchWithHeaders<DepositsLargerThanResponse>(`${aspUrl}/${chainId}/public/deposits-larger-than?amount=${amount}`, {
-      'X-Pool-Scope': scope,
-    }),
 
   fetchPoolStatistics: (aspUrl: string, chainId: number, scope: string) =>
     fetchWithHeaders<PoolStatisticsResponse>(`${aspUrl}/${chainId}/public/pool-statistics`, {
@@ -183,10 +188,23 @@ const aspClient = {
     ),
 
   // Brevis ASP endpoints
-  fetchBrevisAspLeaves: (brevisAspUrl: string) => fetchWithHeaders<BrevisAspLeavesResponse>(`${brevisAspUrl}/leaves`),
+  // The pool's approved deposit amounts, in wei, sorted ascending. The same
+  // bytes for every caller, which is what lets it be fetched with the rest of
+  // the boot traffic and answered against locally.
+  fetchDepositAmounts: (aspUrl: string, chainId: number, scope: string) =>
+    fetchWithHeaders<DepositAmountsResponse>(`${aspUrl}/${chainId}/public/deposit-amounts`, {
+      'X-Pool-Scope': scope,
+    }),
+
+  fetchBrevisAspLeaves: async (brevisAspUrl: string): Promise<BrevisAspLeavesResponse> => {
+    const data = await fetchWithHeaders<BrevisAspLeavesResponse>(`${brevisAspUrl}/leaves`);
+    if (!data || data.err != null) throw new Error('Brevis approval snapshot unavailable');
+    return { ...data, aspLeaves: validateLeaves(data.aspLeaves) };
+  },
 
   fetchBrevisAspRoot: (brevisAspUrl: string) => fetchWithHeaders<BrevisAspRootResponse>(`${brevisAspUrl}/root`),
 
+  // Legacy migration only, same rule as fetchDepositsByLabel above.
   fetchBrevisDepositReviewStatus: (labels: string[]) => {
     const queryParams = labels.map((label) => `label=${encodeURIComponent(label)}`).join('&');
     return fetchWithHeaders<{
@@ -204,7 +222,7 @@ export { aspClient };
 export type {
   PoolStats,
   PoolStatsResponse,
-  DepositsLargerThanResponse,
+  DepositAmountsResponse,
   PoolStatisticsResponse,
   PoolIncentivesStats,
   PoolIncentivesStatsResponse,

@@ -5,12 +5,13 @@ import { formatUnits } from 'viem';
 import { PoolAccountTable, SPagination, AdvancedNavigation } from '~/components';
 import { useAuthContext, useAccountContext, useAdvancedView, useChainContext } from '~/hooks';
 import { PoolAccount } from '~/types';
+import { poolDecimals } from '~/utils';
 import { ViewAllText, ViewAllButton } from './PoolAccountsPreview';
 
 export const PoolAccountsFull = () => {
-  const {
-    balanceBN: { symbol, decimals },
-  } = useChainContext();
+  const { balanceBN, selectedPoolInfo } = useChainContext();
+  const decimals = poolDecimals(selectedPoolInfo, balanceBN);
+  const symbol = selectedPoolInfo?.asset ?? balanceBN.symbol;
   const { poolAccounts, allPools, amountPoolAsset, pendingAmountPoolAsset, hideEmptyPools, toggleHideEmptyPools } =
     useAccountContext();
   const { ITEMS_PER_PAGE, fullPoolAccounts } = useAdvancedView();

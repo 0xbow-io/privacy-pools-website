@@ -139,7 +139,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
     historyData,
   } = accountContext;
   const { setModalOpen } = useModal();
-  const { isLogged, isConnected, isAuthorized } = useAuthContext();
+  const { isLogged, hasWallet, hasSession, isAuthorized } = useAuthContext();
   const goTo = useGoTo();
 
   // Get chain name for display
@@ -663,7 +663,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
           </PAContainer>
         )}
 
-        {!isConnected && (
+        {!hasWallet && !hasSession && (
           <ConnectContainer sx={{ minHeight: '13.2rem' }}>
             <Stack
               padding='1rem'
@@ -681,7 +681,7 @@ export const PoolPage = ({ chainId, poolId }: PoolPageProps) => {
           </ConnectContainer>
         )}
 
-        {isConnected && !isLogged && (
+        {hasWallet && !isLogged && (
           <ConnectContainer sx={{ minHeight: '13.2rem' }}>
             <Stack
               padding='1rem'

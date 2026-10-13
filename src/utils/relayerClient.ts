@@ -1,5 +1,17 @@
 import { FeesResponse, RelayRequestBody, RelayerResponse, QuoteRequestBody, QuoteResponse } from '~/types';
 
+/** A non-2xx answer from a relayer, keeping the status and body for callers that branch on them. */
+export class RelayerRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly body: string,
+  ) {
+    super(message);
+    this.name = 'RelayerRequestError';
+  }
+}
+
 interface FetchClient {
   fetchFees: (relayerUrl: string, chainId: number, assetAddress: string) => Promise<FeesResponse>;
   relay: (relayerUrl: string, input: RelayRequestBody) => Promise<RelayerResponse>;
@@ -62,7 +74,11 @@ const fetchClient: FetchClient = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to fetch quote: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new RelayerRequestError(
+        `Failed to fetch quote: ${response.status} ${response.statusText} - ${errorText}`,
+        response.status,
+        errorText,
+      );
     }
 
     const data = await response.json();

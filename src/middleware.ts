@@ -15,7 +15,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  if (userConnected && userLogged) {
+  // The logged cookie is set by login(), which needs a seed but no wallet, so
+  // it alone marks a session; the connected cookie is only set on wallet connect.
+  if (userLogged) {
     if (request.nextUrl.pathname.startsWith(ROUTER.account.base)) {
       return NextResponse.redirect(new URL(ROUTER.home.base, request.url));
     }

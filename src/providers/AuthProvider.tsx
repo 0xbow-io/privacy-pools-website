@@ -8,9 +8,15 @@ import { useAccountContext } from '~/hooks';
 interface AuthContextType {
   isLogged: boolean;
   setIsLogged: (isLogged: boolean) => void;
+  /** wagmi has an address. Needed to send a transaction from the user's own account. */
+  hasWallet: boolean;
+  /** A seed is loaded and the user is logged in. Needed to see and spend pool notes. */
+  hasSession: boolean;
+  /** Same as `hasWallet`; kept for existing call sites. */
   isConnected: boolean;
   login: (_seed?: string) => void;
   logout: () => void;
+  /** Same as `hasSession`. */
   isAuthorized: boolean;
 }
 
@@ -30,12 +36,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLogged(false);
   };
 
+  // A session is a seed; the wallet is optional (deposit and exit ask for it themselves).
   const login = (_seed?: string) => {
-    if ((seed || _seed) && address) {
+    if (seed || _seed) {
       setUserLoggedCookie();
       setIsLogged(true);
     } else {
-      throw new Error('Seed or address is missing');
+      throw new Error('Seed is missing');
     }
   };
 
@@ -44,15 +51,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     deleteUserConnectedCookie();
   }, []);
 
+  const hasWallet = !!address;
+  const hasSession = isLogged && !!seed;
+
   return (
     <AuthContext.Provider
       value={{
         isLogged,
         setIsLogged,
-        isConnected: !!address,
+        hasWallet,
+        hasSession,
+        isConnected: hasWallet,
         login,
         logout,
-        isAuthorized: isLogged && !!address,
+        isAuthorized: hasSession,
       }}
     >
       {children}
