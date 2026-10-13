@@ -31,9 +31,9 @@ describe('V2 invite banner', () => {
   });
 
   it('links to V2 with attribution and no double slash', () => {
-    expect(v2BannerHref('https://v2.privacypools.com')).toBe(
-      'https://v2.privacypools.com/?utm_source=v1-app&utm_medium=banner&utm_campaign=try-v2',
+    expect(v2BannerHref('https://privacypools.com')).toBe(
+      'https://privacypools.com/?utm_source=v1-app&utm_medium=banner&utm_campaign=try-v2',
     );
-    expect(v2BannerHref()).toMatch(/^https:\/\/v2\.privacypools\.com\/\?utm_source=v1-app/);
+    expect(v2BannerHref()).toMatch(/^https:\/\/privacypools\.com\/\?utm_source=v1-app/);
   });
 });

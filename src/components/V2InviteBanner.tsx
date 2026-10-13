@@ -13,11 +13,11 @@ import {
 } from '~/utils/v2Banner';
 
 /**
- * Invitation to try the Privacy Pools V2 preview, at the very top of the page.
+ * Invitation to try the Privacy Pools V2 app, at the very top of the page.
  *
  * ONE line at every width (Pat, 2026-09-04): the copy never wraps. Desktop
  * reads the full sentence with the deposit cap; below the md breakpoint the
- * detail drops; on phones only "V2 is live on mainnet (preview)" and the
+ * detail drops; on phones only "V2 is live on mainnet" and the
  * button remain. Monochrome on purpose: the site is black-and-white IBM Plex
  * Mono, so the banner borrows the theme's grey scale (a soft gradient one step
  * off the page background) and gets its emphasis from a single high-contrast
@@ -73,10 +73,10 @@ export const V2InviteBanner = () => {
     <Root
       ref={bannerRef}
       role='region'
-      aria-label='Privacy Pools V2 is live on mainnet in preview'
+      aria-label='Privacy Pools V2 is live on mainnet'
       data-testid='v2-invite-banner'
     >
-      <Tag>Preview</Tag>
+      <Tag>New</Tag>
       <Copy variant='body2'>
         <Wide>
           <strong>Privacy Pools V2 is live on mainnet.</strong>
@@ -87,7 +87,7 @@ export const V2InviteBanner = () => {
           </Detail>
         </Wide>
         <Narrow>
-          <strong>V2 is live on mainnet</strong> (preview)
+          <strong>V2 is live on mainnet</strong>
         </Narrow>
       </Copy>
       <Cta href={v2BannerHref()} target='_blank' rel='noopener noreferrer'>
