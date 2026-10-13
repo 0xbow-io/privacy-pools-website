@@ -70,12 +70,7 @@ export const V2InviteBanner = () => {
   if (!visible) return null;
 
   return (
-    <Root
-      ref={bannerRef}
-      role='region'
-      aria-label='Privacy Pools V2 is live on mainnet'
-      data-testid='v2-invite-banner'
-    >
+    <Root ref={bannerRef} role='region' aria-label='Privacy Pools V2 is live on mainnet' data-testid='v2-invite-banner'>
       <Tag>New</Tag>
       <Copy variant='body2'>
         <Wide>
