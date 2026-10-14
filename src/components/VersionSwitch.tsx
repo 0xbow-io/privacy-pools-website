@@ -13,7 +13,9 @@ export const VersionSwitch = () => {
   return (
     <Wrapper data-testid='version-switch'>
       <Segments role='group' aria-label='Privacy Pools version'>
-        <Selected aria-current='page' aria-label='Privacy Pools v1, current site'>v1</Selected>
+        <Selected aria-current='page' aria-label='Privacy Pools v1, current site'>
+          v1
+        </Selected>
         <Option
           href={V2_APP_URL}
           target='_blank'
