@@ -5,7 +5,7 @@ import { styled } from '@mui/material/styles';
 import { CustomRpcButton, Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
 import { MaintenanceBanner } from '~/components/MaintenanceBanner';
-import { UseV2Button } from '~/components/UseV2Button';
+import { VersionSwitch } from '~/components/VersionSwitch';
 import { useAuthContext } from '~/hooks';
 import { MigrationBanner } from '~/migration';
 import { zIndex } from '~/utils';
@@ -26,7 +26,7 @@ export const Header = () => {
           <Link href='/'>
             <Logo />
           </Link>
-          <UseV2Button />
+          <VersionSwitch />
         </LeftSection>
         <Actions>
           <ChainSelect />

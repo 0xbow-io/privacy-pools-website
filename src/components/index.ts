@@ -22,4 +22,4 @@ export * from './WithdrawAssetSelect';
 export * from './NewsletterSubscriptionModal';
 export * from './SafeApp';
 export * from './FeatureFlagInitializer';
-export * from './UseV2Button';
+export * from './VersionSwitch';
