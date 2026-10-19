@@ -36,7 +36,7 @@ export const isWithdrawable = (account: PoolAccount | undefined): boolean =>
   !!account && account.reviewStatus === ReviewStatus.APPROVED && account.balance > 0n;
 
 export const NOT_WITHDRAWABLE_MESSAGE =
-  'This pool account is not approved for withdrawal. Pick an approved account or use Exit.';
+  'This pool account cannot be withdrawn: it is not approved or has no balance left. Pick an approved account with funds, or use Exit.';
 
 /**
  * Re-checked right before a proof is built and before the relay is sent: the
