@@ -1,6 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 import { PoolAccount, ReviewStatus } from '~/types';
-import { isWithdrawable, selectedPoolAccount } from '~/utils/selectedPoolAccount';
+import {
+  assertWithdrawable,
+  isWithdrawable,
+  NOT_WITHDRAWABLE_MESSAGE,
+  selectedPoolAccount,
+} from '~/utils/selectedPoolAccount';
 
 const pa = (label: bigint, reviewStatus: ReviewStatus, balance: bigint, chainId = 1, scope = 11n) =>
   ({ name: Number(label), label, reviewStatus, balance, chainId, scope }) as unknown as PoolAccount;
@@ -44,5 +49,17 @@ describe('selectedPoolAccount', () => {
     expect(isWithdrawable(pending)).toBe(false);
     expect(isWithdrawable(pa(5n, ReviewStatus.APPROVED, 0n))).toBe(false);
     expect(isWithdrawable(undefined)).toBe(false);
+  });
+});
+
+describe('assertWithdrawable', () => {
+  it('stops a withdraw whose account flipped to pending or was spent', () => {
+    expect(() => assertWithdrawable(pending)).toThrow(NOT_WITHDRAWABLE_MESSAGE);
+    expect(() => assertWithdrawable(pa(5n, ReviewStatus.APPROVED, 0n))).toThrow(NOT_WITHDRAWABLE_MESSAGE);
+    expect(() => assertWithdrawable(undefined)).toThrow(NOT_WITHDRAWABLE_MESSAGE);
+  });
+
+  it('lets an approved account with a balance through', () => {
+    expect(() => assertWithdrawable(approved)).not.toThrow();
   });
 });
