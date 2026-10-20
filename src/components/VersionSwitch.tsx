@@ -20,7 +20,7 @@ export const VersionSwitch = () => {
           href={V2_APP_URL}
           target='_blank'
           rel='noopener noreferrer'
-          aria-label='Privacy Pools v2, opens v2.privacypools.com'
+          aria-label={`Privacy Pools v2, opens ${V2_APP_URL.replace(/^https?:\/\//, '')}`}
         >
           v2
         </Option>

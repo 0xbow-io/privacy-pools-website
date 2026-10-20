@@ -4,4 +4,4 @@
 export const V2_LINK_ENABLED = process.env.NEXT_PUBLIC_V2_BANNER !== 'false';
 
 /** The v2 site. A plain link, no tracking params. Overridable for previews/staging of V2. */
-export const V2_APP_URL = (process.env.NEXT_PUBLIC_V2_URL || 'https://v2.privacypools.com').replace(/\/+$/, '');
+export const V2_APP_URL = (process.env.NEXT_PUBLIC_V2_URL || 'https://privacypools.com').replace(/\/+$/, '');
