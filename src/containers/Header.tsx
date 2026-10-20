@@ -5,6 +5,7 @@ import { styled } from '@mui/material/styles';
 import { CustomRpcButton, Disclaimer, Logo, Menu, SignInButton } from '~/components';
 import { ChainSelect } from '~/components/ChainSelect';
 import { MaintenanceBanner } from '~/components/MaintenanceBanner';
+import { VersionSwitch } from '~/components/VersionSwitch';
 import { useAuthContext } from '~/hooks';
 import { MigrationBanner } from '~/migration';
 import { zIndex } from '~/utils';
@@ -25,6 +26,7 @@ export const Header = () => {
           <Link href='/'>
             <Logo />
           </Link>
+          <VersionSwitch />
         </LeftSection>
         <Actions>
           <ChainSelect />
@@ -88,8 +90,11 @@ const Actions = styled('div')({
   gap: '1rem',
 });
 
-const LeftSection = styled('div')({
+const LeftSection = styled('div')(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   gap: '2.4rem',
-});
+  [theme.breakpoints.down('sm')]: {
+    gap: '1rem',
+  },
+}));

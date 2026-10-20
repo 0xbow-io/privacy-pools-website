@@ -16,9 +16,19 @@ import { captureException } from '@sentry/nextjs';
 import { formatUnits } from 'viem';
 import { useSignTypedData, useAccount } from 'wagmi';
 import { getCustomRpcUrl } from '~/config';
-import { useGoTo, useChainContext, useAuthContext, useAccountContext, useModal } from '~/hooks';
+import {
+  useGoTo,
+  useChainContext,
+  useAuthContext,
+  useAccountContext,
+  useModal,
+  useAccountType,
+  useNotifications,
+  canUseWalletSeedSigning,
+} from '~/hooks';
 import { ModalType } from '~/types';
 import {
+  SeedSignatureError,
   deriveMnemonicFromWalletSignature,
   buildSeedDerivationTypedData,
   formatDataNumber,
@@ -43,6 +53,8 @@ export const Menu = () => {
   const { copied, copyToClipboard } = useClipboard({ timeout: 1400 });
   const [isDownloading, setIsDownloading] = useState(false);
   const { signTypedDataAsync } = useSignTypedData();
+  const { accountType } = useAccountType();
+  const { addNotification } = useNotifications();
   const theme = useTheme();
 
   // Get signup method and version from localStorage
@@ -114,6 +126,17 @@ export const Menu = () => {
       let mnemonic = canReDeriveFromWallet ? '' : seed;
 
       if (canReDeriveFromWallet && address) {
+        // Same rule as sign-in: only a plain or EIP-7702 EOA may turn a signature into the seed.
+        if (!canUseWalletSeedSigning(accountType)) {
+          addNotification(
+            accountType === null ? 'info' : 'error',
+            accountType === null
+              ? 'Still checking your wallet type. Please try again in a moment.'
+              : 'The connected wallet cannot be used to re-create your seedphrase. Use your downloaded backup seedphrase.',
+          );
+          handleClose();
+          return;
+        }
         // Use stored version, or default to v1 for backward compatibility with users who signed in before version tracking
         const version: 'v1' | 'v2' = walletSeedVersion || 'v1';
 
@@ -144,6 +167,12 @@ export const Menu = () => {
     } catch (err) {
       console.error(err);
       captureException(err, { tags: { stage: 'download_seedphrase' } });
+      if (err instanceof SeedSignatureError) {
+        addNotification(
+          'error',
+          'The connected wallet cannot be used to re-create your seedphrase. Use your downloaded backup seedphrase.',
+        );
+      }
     } finally {
       setIsDownloading(false);
     }

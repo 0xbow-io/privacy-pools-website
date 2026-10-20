@@ -17,9 +17,17 @@ import {
 import { captureException } from '@sentry/nextjs';
 import { useAccount, useSignTypedData } from 'wagmi';
 import { CloseButton } from '~/components';
-import { useGoTo, useModal, useAccountContext, useAuthContext, useNotifications, useAccountType } from '~/hooks';
+import {
+  useGoTo,
+  useModal,
+  useAccountContext,
+  useAuthContext,
+  useNotifications,
+  useAccountType,
+  canUseWalletSeedSigning,
+} from '~/hooks';
 import { ModalType } from '~/types';
-import { ROUTER, deriveMnemonicFromWalletSignature, buildSeedDerivationTypedData } from '~/utils';
+import { ROUTER, deriveMnemonicFromWalletSignature, buildSeedDerivationTypedData, SeedSignatureError } from '~/utils';
 
 export const Welcome = () => {
   const goTo = useGoTo();
@@ -37,18 +45,18 @@ export const Welcome = () => {
   const { setSeed, loadAccount } = useAccountContext();
   const { login } = useAuthContext();
   const { addNotification } = useNotifications();
-  const { accountType, isSafeAccount } = useAccountType();
+  const { accountType, isUnsupportedWalletChain } = useAccountType();
 
   // Check if current wallet is Coinbase Wallet
   const isCoinbaseWallet = connector?.id === 'coinbaseWalletSDK' || connector?.name?.toLowerCase().includes('coinbase');
 
-  // Check if current wallet is a smart contract wallet (exclude MetaMask Smart Account which is EIP-7702 and can still sign)
+  // Fail closed: only a plain EOA or an EIP-7702 EOA ('MetaMask Smart Account') may sign, and
+  // only once its type is known for this exact address, chain and connector.
+  const isAccountTypePending = !!address && accountType === null && !isUnsupportedWalletChain;
   const isSmartContractWallet =
-    accountType === 'Unknown Smart Contract' ||
-    accountType === 'Unknown Smart Account' ||
-    accountType === 'Safe Wallet' ||
-    accountType === 'Safe App' ||
-    isSafeAccount;
+    !!address && accountType !== null && accountType !== 'Unknown' && !canUseWalletSeedSigning(accountType);
+  const isAccountTypeUnknown =
+    !!address && !isAccountTypePending && !isSmartContractWallet && !canUseWalletSeedSigning(accountType);
 
   // Check if wallet is connected via WalletConnect and if it's not in the whitelist
   const isWalletConnect = connector?.id === 'walletConnect';
@@ -58,7 +66,8 @@ export const Welcome = () => {
   const isBlockedWalletConnect = isWalletConnect && !isWhitelistedWalletConnect;
 
   // Disable wallet-based generation for smart contract wallets, Coinbase Wallet, AND non-whitelisted WalletConnect
-  const isWalletSigningDisabled = isSmartContractWallet || isCoinbaseWallet || isBlockedWalletConnect;
+  const isWalletSigningDisabled =
+    isSmartContractWallet || isAccountTypePending || isAccountTypeUnknown || isCoinbaseWallet || isBlockedWalletConnect;
 
   const handleManualCreate = () => {
     goTo(ROUTER.account.children.create);
@@ -143,7 +152,12 @@ export const Welcome = () => {
     } catch (err) {
       console.error(err);
       captureException(err, { tags: { stage: 'generate_mnemonic_wallet' } });
-      addNotification('error', 'Failed to generate key from wallet. Please try again or use manual setup.');
+      addNotification(
+        'error',
+        err instanceof SeedSignatureError
+          ? 'This wallet cannot be used for wallet-based key generation. Please use manual seedphrase generation.'
+          : 'Failed to generate key from wallet. Please try again or use manual setup.',
+      );
       setIsGenerating(false);
     }
   };
@@ -332,7 +346,13 @@ export const Welcome = () => {
               ? 'This wallet connected via WalletConnect is not supported for wallet-based key generation. Please use MetaMask, Rabby, Rainbow, or Family wallet, or use manual seedphrase generation below.'
               : isCoinbaseWallet
                 ? 'Coinbase Wallet does not support wallet-based key generation. Please use manual seedphrase generation below.'
-                : 'Smart wallets do not support wallet-based key generation. Please use manual seedphrase generation below.'}
+                : isSmartContractWallet
+                  ? 'Smart wallets do not support wallet-based key generation. Please use manual seedphrase generation below.'
+                  : isAccountTypePending
+                    ? 'Checking your wallet type...'
+                    : isUnsupportedWalletChain
+                      ? 'Switch your wallet to a supported network to use wallet-based key generation, or use manual seedphrase generation below.'
+                      : 'Could not check your wallet type. Reconnect and try again, or use manual seedphrase generation below.'}
           </Alert>
         )}
 

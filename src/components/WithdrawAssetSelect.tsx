@@ -8,12 +8,13 @@ import { allPoolsChainData } from '~/config';
 import { useModal, usePoolAccountsContext, useAccountContext, useNotifications, useAuthContext } from '~/hooks';
 import { useChainContext } from '~/hooks/context/useChainContext';
 import { EventType, ModalType, ReviewStatus } from '~/types';
+import { isWithdrawable } from '~/utils/selectedPoolAccount';
 
 export const WithdrawAssetSelect: React.FC = () => {
   const pathname = usePathname();
   const { hasSomeRelayerAvailable, chainId, setSelectedAsset, setChainId, selectedPoolInfo } = useChainContext();
   const { setModalOpen } = useModal();
-  const { setActionType } = usePoolAccountsContext();
+  const { setActionType, poolAccount, setPoolAccount } = usePoolAccountsContext();
   const { poolAccountsByChainScope, seed } = useAccountContext();
   // A withdrawal is relayed: it needs the seed, not a wallet.
   const { hasWallet } = useAuthContext();
@@ -80,6 +81,8 @@ export const WithdrawAssetSelect: React.FC = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setSelectedAsset(firstPoolWithFunds.asset as any);
     }
+    // A pending account left selected by its details modal cannot be withdrawn.
+    if (!isWithdrawable(poolAccount)) setPoolAccount(undefined);
     setModalOpen(ModalType.WITHDRAW);
     setActionType(EventType.WITHDRAWAL);
   };
