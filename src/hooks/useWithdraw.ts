@@ -36,6 +36,7 @@ import {
   waitForRelayedReceipt,
   poolDecimals,
 } from '~/utils';
+import { assertWithdrawable } from '~/utils/selectedPoolAccount';
 
 const {
   env: { TEST_MODE },
@@ -214,6 +215,12 @@ export const useWithdraw = () => {
         console.error('❌ Missing required data for proof generation:', missingFields);
         throw new Error(`Missing required data: ${missingFields.join(', ')}`);
       }
+      try {
+        assertWithdrawable(poolAccount);
+      } catch (err) {
+        addNotification('error', (err as Error).message);
+        throw err;
+      }
 
       // TypeScript assertions - we've already validated these exist above
       if (!relayerDetails || !relayerDetails.relayerAddress) {
@@ -375,6 +382,12 @@ export const useWithdraw = () => {
           "This pool's history could not be loaded, so your balance may be incomplete. " +
             'Reload your account before withdrawing.',
         );
+      }
+      try {
+        assertWithdrawable(poolAccount);
+      } catch (err) {
+        addNotification('error', (err as Error).message);
+        throw err;
       }
 
       if (!TEST_MODE) {
