@@ -18,6 +18,7 @@ import {
   aspClient,
 } from '~/utils';
 import { approvedLabelSet, updateAccountStatus } from '~/utils/accountStatus';
+import { selectedPoolAccount } from '~/utils/selectedPoolAccount';
 
 const { TEST_MODE } = getEnv();
 
@@ -138,18 +139,15 @@ export const AccountProvider = ({ children }: Props) => {
   }, [firstApprovedAccount]);
 
   // Keep the selected commitment/status current after refreshes and scope changes.
+  // A pending account opened for details or Exit stays selected (see selectedPoolAccount).
   useEffect(() => {
-    const current =
-      poolAccount &&
-      poolAccounts.find(
-        (entry) =>
-          entry.label === poolAccount.label &&
-          entry.chainId === selectedPoolInfo.chainId &&
-          entry.scope === selectedPoolInfo.scope &&
-          entry.reviewStatus === ReviewStatus.APPROVED &&
-          entry.balance > 0n,
-      );
-    const next = current || firstApprovedAccount;
+    const next = selectedPoolAccount(
+      poolAccount,
+      poolAccounts,
+      selectedPoolInfo.chainId,
+      selectedPoolInfo.scope,
+      firstApprovedAccount,
+    );
     if (next !== poolAccount) setPoolAccount(next);
   }, [
     firstApprovedAccount,
