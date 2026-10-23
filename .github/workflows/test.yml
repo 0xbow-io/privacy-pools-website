@@ -32,7 +32,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run Cypress and Jest
-        uses: cypress-io/github-action@v6
+        uses: cypress-io/github-action@v7
         with:
           build: pnpm build
           start: pnpm start
