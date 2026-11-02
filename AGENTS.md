@@ -10,6 +10,8 @@ production dependency tree. Run the same check locally before every commit that 
 pnpm audit --prod --audit-level high
 ```
 
+Do not rerun the audit if the last commit on this branch is less than 2 hours old (`git log -1 --format=%cr`), unless `package.json` or the lockfile changed since then. A changed dependency tree always needs a fresh run.
+
 If it fails:
 
 1. Fix it the way `docs/dependency-audit.md` describes: bump to the lowest patched version in the
