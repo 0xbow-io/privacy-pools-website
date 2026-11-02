@@ -12,7 +12,7 @@ declare ourselves is bumped in `package.json`. For a transitive dependency add a
 entry pinned to that version and limited to the vulnerable major, for example:
 
 ```json
-"minimatch@>=3.0.0 <4.0.0": "3.1.4"
+"minimatch@>=3.0.0 <4.0.0": "3.1.5"
 ```
 
 Do not force a breaking bump through an override without checking the dependent still works. In a 0.x
