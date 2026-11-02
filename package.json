@@ -104,7 +104,8 @@
     "auditConfig": {
       "ignoreGhsas": [
         "GHSA-5c6j-r48x-rmvq",
-        "GHSA-mrhx-c7xc-m3w5"
+        "GHSA-mrhx-c7xc-m3w5",
+        "GHSA-qr28-fpjm-wq7f"
       ]
     },
     "overrides": {
@@ -118,7 +119,6 @@
       "brace-expansion@>=1.0.0 <2.0.0": "1.1.20",
       "brace-expansion@>=2.0.0 <3.0.0": "2.1.6",
       "browserslist@>=4.0.0 <5.0.0": "4.28.7",
-      "decode-uri-component@>=0.2.0 <0.3.0": "0.5.1",
       "defu@>=6.0.0 <7.0.0": "6.1.5",
       "effect@>=3.0.0 <4.0.0": "3.20.0",
       "fast-uri@>=3.0.0 <4.0.0": "3.1.7",
