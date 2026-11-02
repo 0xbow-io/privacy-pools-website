@@ -6,9 +6,10 @@ production dependency tree.
 
 ## Fixing a finding
 
-Bump the dependency to the lowest patched version. A package we declare ourselves is bumped in
-`package.json`. For a transitive dependency add a `pnpm.overrides` entry pinned to the lowest patched
-version and limited to the vulnerable major, for example:
+Bump the dependency to the lowest patched version in its current major, and skip a version the
+registry marks as deprecated (lodash 4.18.0 is a "Bad release", 4.18.1 is the fix to use). A package we
+declare ourselves is bumped in `package.json`. For a transitive dependency add a `pnpm.overrides`
+entry pinned to that version and limited to the vulnerable major, for example:
 
 ```json
 "minimatch@>=3.0.0 <4.0.0": "3.1.4"
