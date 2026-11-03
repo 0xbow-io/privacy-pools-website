@@ -20,7 +20,7 @@ export const LinksSection = ({ context = 'deposit' }: LinksSectionProps) => {
       <Typography
         variant='body1'
         component='a'
-        href='https://docs.google.com/forms/d/e/1FAIpQLSe0UKiTrZ4kD0apx75bEW0PWqJxpd6bCYh_IUKBrCkJOBzkpQ/viewform'
+        href='https://t.me/privacypoolspublic'
         target='_blank'
       >
         Support
