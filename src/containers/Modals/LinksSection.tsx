@@ -17,12 +17,7 @@ export const LinksSection = ({ context = 'deposit' }: LinksSectionProps) => {
         FAQ
       </Typography>
       <Divider />
-      <Typography
-        variant='body1'
-        component='a'
-        href='https://t.me/privacypoolspublic'
-        target='_blank'
-      >
+      <Typography variant='body1' component='a' href='https://t.me/privacypoolspublic' target='_blank'>
         Support
       </Typography>
     </Container>
