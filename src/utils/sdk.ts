@@ -353,15 +353,7 @@ export const loadAccount = async (
   };
 };
 
-// TODO(sdk@1.5.0): drop the `index` argument and let the SDK derive it. On 1.4.0
-// the SDK infers the next index from `poolAccounts.length`, which is the same
-// unsafe derivation as computing it here; the incomplete-scope guard in
-// useDeposit is what actually prevents the collision today. Once 1.5.0 lands the
-// SDK records `depositIndex` per account, derives the next index from it, and
-// throws for an incomplete scope on its own.
-export const createDepositSecrets = (accountService: AccountService, scope: Hash, index: bigint) => {
-  return accountService.createDepositSecrets(scope, index);
-};
+export { createDepositSecrets, nextDepositIndex } from '~/utils/depositIndex';
 
 export const createWithdrawalSecrets = (accountService: AccountService, commitment: AccountCommitment) => {
   return accountService.createWithdrawalSecrets(commitment);
@@ -380,6 +372,9 @@ export const addPoolAccount = (
     /** block.timestamp when the caller knows it; defaults to "now", since the
      *  caller has just seen the transaction confirm. Never looked up. */
     timestamp?: bigint;
+    /** The index the deposit secrets were derived at (from createDepositSecrets).
+     *  Recording it is what lets the SDK hand out the next index safely. */
+    depositIndex?: bigint;
   },
 ) => {
   const accountInfo = accountService.addPoolAccount(
@@ -390,6 +385,7 @@ export const addPoolAccount = (
     newPoolAccount.label,
     newPoolAccount.blockNumber,
     newPoolAccount.txHash,
+    newPoolAccount.depositIndex !== undefined ? { depositIndex: newPoolAccount.depositIndex } : undefined,
   );
   recordTransactionTimestamp(newPoolAccount.txHash, newPoolAccount.timestamp ?? nowSeconds());
 
