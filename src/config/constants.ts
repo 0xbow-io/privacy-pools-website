@@ -7,7 +7,7 @@ const constants: Constants = {
     { label: 'X', href: 'https://x.com/0xbowio' },
     {
       label: 'Support',
-      href: 'https://docs.google.com/forms/d/e/1FAIpQLSe0UKiTrZ4kD0apx75bEW0PWqJxpd6bCYh_IUKBrCkJOBzkpQ/viewform',
+      href: 'https://t.me/privacypoolspublic',
     },
     {
       label: 'Github',
