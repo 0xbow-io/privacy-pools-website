@@ -16,6 +16,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New deposits pick their deposit index the way SDK 1.5.0 does: migrated accounts no longer count, and the index is recorded on the account, so a deposit never skips or reuses an index after a migration (#262)
 - CI: the end-to-end job starts and polls the app server itself, since the Cypress action's wait step failed on GitHub's Node 24 runtime (#262)
 
+## [2.17.0] - 2026-10-20
+
+### Added
+
+- A v1 | v2 switch next to the logo, with a NEW! badge, linking to Privacy Pools v2 at privacypools.com (#232)
+- WebAuthn related-origins file so v2 passkeys can unlock from this domain (#232)
+
+### Changed
+
+- The not-withdrawable message says ragequit instead of Exit (#257)
+
+### Fixed
+
+- Wallet-based key generation is only offered for EOA signers, so smart wallets no longer produce unusable seeds (#253)
+- Pending pool account details and the Exit action (#256)
+## [2.16.2] - 2026-09-28
+
+### Fixed
+
+- USDT deposits no longer fail after an earlier approval landed without its deposit. A leftover allowance is zeroed before approving, and Safe batches always zero it first (#249)
+- After a full withdrawal, the success screen names the pool account that was spent, instead of "PA-undefined" or a different account (#250)
+
+## [2.16.1] - 2026-09-23
+
+### Fixed
+
+- Withdrawals from the BSC BNB pool no longer revert with `IncorrectASPRoot`. Pools that share an entrypoint with a Brevis pool now build their ASP root from Brevis's leaves as well as 0xbow's
+
+## [2.16.0] - 2026-09-22
+
+### Added
+
+- Custom RPC endpoints, one per network, configurable before sign-in
+- Sign in with a recovery phrase, without a wallet
+- A price freshness countdown on the withdraw review step
+
+### Changed
+
+- With at least one custom endpoint configured, networks left unset are excluded from the account scan rather than served from the defaults. The form lists them before saving; clearing every endpoint restores the previous behaviour
+- The default log range for a custom endpoint is 500,000 blocks, with a smaller range retained for providers documented to cap lower
+- The withdraw form requests the price at review and the fee commitment at confirm
+- The recipient is sent at review only to relayers that require it
+- Wallet balance reads use a single fixed interval
+- Event dates come from the bulk scan, and relay confirmation from block data
+
+### Fixed
+
+- Pool amounts are denominated from the pool asset's configuration rather than the wallet balance query, so formatting, parsing and proof inputs agree while that query is unresolved
+- Dialogs taller than the viewport scroll to their controls
+- The custom RPC form lays its endpoints out side by side
+- Block timestamps are completed for chains scanned through a custom endpoint
+
+### Notes
+
+- Account discovery issues a large number of requests. A rate-limited endpoint can take considerably longer on first load; the form notes this
+
 ## [2.15.1] - 2026-09-11
 
 ### Changed
