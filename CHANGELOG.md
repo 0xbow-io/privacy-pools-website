@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.1] - 2026-11-17
+
+### Changed
+
+- Privacy Pools core SDK 1.5.0 (#262)
+
+### Fixed
+
+- New deposits pick their deposit index the way SDK 1.5.0 does: migrated accounts no longer count, and the index is recorded on the account, so a deposit never skips or reuses an index after a migration (#262)
+- CI: the end-to-end job starts and polls the app server itself, since the Cypress action's wait step failed on GitHub's Node 24 runtime (#262)
+
 ## [2.15.1] - 2026-09-11
 
 ### Changed
