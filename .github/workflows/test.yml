@@ -41,7 +41,7 @@ jobs:
         run: |
           pnpm start > /tmp/next-start.log 2>&1 &
           for i in $(seq 1 90); do
-            curl -s -o /dev/null http://127.0.0.1:3000 && exit 0
+            curl -s -o /dev/null --connect-timeout 2 --max-time 5 http://127.0.0.1:3000 && exit 0
             sleep 1
           done
           cat /tmp/next-start.log
