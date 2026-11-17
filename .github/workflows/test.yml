@@ -31,10 +31,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build
+        run: pnpm build
+
+      # The action's own wait-on fails at once on the Node 24 runtime ("Socket closed before
+      # the connection was established") instead of retrying while the server boots, so the
+      # server is started and polled here and the action only runs the tests.
+      - name: Start server
+        run: |
+          pnpm start > /tmp/next-start.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -s -o /dev/null http://127.0.0.1:3000 && exit 0
+            sleep 1
+          done
+          cat /tmp/next-start.log
+          exit 1
+
       - name: run Cypress and Jest
         uses: cypress-io/github-action@v6
         with:
-          build: pnpm build
-          start: pnpm start
-          wait-on: "http://localhost:3000"
           command: pnpm test
