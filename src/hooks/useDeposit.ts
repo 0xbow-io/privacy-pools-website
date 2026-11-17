@@ -45,7 +45,7 @@ export const useDeposit = () => {
   const { setModalOpen, setIsClosable } = useModal();
   const { amount, setTransactionHash, vettingFeeBPS, selectedAlternativeToken } = usePoolAccountsContext();
   const [isLoading, setIsLoading] = useState(false);
-  const { accountService, poolAccounts, addPoolAccount, isScopeComplete } = useAccountContext();
+  const { accountService, addPoolAccount, isScopeComplete } = useAccountContext();
   const { data: walletClient, refetch: refetchWalletClient } = useWalletClient({ chainId });
   const publicClient = usePublicClient({ chainId });
   const { isSafeApp, createSafeBatchTransaction, sendSafeBatchTransaction, waitForSafeTransaction } =
@@ -152,18 +152,12 @@ export const useDeposit = () => {
         );
       }
 
-      // Count only pool accounts for the current scope
-      const poolAccountsForScope = poolAccounts.filter((account) => account.scope === selectedPoolInfo.scope);
-
       const {
         nullifier,
         secret,
         precommitment: precommitmentHash,
-      } = createDepositSecrets(
-        accountService,
-        BigInt(selectedPoolInfo.scope) as Hash,
-        BigInt(poolAccountsForScope.length),
-      );
+        depositIndex,
+      } = createDepositSecrets(accountService, BigInt(selectedPoolInfo.scope) as Hash);
       const value = parseUnits(amount, decimals);
 
       if (!TEST_MODE) {
@@ -584,6 +578,7 @@ export const useDeposit = () => {
           label: _label as Hash,
           blockNumber: receipt.blockNumber,
           txHash: hash,
+          depositIndex,
         });
 
         // Show success modal first
