@@ -36,5 +36,8 @@ jobs:
         with:
           build: pnpm build
           start: pnpm start
-          wait-on: "http://localhost:3000"
+          # 127.0.0.1, not localhost: on the Node 24 runtime localhost tries ::1 and 127.0.0.1
+          # together, and a refused connection during startup then surfaces as
+          # "Socket closed before the connection was established", which the action does not retry.
+          wait-on: "http://127.0.0.1:3000"
           command: pnpm test
